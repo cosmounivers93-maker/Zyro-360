@@ -18,6 +18,15 @@ let listeningTo = null;
 let geolocationError = '';
 let lastAlertKey = '';
 const inviteCodes = new Map();
+// Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
+let mapInstance=null, ownMarker=null, accuracyCircle=null, mapTracking=false, ownCentered=false;
+const contactMapMarkers = new Map();
+let compassHeading = null;
+// Pick Pocket is a foreground browser experiment, not an Android system lock.
+let pickArmed=false, theftTriggered=false, lastMotionAt=0, motionPeaks=0, motionSamples=0, armTime=0;
+const pickSelected = new Set();
+let sirenContext=null, sirenOscillator=null, sirenGain=null, sirenTimer=null, theftIsPending=false;
+
 function escapeHtml(t) { return String(t??'').replace(/[&<>"']/g,x=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[x])); }
 function initials(s) {return String(s||'?').trim().charAt(0).toUpperCase();}
 function toast(message,error=false) {const el=$('toast');el.textContent=message;el.classList.toggle('error',error);el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),5200);}
@@ -55,8 +64,11 @@ function setState(data){
   const prev = current;
   current=data;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
-  updateGeo(prev?.me?.sharing||!!prev?.me?.sos, data.me.sharing || !!data.me.sos);
-  renderHome();renderCircles();renderSettings();
+  updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
+  renderHome();renderCircles();renderSettings();renderPickControls();
+  if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
+  if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
+
   const key = data.alerts.filter(a=>a.userId!==data.me.id).map(a=>a.id).sort().join(',');
   if(prev && key && key !== lastAlertKey) toast('🆘 Nuovo SOS nella tua cerchia.',true);
   lastAlertKey=key;
@@ -66,29 +78,30 @@ function when(ts){if(!ts)return 'Nessuna posizione';const diff=Date.now()-ts;if(
 function locationUrl(p){return `https://www.openstreetmap.org/?mlat=${encodeURIComponent(p.lat)}&mlon=${encodeURIComponent(p.lon)}#map=16/${encodeURIComponent(p.lat)}/${encodeURIComponent(p.lon)}`;}
 function renderHome(){
   if(!current)return;
-  const me=current.me, contacts=uniqueContacts(), sos=!!me.sos;
+  const me=current.me, contacts=uniqueContacts(), pick=me.alertKind==='pickpocket', sos=!!me.sos&&!pick;
   $('greetingName').textContent=me.name.split(' ')[0];$('myAvatar').textContent=initials(me.name);
   $('totalMembers').textContent=contacts.length;$('totalCircles').textContent=current.circles.length;
-  $('shareToggle').checked=!!me.sharing; $('shareToggle').disabled=sos;
-  const liveGPS=me.sharing||sos;
+  $('shareToggle').checked=!!me.sharing; $('shareToggle').disabled=!!me.sos;
+  const liveGPS=me.sharing||sos||(pick&&me.theftShare);
   $('myLocationText').textContent= sos?'GPS richiesto durante SOS · attivo fino alla fine dell’allarme':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
-  $('sosCard').classList.toggle('is-active',sos);
-  $('sosTitle').textContent=sos?'SOS inviato alla tua cerchia':'Hai bisogno di aiuto?';
-  $('sosDescription').textContent=sos?(contacts.length?'L’allarme è visibile alle persone della cerchia. Tieni aperta l’app per GPS e audio live.':'Nessun contatto nella tua cerchia: il tuo SOS non raggiunge nessuno. In emergenza chiama il 112.'):'Premi il pulsante per avvisare la tua cerchia e condividere la tua posizione in tempo reale.';
-  $('sosButton').disabled=sos;
-  $('sosButton').setAttribute('aria-label',sos?'SOS già attivo':'Attiva SOS');
+  $('sosCard').classList.toggle('is-active',!!me.sos);
+  $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS inviato alla tua cerchia':'Hai bisogno di aiuto?';
+  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'L’allarme è visibile alle persone della cerchia. Tieni aperta l’app per GPS e audio live.':'Nessun contatto nella tua cerchia: il tuo SOS non raggiunge nessuno. In emergenza chiama il 112.'):'Premi il pulsante per avvisare la tua cerchia e condividere la tua posizione in tempo reale.';
+  $('sosButton').disabled=!!me.sos;
+  $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Attiva SOS');
   $('sosActiveActions').classList.toggle('hidden',!sos);
-  $('sosInactiveNote').classList.toggle('hidden',sos);
+  $('sosInactiveNote').classList.toggle('hidden',!!me.sos);
   $('audioButton').textContent=localStream?'🔇 Disattiva microfono':'🎙 Attiva microfono';
   $('contactsList').innerHTML=contacts.length?contacts.map((u,i)=>{
-    const status=u.sos?'🆘 SOS ATTIVO':u.online?(u.sharing?'Posizione attiva':'Online'):'Offline';
+    const status=u.sos?(u.sos.kind==='pickpocket'?'🚨 POSSIBILE FURTO':'🆘 SOS ATTIVO'):u.online?(u.sharing?'Posizione attiva':'Online'):'Offline';
     const loc=u.location, time=loc?when(loc.updatedAt):(u.sharing?'Posizione in attesa':'Posizione non condivisa');
     return `<div class="contact-card"><div class="contact-avatar ${i%2?'alt':''}">${escapeHtml(initials(u.name))}</div><div class="contact-info"><b>${escapeHtml(u.name)}</b><small>${escapeHtml(time)}</small></div><div class="contact-actions"><span class="status-chip ${u.sos?'alert':!u.online?'off':''}">${escapeHtml(status)}</span>${loc?`<a class="mini-btn" target="_blank" rel="noopener noreferrer" href="${locationUrl(loc)}">📍 Mappa</a>`:''}${u.sos?.hasAudio?`<button type="button" class="mini-btn audio" data-listen="${escapeHtml(u.id)}">🎧 Ascolta</button>`:''}</div></div>`;
   }).join(''):`<div class="empty-state"><div class="empty-symbol">♧</div><strong>La tua cerchia inizia da qui</strong>Aggiungi le persone di cui ti fidi per condividere la posizione e ricevere SOS.</div>`;
   const otherAlerts=current.alerts.filter(a=>a.userId!==me.id);
   $('activeAlerts').classList.toggle('hidden',!otherAlerts.length);
-  $('activeAlerts').innerHTML=otherAlerts.map(a=>`<div class="alert-box"><h3>🆘 ${escapeHtml(a.name)} chiede aiuto</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p><div class="action-row">${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
+  $('activeAlerts').innerHTML=otherAlerts.map(a=>`<div class="alert-box"><h3>${a.kind==='pickpocket'?'🚨 Possibile furto:':'🆘'} ${escapeHtml(a.name)} ${a.kind==='pickpocket'?'potrebbe aver subito uno scippo':'chiede aiuto'}</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p><div class="action-row">${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
   document.querySelectorAll('[data-listen]').forEach(btn=>btn.addEventListener('click',()=>action(()=>listenTo(btn.dataset.listen))));
+  renderMap();
 }
 function inviteBox(code){return `<div class="invite-code-box"><small>CODICE MONOUSO · VALIDO 24 ORE</small><code>${escapeHtml(code)}</code><button type="button" class="copy-code">Copia codice</button></div>`;}
 function renderCircles(){
@@ -109,13 +122,14 @@ function bindCopyCodes(root){root.querySelectorAll('.copy-code').forEach(btn=>bt
 function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;$('profileAvatar').textContent=initials(current.me.name);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
 function showView(view){activeView=view;for(const v of ['home','circles','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});}
 function updateGeo(oldOn,newOn){
-  if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;geolocationError='';return;}
+  if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;geolocationError='';renderMap();return;}
   if(watchId!==null)return;
   if(!navigator.geolocation){geolocationError='GPS non disponibile su questo browser';toast(geolocationError,true);return;}
   geolocationError='';
   watchId=navigator.geolocation.watchPosition(async(p)=>{
-    lastCoords={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy};geolocationError='';
-    if(Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
+    lastCoords={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy,heading:Number.isFinite(p.coords.heading)?p.coords.heading:compassHeading};geolocationError='';
+    const canShare=!!current?.me?.sharing || (!!current?.me?.sos && (current.me.alertKind!=='pickpocket' || !!current.me.theftShare));
+    if(canShare && Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
     renderHome();
   },err=>{geolocationError=`GPS: ${err.message||'permesso negato'}`;renderHome();toast(geolocationError,true);},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
 }
@@ -188,6 +202,161 @@ async function enablePush(){
 }
 function base64ToBytes(base64){const padding='='.repeat((4-base64.length%4)%4);const binary=atob((base64+padding).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(binary,x=>x.charCodeAt(0));}
 function setMode(m){authMode=m;document.querySelectorAll('.auth-tab').forEach(b=>{const yes=b.dataset.mode===m;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));});$('nameField').classList.toggle('hidden',m==='login');$('name').required=m==='register';$('password').autocomplete=m==='register'?'new-password':'current-password';$('authSubmit').innerHTML=m==='login'?'Entra nella tua cerchia <span>→</span>':'Crea il mio account <span>→</span>';}
+// Lightweight Leaflet map with real OpenStreetMap tiles and contact markers.
+function directionIcon(heading){
+  const valid=Number.isFinite(heading), deg=valid?heading:0;
+  return window.L.divIcon({className:'',iconSize:[42,42],iconAnchor:[21,21],html:`<div class="zyro-arrow-marker"><span class="arrow" style="${valid?`transform:rotate(${deg}deg)`:'display:none'}"></span><span class="dot"></span></div>`});
+}
+function renderMap(){
+  if(!current || $('homeView').classList.contains('hidden'))return;
+  if(!window.L){$('mapStatus').textContent='La mappa non si carica: controlla Internet o il blocco dei contenuti.';return;}
+  if(!mapInstance){
+    $('liveMap').innerHTML='';
+    mapInstance=L.map('liveMap',{zoomControl:true,scrollWheelZoom:false}).setView([42.7,12.5],5);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',maxZoom:19}).addTo(mapInstance);
+    setTimeout(()=>mapInstance?.invalidateSize(),120);
+  }
+  if(lastCoords){
+    const pos=[lastCoords.lat,lastCoords.lon];
+    if(!ownMarker)ownMarker=L.marker(pos,{icon:directionIcon(lastCoords.heading),zIndexOffset:200}).addTo(mapInstance).bindPopup('La tua posizione');
+    else ownMarker.setLatLng(pos).setIcon(directionIcon(lastCoords.heading));
+    if(!accuracyCircle)accuracyCircle=L.circle(pos,{radius:lastCoords.accuracy||20,fillColor:'#2785df',fillOpacity:.08,color:'#2785df',weight:1}).addTo(mapInstance);
+    else accuracyCircle.setLatLng(pos).setRadius(lastCoords.accuracy||20);
+    if(!ownCentered){mapInstance.setView(pos,16);ownCentered=true;}
+    $('mapStatus').textContent=`La tua posizione · ±${Math.round(lastCoords.accuracy||0)} m ${Number.isFinite(lastCoords.heading)?'· direzione stimata':''}`;
+  }else $('mapStatus').textContent=geolocationError||'Tocca «Trova la mia posizione» per attivare il GPS.';
+  const seen=new Set();
+  for(const m of uniqueContacts()){
+    if(!m.location)continue;
+    const id=m.id;seen.add(id);
+    const pos=[m.location.lat,m.location.lon];
+    const icon=L.divIcon({className:'',iconSize:[24,24],iconAnchor:[12,12],html:`<div class="zyro-contact-pin">${escapeHtml(initials(m.name))}</div>`});
+    const popup=`<b>${escapeHtml(m.name)}</b><div>${escapeHtml(when(m.location.updatedAt))}</div>`;
+    let mark=contactMapMarkers.get(id);
+    if(mark)mark.setLatLng(pos).setPopupContent(popup);
+    else {mark=L.marker(pos,{icon}).addTo(mapInstance).bindPopup(popup);contactMapMarkers.set(id,mark);}
+  }
+  for(const [id,marker] of contactMapMarkers)if(!seen.has(id)){mapInstance.removeLayer(marker);contactMapMarkers.delete(id);}
+}
+function onOrientation(e){
+  let direction=Number.isFinite(e.webkitCompassHeading)?e.webkitCompassHeading:Number.isFinite(e.alpha)?(360-e.alpha)%360:null;
+  if(direction===null)return;
+  compassHeading=direction;
+  if(lastCoords && !Number.isFinite(lastCoords.heading)){
+    lastCoords.heading=direction; if(ownMarker)ownMarker.setIcon(directionIcon(direction));
+  }
+}
+async function orientationPermission(){
+  try{
+    if(typeof window.DeviceOrientationEvent?.requestPermission==='function'){
+      const granted=await window.DeviceOrientationEvent.requestPermission();if(granted!=='granted')return;
+    }
+    window.removeEventListener('deviceorientation',onOrientation);
+    window.addEventListener('deviceorientation',onOrientation);
+  }catch{ /* Compass is optional. */ }
+}
+function renderPickControls(){
+  if(!current)return;
+  const contacts=uniqueContacts(), validIds=new Set(contacts.map(c=>c.id));
+  for(const id of [...pickSelected])if(!validIds.has(id))pickSelected.delete(id);
+  $('pickRecipientsList').innerHTML=contacts.length?contacts.map(c=>`<label><input type="checkbox" data-pickcontact="${escapeHtml(c.id)}" ${pickSelected.has(c.id)?'checked':''}><span>${escapeHtml(c.name)}</span></label>`).join(''):'<span class="empty-contacts">Prima aggiungi qualcuno a una cerchia.</span>';
+  $('pickRecipients').classList.toggle('hidden',!$('pickNotify').checked);
+  $('pickPanel').classList.toggle('armed',pickArmed);
+  $('pickPanel').classList.toggle('alarming',theftTriggered);
+  $('pickArm').textContent=pickArmed?'Disattiva Pick Pocket':'Attiva Pick Pocket';
+  $('pickArm').disabled=theftTriggered;
+  $('pickSensitivity').disabled=pickArmed;
+  $('pickNotify').disabled=pickArmed;
+  $('pickRecipientsList').querySelectorAll('input').forEach(el=>el.disabled=pickArmed);
+  $('pickStatus').textContent=theftTriggered?'🚨 Movimento sospetto rilevato. Inserisci la password nella schermata di allarme.':pickArmed?'🟢 Pick Pocket attiva: tieni ZYRO 360 aperta. La protezione si ferma se il browser sospende i sensori.':'Protezione disattivata. Attivala solo per i test con l’app aperta.';
+}
+async function motionPermission(){
+  if(!('DeviceMotionEvent' in window))throw Error('Questo telefono/browser non espone i sensori di movimento.');
+  if(typeof window.DeviceMotionEvent.requestPermission==='function'){
+    const p=await window.DeviceMotionEvent.requestPermission();
+    if(p!=='granted')throw Error('Permesso sensori di movimento negato.');
+  }
+}
+function motionListener(e){
+  if(!pickArmed || theftTriggered || Date.now()-armTime<3500)return;
+  motionSamples++;
+  const a=e.acceleration; if(!a)return;
+  const force=Math.hypot(a.x||0,a.y||0,a.z||0);
+  const r=e.rotationRate;
+  const turn=r?Math.max(Math.abs(r.alpha||0),Math.abs(r.beta||0),Math.abs(r.gamma||0)):0;
+  const high=$('pickSensitivity').value==='high';
+  const strong=force>(high?13:18) && (turn>(high?60:100) || force>(high?20:27));
+  if(!strong)return;
+  const now=Date.now();
+  const gap=now-lastMotionAt;
+  if(gap>1350)motionPeaks=0;
+  if(gap>180){motionPeaks++;lastMotionAt=now;}
+  if(force>(high?25:31) || (motionPeaks>=2 && turn>(high?60:100)))void triggerTheft();
+}
+function startSiren(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return;
+    if(!sirenContext)sirenContext=new AC();
+    sirenContext.resume().catch(()=>{});
+    if(sirenOscillator)return;
+    sirenOscillator=sirenContext.createOscillator();sirenGain=sirenContext.createGain();
+    sirenOscillator.type='sawtooth';sirenOscillator.frequency.value=720;sirenGain.gain.value=.17;
+    sirenOscillator.connect(sirenGain).connect(sirenContext.destination);sirenOscillator.start();
+    let high=false;sirenTimer=setInterval(()=>{if(!sirenContext||!sirenOscillator)return;high=!high;sirenOscillator.frequency.setTargetAtTime(high?1230:670,sirenContext.currentTime,.045);navigator.vibrate?.(180);},340);
+  }catch{toast('Sirena non disponibile nel browser.',true);}
+}
+function stopSiren(){
+  clearInterval(sirenTimer);sirenTimer=null;
+  if(sirenOscillator){try{sirenOscillator.stop();sirenOscillator.disconnect();}catch{}sirenOscillator=null;}
+  if(sirenGain){try{sirenGain.disconnect();}catch{}sirenGain=null;}
+  navigator.vibrate?.(0);
+}
+function showTheftOverlay(message){$('theftOverlay').classList.remove('hidden');$('theftMessage').textContent=message;}
+function hideTheftOverlay(){$('theftOverlay').classList.add('hidden');$('theftPassword').value='';}
+async function armPick(){
+  if(theftTriggered)return;
+  if(pickArmed){pickArmed=false;window.removeEventListener('devicemotion',motionListener);updateGeo(null,current?.me?.sharing||!!current?.me?.sos||mapTracking);renderPickControls();toast('Pick Pocket disattivata.');return;}
+  if($('pickNotify').checked && !pickSelected.size)throw Error('Seleziona almeno un familiare o un amico da avvisare.');
+  await motionPermission();
+  // Autoplay permission is tied to this user gesture; still not guaranteed by every browser.
+  try{const AC=window.AudioContext||window.webkitAudioContext;if(AC){sirenContext ||= new AC();await sirenContext.resume();}}catch{}
+  void orientationPermission();
+  pickArmed=true;armTime=Date.now();motionSamples=0;motionPeaks=0;lastMotionAt=0;
+  window.addEventListener('devicemotion',motionListener);
+  updateGeo(null,true);renderPickControls();toast('Pick Pocket attivata. Muovi il telefono con prudenza: può generare falsi allarmi.');
+  setTimeout(()=>{if(pickArmed && !theftTriggered && motionSamples===0)toast('Verifica se il browser concede l’accesso ai sensori; a schermo spento potrebbero non funzionare.',true);},7000);
+}
+async function triggerTheft(){
+  if(!pickArmed || theftTriggered)return;
+  theftTriggered=true;theftIsPending=true;pickArmed=false;
+  window.removeEventListener('devicemotion',motionListener);
+  showTheftOverlay('Movimento molto brusco rilevato. Potrebbe essere uno scippo (possibili falsi allarmi).');
+  $('theftNetwork').textContent='Invio segnalazione in corso…';
+  startSiren();renderPickControls();
+  try{
+    const recipients=$('pickNotify').checked?[...pickSelected]:[];
+    const result=await post('/api/pickpocket/start',{recipients});
+    $('theftNetwork').textContent=recipients.length?`Allarme inviato al server. Destinatari scelti: ${result.notifiedUsers}. Notifiche push non garantite.`:'Sirena locale attiva. Nessun contatto selezionato per l’avviso.';
+    await refresh();
+  }catch(e){$('theftNetwork').textContent='⚠ Invio non riuscito: '+e.message+'. Sirena locale attiva, i contatti potrebbero NON essere avvisati.';}
+  finally{theftIsPending=false;}
+}
+async function stopTheft(){
+  const password=$('theftPassword').value;
+  if(!password)throw Error('Inserisci la password del tuo account per fermare l’allarme.');
+  $('theftStop').disabled=true;
+  try{
+    await post('/api/pickpocket/stop',{password});
+    theftTriggered=false;theftIsPending=false;stopSiren();hideTheftOverlay();
+    await refresh();renderPickControls();toast('Allarme antifurto terminato dal proprietario.');
+  }finally{$('theftStop').disabled=false;}
+}
+async function previewSiren(){
+  if(theftTriggered)return;
+  startSiren();toast('Test sirena locale di 2 secondi, nessun avviso inviato.');
+  setTimeout(()=>{if(!theftTriggered)stopSiren();},2000);
+}
 async function init(){
   document.querySelectorAll('.auth-tab').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
   $('authForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{
@@ -196,6 +365,12 @@ async function init(){
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
   $('openCircles').addEventListener('click',()=>showView('circles'));
+  $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){ownCentered=false;renderMap();}else toast('Richiesta permesso GPS in corso.');}));
+  $('pickNotify').addEventListener('change',renderPickControls);
+  $('pickRecipientsList').addEventListener('change',e=>{if(!e.target.matches('[data-pickcontact]'))return;const id=e.target.dataset.pickcontact;if(e.target.checked)pickSelected.add(id);else pickSelected.delete(id);});
+  $('pickArm').addEventListener('click',()=>action(armPick));
+  $('pickTest').addEventListener('click',()=>action(previewSiren));
+  $('theftStop').addEventListener('click',()=>action(stopTheft));
   $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/circles',{name:$('circleName').value});$('circleName').value='';await refresh();toast('Cerchia creata! Ora puoi generare un invito.');});});
   $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/invites/join',{code:$('inviteInput').value});$('inviteInput').value='';await refresh();toast('Ora fai parte della cerchia!');});});
   $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
@@ -204,11 +379,11 @@ async function init(){
   $('audioButton').addEventListener('click',()=>action(async()=>{if(localStream){stopAudio();toast('Microfono disattivato. Il tuo SOS rimane attivo.');}else await startAudio();}));
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;current=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;ownMarker?.remove();ownMarker=null;accuracyCircle?.remove();accuracyCircle=null;for(const marker of contactMapMarkers.values())mapInstance?.removeLayer(marker);contactMapMarkers.clear();mapInstance?.setView([42.7,12.5],5);current=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
-  window.addEventListener('pagehide',()=>{ /* The browser may suspend geo/audio; never promise background tracking. */ });
+  window.addEventListener('pagehide',()=>{ /* Browsers may suspend GPS, sensors and audio: never promise background safety. */ });
 }
 init();
