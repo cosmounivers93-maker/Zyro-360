@@ -1,0 +1,19 @@
+# Prototipo per test. Il disco persistente richiede un servizio Render a pagamento.
+services:
+  - type: web
+    name: zyro-360
+    runtime: node
+    plan: 0.5c-512mb
+    region: frankfurt
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+    disk:
+      name: zyro-360-data
+      mountPath: /var/data
+      sizeGB: 1
