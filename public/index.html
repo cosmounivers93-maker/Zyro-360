@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1831">
+  <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
+  <meta name="color-scheme" content="light">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" href="/assets/icon192.png">
+  <link rel="apple-touch-icon" href="/assets/icon192.png">
+  <link rel="stylesheet" href="/style.css">
+  <title>Zyro 360 — insieme, più sicuri</title>
+</head>
+<body>
+<div id="authScreen" class="auth-shell">
+  <div class="auth-brand"><div class="brand-emblem">✦</div><span>ZYRO <b>360</b></span></div>
+  <main class="auth-card">
+    <div class="auth-illustration"><div class="orb orb-a">♥</div><div class="orb orb-b">✦</div><div class="orb orb-c">✓</div><div class="orbit-ring"></div><div class="center-shield">✣</div></div>
+    <p class="eyebrow">LA SICUREZZA È PIÙ BELLA INSIEME</p>
+    <h1>La tua cerchia.<br><span>La tua tranquillità.</span></h1>
+    <p class="auth-copy">Resta in contatto con le persone di cui ti fidi. In caso di bisogno, un gesto basta per chiedere aiuto.</p>
+    <div class="auth-tabs" role="tablist"><button class="auth-tab active" data-mode="login" aria-selected="true">Accedi</button><button class="auth-tab" data-mode="register" aria-selected="false">Registrati</button></div>
+    <form id="authForm" autocomplete="on">
+      <label id="nameField" class="field hidden"><span>Il tuo nome</span><input id="name" name="name" type="text" autocomplete="name" maxlength="36" placeholder="Come vuoi essere chiamato"></label>
+      <label class="field"><span>Email</span><input id="email" name="email" type="email" autocomplete="email" required placeholder="nome@email.it"></label>
+      <label class="field"><span>Password</span><input id="password" name="password" type="password" autocomplete="current-password" required minlength="10" placeholder="Almeno 10 caratteri"></label>
+      <button id="authSubmit" class="btn btn-primary btn-wide" type="submit">Entra nella tua cerchia <span>→</span></button>
+    </form>
+    <p class="auth-note">🔒 Solo le persone autorizzate possono vedere la tua posizione.</p>
+  </main>
+  <p class="tiny-auth">Un aiuto tra persone fidate. Non sostituisce i soccorsi d'emergenza.</p>
+</div>
+
+<div id="appScreen" class="app-shell hidden">
+  <header class="topbar">
+    <div class="brand"><div class="brand-emblem">✦</div><span>ZYRO <b>360</b></span></div>
+    <div class="connection-pill"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">Connessione...</span></div>
+  </header>
+  <main class="container">
+    <section id="homeView" class="view">
+      <div class="greeting"><div><p class="eyebrow muted">UNO SPAZIO DI FIDUCIA</p><h1>Ciao, <span id="greetingName">amico</span> <span class="wave">✳</span></h1><p>La tua sicurezza è la nostra priorità.</p></div><div class="avatar" id="myAvatar">S</div></div>
+      <div class="top-cards">
+        <div class="stat-card"><span class="stat-icon mint">◎</span><div><strong id="totalMembers">0</strong><small>Persone fidate</small></div></div>
+        <div class="stat-card"><span class="stat-icon violet">◈</span><div><strong id="totalCircles">0</strong><small>Le tue cerchie</small></div></div>
+      </div>
+      <div class="sos-card" id="sosCard">
+        <div class="sos-card-top"><span class="white-dot"></span><span>LA TUA SICUREZZA, A PORTATA DI MANO</span><span class="sos-sparkle">✧</span></div>
+        <h2 id="sosTitle">Hai bisogno di aiuto?</h2>
+        <p id="sosDescription">Premi il pulsante per avvisare la tua cerchia e condividere la tua posizione in tempo reale.</p>
+        <button id="sosButton" class="sos-button" type="button" aria-label="Attiva SOS"><span class="sos-button-inner"><span class="sos-icon">✳</span><b>SOS</b><small>PREMI QUI</small></span></button>
+        <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> ALLARME ATTIVO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">🎙 Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div></div>
+        <div id="sosInactiveNote" class="sos-card-bottom"><span>♧</span><span>La richiesta arriva ai tuoi contatti collegati</span></div>
+      </div>
+      <div class="section-head"><div><h2>Condivisione posizione</h2><p>Scegli tu quando farti trovare</p></div><span class="location-glyph">⌖</span></div>
+      <div class="share-card"><div class="share-icon">⌖</div><div class="share-details"><b>La mia posizione</b><span id="myLocationText">Condivisione disattivata</span></div><label class="switch" aria-label="Condividi la posizione"><input id="shareToggle" type="checkbox"><span class="switch-slider"></span></label></div>
+      <div class="section-head space-top"><div><h2>Le persone vicine a te</h2><p>Contatti nella tua cerchia</p></div><button id="openCircles" class="text-action">Gestisci →</button></div>
+      <div id="contactsList" class="contacts-list"></div>
+      <div id="activeAlerts" class="hidden"></div>
+      <div class="emergency-card"><span>✚</span><div><b>Emergenza immediata?</b><p>Per un pericolo reale contatta sempre i soccorsi.</p></div><a href="tel:112" class="call-button">Chiama 112</a></div>
+    </section>
+
+    <section id="circlesView" class="view hidden">
+      <div class="page-heading"><p class="eyebrow muted">PERSONE SPECIALI</p><h1>Le tue cerchie <span>✧</span></h1><p>Crea un gruppo privato e invita solo persone di fiducia.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon">＋</span><div><h2>Crea una cerchia</h2><p>Amici, famiglia o persone fidate</p></div></div><form id="createCircleForm" class="inline-form"><input id="circleName" maxlength="48" required placeholder="Es. Famiglia ❤️" aria-label="Nome cerchia"><button class="btn btn-primary" type="submit">Crea</button></form></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">⌘</span><div><h2>Hai ricevuto un codice?</h2><p>Entra nella cerchia di qualcuno</p></div></div><form id="joinCircleForm" class="inline-form"><input id="inviteInput" maxlength="28" required placeholder="Codice di invito" aria-label="Codice di invito" autocapitalize="characters"><button class="btn btn-dark" type="submit">Entra</button></form></div>
+      <div class="section-head space-top"><div><h2>I miei gruppi</h2><p>Un invito dura 24 ore e si usa una volta</p></div></div>
+      <div id="circlesList" class="circle-list"></div>
+    </section>
+
+    <section id="settingsView" class="view hidden">
+      <div class="page-heading"><p class="eyebrow muted">IL TUO SPAZIO</p><h1>Impostazioni <span>⚙</span></h1><p>Decidi cosa condividere e con chi.</p></div>
+      <div class="panel setting-profile"><div class="profile-avatar" id="profileAvatar">S</div><div><strong id="profileName">Utente</strong><p id="profileEmail">email</p></div></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon">♧</span><div><h2>Avvisi SOS</h2><p>Ricevi notifiche se una persona della tua cerchia chiede aiuto</p></div></div><button id="pushButton" class="btn btn-dark btn-wide" type="button">Attiva notifiche</button><p id="pushStatus" class="setting-description">Le notifiche dipendono dal supporto del browser e dalle impostazioni del dispositivo.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile soltanto ai membri delle tue cerchie mentre la condividi o hai un SOS attivo. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon warm">☏</span><div><h2>Numeri di emergenza</h2><p>In Italia e nell'UE il numero unico è 112</p></div></div><a href="tel:112" class="btn btn-outline btn-wide">Chiama il 112</a></div>
+      <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
+      <p class="small-disclaimer">Questa è una versione iniziale da testare. Connessione Internet, autorizzazioni e app aperta possono essere necessari. Non usarla come unico strumento di emergenza.</p>
+    </section>
+  </main>
+  <nav class="bottom-nav" aria-label="Navigazione principale"><button class="nav-item active" data-view="home" type="button"><span class="nav-icon">⌂</span><span>Home</span></button><button class="nav-item" data-view="circles" type="button"><span class="nav-icon">◎</span><span>Cerchie</span></button><button class="nav-item" data-view="settings" type="button"><span class="nav-icon">⚙</span><span>Profilo</span></button></nav>
+</div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+<div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
+<script src="/app.js" defer></script>
+</body>
+</html>

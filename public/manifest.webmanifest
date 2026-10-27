@@ -1,0 +1,26 @@
+{
+  "id": "/",
+  "name": "Zyro 360",
+  "short_name": "Zyro 360",
+  "description": "Sicurezza personale, cerchie private, GPS e richieste SOS in tempo reale",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fc",
+  "theme_color": "#0b1831",
+  "lang": "it",
+  "icons": [
+    {
+      "src": "/assets/icon192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/icon512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
