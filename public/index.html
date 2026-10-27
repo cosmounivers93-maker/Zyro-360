@@ -9,7 +9,6 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="/style.css">
   <title>Zyro 360 — insieme, più sicuri</title>
 </head>
@@ -39,14 +38,26 @@
     <div class="connection-pill"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">Connessione...</span></div>
   </header>
   <main class="container">
-    <section id="homeView" class="view">
-      <div class="greeting"><div><p class="eyebrow muted">UNO SPAZIO DI FIDUCIA</p><h1>Ciao, <span id="greetingName">amico</span> <span class="wave">✳</span></h1><p>La tua sicurezza è la nostra priorità.</p></div><div class="avatar" id="myAvatar">S</div></div>
-      <section class="geo-panel" aria-label="Mappa posizione in tempo reale">
-        <div class="geo-panel-head"><div><p class="eyebrow muted">POSIZIONE IN TEMPO REALE</p><h2>La tua mappa <span>◎</span></h2><p>Tu e i contatti che condividono il GPS</p></div><span class="live-indicator"><i></i> MAPPA LIVE</span></div>
-        <div id="liveMap" class="live-map" aria-label="Mappa interattiva OpenStreetMap"><div class="map-placeholder">Caricamento mappa reale…</div></div>
-        <div class="map-footer"><div id="mapStatus" class="map-status">Attiva il GPS per vedere il tuo punto sulla mappa.</div><button id="locateMe" class="btn btn-primary" type="button">⌖ Trova la mia posizione</button></div>
-        <p class="map-note">La posizione GPS viene usata sulla mappa del telefono; viene inviata alle tue cerchie solo quando autorizzi la condivisione o attivi un allarme. Mappe © OpenStreetMap.</p>
+    <section id="homeView" class="view home-map-view">
+      <section class="geo-panel geo-immersive" aria-label="Mappa reale della tua posizione">
+        <div id="liveMap" class="live-map" aria-label="Mappa interattiva. Trascina per spostarti, usa due dita per ingrandire.">
+          <div id="mapTiles" class="map-tiles" aria-hidden="true"></div>
+          <div id="mapPins" class="map-pins" aria-hidden="true"></div>
+          <div class="map-top-label"><span class="map-live-dot"></span> MAPPA IN TEMPO REALE</div>
+          <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
+          <div id="mapUnavailable" class="map-unavailable hidden" role="alert">La cartografia non è disponibile. Controlla la connessione Internet e riprova.</div>
+          <div class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap contributors</a></div>
+        </div>
+        <div class="home-map-actions">
+          <label class="home-share-action" for="shareToggle"><span class="home-action-symbol">◎</span><span class="home-action-text">Attiva posizione</span><span class="switch"><input id="shareToggle" type="checkbox" aria-label="Attiva o disattiva la condivisione posizione con la cerchia"><span class="switch-slider"></span></span></label>
+          <button id="locateMe" class="home-locate-action" type="button"><span class="home-action-symbol">⌖</span><span>Trova la mia posizione</span></button>
+        </div>
       </section>
+    </section>
+
+    <section id="circlesView" class="view hidden">
+      <div class="page-heading"><p class="eyebrow muted">PERSONE SPECIALI</p><h1>Le tue cerchie <span>✧</span></h1><p>Persone fidate, sicurezza e tutte le tue funzioni.</p></div>
+      <div class="greeting"><div><p class="eyebrow muted">UNO SPAZIO DI FIDUCIA</p><h1>Ciao, <span id="greetingName">amico</span> <span class="wave">✳</span></h1><p>La tua sicurezza è la nostra priorità.</p></div><div class="avatar" id="myAvatar">S</div></div>
       <div class="top-cards">
         <div class="stat-card"><span class="stat-icon mint">◎</span><div><strong id="totalMembers">0</strong><small>Persone fidate</small></div></div>
         <div class="stat-card"><span class="stat-icon violet">◈</span><div><strong id="totalCircles">0</strong><small>Le tue cerchie</small></div></div>
@@ -59,8 +70,7 @@
         <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> ALLARME ATTIVO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">🎙 Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div></div>
         <div id="sosInactiveNote" class="sos-card-bottom"><span>♧</span><span>La richiesta arriva ai tuoi contatti collegati</span></div>
       </div>
-      <div class="section-head"><div><h2>Condivisione posizione</h2><p>Scegli tu quando farti trovare</p></div><span class="location-glyph">⌖</span></div>
-      <div class="share-card"><div class="share-icon">⌖</div><div class="share-details"><b>La mia posizione</b><span id="myLocationText">Condivisione disattivata</span></div><label class="switch" aria-label="Condividi la posizione"><input id="shareToggle" type="checkbox"><span class="switch-slider"></span></label></div>
+      <section class="circle-location-status panel"><div class="panel-title"><span class="panel-icon">⌖</span><div><h2>La mia posizione</h2><p id="myLocationText">Condivisione disattivata</p></div></div></section>
       <section class="pick-panel" id="pickPanel">
         <div class="pick-top"><div class="pick-symbol">🛡</div><div><p class="eyebrow muted">ANTIFURTO SPERIMENTALE</p><h2>Modalità Pick Pocket</h2><p>Rileva uno strappo brusco con i sensori del telefono e prova ad avviare una sirena.</p></div></div>
         <div class="pick-settings" id="pickSettings">
@@ -73,13 +83,10 @@
         <button id="pickTest" type="button" class="pick-test">Ascolta la sirena (test locale, nessun avviso)</button>
         <p class="pick-limits">Non blocca il sistema Android, non impedisce spegnimento o chiusura dell'app e non garantisce l'allarme con schermo spento. La sirena rispetta il volume del dispositivo. Uno strappo può essere confuso con un normale movimento.</p>
       </section>
-      <div class="section-head space-top"><div><h2>Le persone vicine a te</h2><p>Contatti nella tua cerchia</p></div><button id="openCircles" class="text-action">Gestisci →</button></div>
-      <div id="contactsList" class="contacts-list"></div>
       <div id="activeAlerts" class="hidden"></div>
+      <div class="section-head space-top"><div><h2>Le persone della tua cerchia</h2><p>Posizione e aggiornamenti condivisi</p></div></div>
+      <div id="contactsList" class="contacts-list"></div>
       <div class="emergency-card"><span>✚</span><div><b>Emergenza immediata?</b><p>Per un pericolo reale contatta sempre i soccorsi.</p></div><a href="tel:112" class="call-button">Chiama 112</a></div>
-    </section>
-
-    <section id="circlesView" class="view hidden">
       <div class="page-heading"><p class="eyebrow muted">PERSONE SPECIALI</p><h1>Le tue cerchie <span>✧</span></h1><p>Crea un gruppo privato e invita solo persone di fiducia.</p></div>
       <div class="panel"><div class="panel-title"><span class="panel-icon">＋</span><div><h2>Crea una cerchia</h2><p>Amici, famiglia o persone fidate</p></div></div><form id="createCircleForm" class="inline-form"><input id="circleName" maxlength="48" required placeholder="Es. Famiglia ❤️" aria-label="Nome cerchia"><button class="btn btn-primary" type="submit">Crea</button></form></div>
       <div class="panel"><div class="panel-title"><span class="panel-icon lavender">⌘</span><div><h2>Hai ricevuto un codice?</h2><p>Entra nella cerchia di qualcuno</p></div></div><form id="joinCircleForm" class="inline-form"><input id="inviteInput" maxlength="28" required placeholder="Codice di invito" aria-label="Codice di invito" autocapitalize="characters"><button class="btn btn-dark" type="submit">Entra</button></form></div>
@@ -104,7 +111,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 <script src="/app.js" defer></script>
 </body>
 </html>

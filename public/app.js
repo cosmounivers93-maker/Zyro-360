@@ -19,8 +19,8 @@ let geolocationError = '';
 let lastAlertKey = '';
 const inviteCodes = new Map();
 // Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
-let mapInstance=null, ownMarker=null, accuracyCircle=null, mapTracking=false, ownCentered=false;
-const contactMapMarkers = new Map();
+let mapTracking=false, ownCentered=false;
+let zyroMap=null;
 let compassHeading = null;
 // Pick Pocket is a foreground browser experiment, not an Android system lock.
 let pickArmed=false, theftTriggered=false, lastMotionAt=0, motionPeaks=0, motionSamples=0, armTime=0;
@@ -120,7 +120,7 @@ function renderCircles(){
 }
 function bindCopyCodes(root){root.querySelectorAll('.copy-code').forEach(btn=>btn.addEventListener('click',async()=>{const code=btn.closest('.invite-code-box')?.querySelector('code')?.textContent;try{await navigator.clipboard.writeText(code);toast('Codice copiato. Condividilo solo con una persona fidata.');}catch{toast('Seleziona e copia il codice mostrato.');}}));}
 function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;$('profileAvatar').textContent=initials(current.me.name);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
-function showView(view){activeView=view;for(const v of ['home','circles','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});}
+function showView(view){activeView=view;for(const v of ['home','circles','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();zyroMap?.invalidateSize();});}}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;geolocationError='';renderMap();return;}
   if(watchId!==null)return;
@@ -202,48 +202,162 @@ async function enablePush(){
 }
 function base64ToBytes(base64){const padding='='.repeat((4-base64.length%4)%4);const binary=atob((base64+padding).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(binary,x=>x.charCodeAt(0));}
 function setMode(m){authMode=m;document.querySelectorAll('.auth-tab').forEach(b=>{const yes=b.dataset.mode===m;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));});$('nameField').classList.toggle('hidden',m==='login');$('name').required=m==='register';$('password').autocomplete=m==='register'?'new-password':'current-password';$('authSubmit').innerHTML=m==='login'?'Entra nella tua cerchia <span>→</span>':'Crea il mio account <span>→</span>';}
-// Lightweight Leaflet map with real OpenStreetMap tiles and contact markers.
-function directionIcon(heading){
-  const valid=Number.isFinite(heading), deg=valid?heading:0;
-  return window.L.divIcon({className:'',iconSize:[42,42],iconAnchor:[21,21],html:`<div class="zyro-arrow-marker"><span class="arrow" style="${valid?`transform:rotate(${deg}deg)`:'display:none'}"></span><span class="dot"></span></div>`});
+// Map tiles are loaded only for the visible viewport. No third-party JS dependency.
+// OpenStreetMap standard tiles: © OpenStreetMap contributors. Internet required.
+const MAP_TILE_SIZE=256, MIN_MAP_ZOOM=3, MAX_MAP_ZOOM=18;
+function clampLatitude(lat){return Math.min(85.05112878,Math.max(-85.05112878,lat));}
+function worldPoint(lat,lon,zoom){
+  const size=MAP_TILE_SIZE*2**zoom, phi=clampLatitude(lat)*Math.PI/180;
+  return {x:(lon+180)/360*size,y:(1-Math.log(Math.tan(phi)+1/Math.cos(phi))/Math.PI)/2*size};
+}
+function geoPoint(x,y,zoom){
+  const size=MAP_TILE_SIZE*2**zoom;
+  return {lat:Math.atan(Math.sinh(Math.PI*(1-2*Math.max(0,Math.min(size,y))/size)))*180/Math.PI,
+    lon:((x/size*360+180)%360+360)%360-180};
+}
+class ZyroNativeMap {
+  constructor(element){
+    this.element=element;this.tiles=$('mapTiles');this.pins=$('mapPins');
+    this.center={lat:41.65,lon:12.48};this.zoom=6;this.tilesByKey=new Map();
+    this.pointerStart=null;this.fingers=new Map();this.pinchStart=null;
+    this.loaded=0;this.failed=0;this.drawQueued=false;
+    this.lastTap=0;this.own=null;this.contacts=[];
+    element.addEventListener('pointerdown',e=>this.onDown(e));
+    element.addEventListener('pointermove',e=>this.onMove(e));
+    element.addEventListener('pointerup',e=>this.onUp(e));
+    element.addEventListener('pointercancel',e=>this.onUp(e));
+    element.addEventListener('wheel',e=>{if(!e.ctrlKey && !e.shiftKey)return;e.preventDefault();this.setZoom(this.zoom+(e.deltaY<0?1:-1));},{passive:false});
+    this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>this.invalidateSize()):null;
+    this.resizeObserver?.observe(element);
+    window.addEventListener('resize',()=>this.invalidateSize());
+    this.invalidateSize();
+  }
+  onDown(e){
+    // Don't intercept links or buttons in the map overlays.
+    if(e.target.closest('a,button,.map-attribution'))return;
+    this.element.setPointerCapture?.(e.pointerId);
+    this.fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(this.fingers.size===1)this.pointerStart={x:e.clientX,y:e.clientY,center:{...this.center}};
+    if(this.fingers.size===2){
+      const [a,b]=[...this.fingers.values()];this.pinchStart={distance:Math.hypot(a.x-b.x,a.y-b.y),zoom:this.zoom};this.pointerStart=null;
+    }
+  }
+  onMove(e){
+    if(!this.fingers.has(e.pointerId))return;
+    this.fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(this.fingers.size===2 && this.pinchStart){
+      const [a,b]=[...this.fingers.values()];const dist=Math.hypot(a.x-b.x,a.y-b.y);
+      if(dist>0 && this.pinchStart.distance>0){
+        const next=this.pinchStart.zoom+Math.round(Math.log2(dist/this.pinchStart.distance)*1.5);
+        this.setZoom(next);
+      }
+      return;
+    }
+    if(!this.pointerStart)return;
+    const p=worldPoint(this.pointerStart.center.lat,this.pointerStart.center.lon,this.zoom);
+    this.center=geoPoint(p.x+this.pointerStart.x-e.clientX,p.y+this.pointerStart.y-e.clientY,this.zoom);
+    this.queueDraw();
+  }
+  onUp(e){
+    if(!this.fingers.has(e.pointerId))return;
+    this.fingers.delete(e.pointerId);
+    if(this.fingers.size===0){
+      this.pointerStart=null;this.pinchStart=null;
+      if(e.type==='pointerup'){
+        const now=Date.now();if(now-this.lastTap<310){this.setZoom(this.zoom+1);this.lastTap=0;}else this.lastTap=now;
+      }
+    }else if(this.fingers.size===1){
+      const a=[...this.fingers.values()][0];this.pointerStart={x:a.x,y:a.y,center:{...this.center}};this.pinchStart=null;
+    }
+  }
+  setZoom(zoom){
+    const value=Math.max(MIN_MAP_ZOOM,Math.min(MAX_MAP_ZOOM,Math.round(zoom)));
+    if(value===this.zoom)return;
+    this.zoom=value;this.queueDraw();
+  }
+  focusOn(lat,lon,zoom=16){
+    if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return;
+    this.center={lat:clampLatitude(lat),lon};this.zoom=Math.max(MIN_MAP_ZOOM,Math.min(MAX_MAP_ZOOM,Math.round(zoom)));
+    this.queueDraw();
+  }
+  reset(){this.own=null;this.contacts=[];this.center={lat:41.65,lon:12.48};this.zoom=6;this.queueDraw();}
+  invalidateSize(){this.queueDraw();}
+  queueDraw(){if(this.drawQueued)return;this.drawQueued=true;requestAnimationFrame(()=>{this.drawQueued=false;this.draw();});}
+  draw(){
+    const w=this.element.clientWidth,h=this.element.clientHeight;
+    if(!w || !h)return;
+    const z=this.zoom, n=2**z, size=MAP_TILE_SIZE*n, center=worldPoint(this.center.lat,this.center.lon,z);
+    const left=center.x-w/2,top=center.y-h/2;
+    const colMin=Math.floor(left/MAP_TILE_SIZE),colMax=Math.floor((left+w)/MAP_TILE_SIZE);
+    const rowMin=Math.max(0,Math.floor(top/MAP_TILE_SIZE)),rowMax=Math.min(n-1,Math.floor((top+h)/MAP_TILE_SIZE));
+    const seen=new Set();
+    for(let col=colMin;col<=colMax;col++)for(let row=rowMin;row<=rowMax;row++){
+      const normalizedX=((col%n)+n)%n, key=`${z}/${normalizedX}/${row}/${col}`;
+      seen.add(key);
+      let img=this.tilesByKey.get(key);
+      if(!img){
+        img=document.createElement('img');img.className='zyro-map-tile';img.alt='';img.draggable=false;
+        img.decoding='async';img.loading='eager';
+        img.addEventListener('load',()=>{this.loaded++;this.updateTileStatus();});
+        img.addEventListener('error',()=>{this.failed++;this.updateTileStatus();});
+        img.src=`https://tile.openstreetmap.org/${z}/${normalizedX}/${row}.png`;
+        this.tilesByKey.set(key,img);this.tiles.append(img);
+      }
+      img.style.transform=`translate3d(${Math.round(col*MAP_TILE_SIZE-left)}px,${Math.round(row*MAP_TILE_SIZE-top)}px,0)`;
+    }
+    for(const [key,tile] of this.tilesByKey){if(!seen.has(key)){tile.remove();this.tilesByKey.delete(key);}}
+    // Real GPS and live shared contacts are drawn above the map raster.
+    this.pins.replaceChildren();
+    const pinAt=(lat,lon,markerClass,label,heading,accuracy)=>{
+      if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return;
+      const p=worldPoint(lat,lon,z);
+      let dx=p.x-center.x;if(dx>size/2)dx-=size;else if(dx<-size/2)dx+=size;
+      const x=w/2+dx,y=h/2+p.y-center.y;
+      if(x < -150||x > w+150 || y < -150||y > h+150)return;
+      if(accuracy){
+        const metersPerPixel=156543.03392*Math.cos(lat*Math.PI/180)/(2**z);
+        const diameter=Math.min(480,Math.max(22,2*accuracy/metersPerPixel));
+        const circle=document.createElement('div');circle.className='zyro-gps-accuracy';
+        circle.style.left=`${x}px`;circle.style.top=`${y}px`;circle.style.width=`${diameter}px`;circle.style.height=`${diameter}px`;
+        this.pins.append(circle);
+      }
+      const marker=document.createElement('div');marker.className=markerClass;marker.style.left=`${x}px`;marker.style.top=`${y}px`;
+      marker.title=label;marker.setAttribute('aria-label',label);
+      if(markerClass.includes('you')){
+        if(Number.isFinite(heading)){const dir=document.createElement('span');dir.className='zyro-heading';dir.style.transform=`translateX(-50%) rotate(${heading}deg)`;marker.append(dir);}
+        const dot=document.createElement('span');dot.className='zyro-you-dot';marker.append(dot);
+      }else{marker.textContent=label.trim().charAt(0).toUpperCase()||'•';}
+      this.pins.append(marker);
+    };
+    for(const c of this.contacts){pinAt(Number(c.location.lat),Number(c.location.lon),'zyro-map-pin zyro-pin-contact',c.name,null,null);}
+    if(this.own)pinAt(this.own.lat,this.own.lon,'zyro-map-pin zyro-pin-you','Tu — posizione GPS',this.own.heading,this.own.accuracy);
+  }
+  updateTileStatus(){
+    const fail=$('mapUnavailable');
+    if(this.loaded>0){fail.classList.add('hidden');return;}
+    if(this.failed>=3)fail.classList.remove('hidden');
+  }
 }
 function renderMap(){
   if(!current || $('homeView').classList.contains('hidden'))return;
-  if(!window.L){$('mapStatus').textContent='La mappa non si carica: controlla Internet o il blocco dei contenuti.';return;}
-  if(!mapInstance){
-    $('liveMap').innerHTML='';
-    mapInstance=L.map('liveMap',{zoomControl:true,scrollWheelZoom:false}).setView([42.7,12.5],5);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',maxZoom:19}).addTo(mapInstance);
-    setTimeout(()=>mapInstance?.invalidateSize(),120);
-  }
+  if(!zyroMap)zyroMap=new ZyroNativeMap($('liveMap'));
+  const contacts=uniqueContacts().filter(m=>m.location && Number.isFinite(Number(m.location.lat)) && Number.isFinite(Number(m.location.lon)));
+  zyroMap.own=lastCoords;zyroMap.contacts=contacts;
   if(lastCoords){
-    const pos=[lastCoords.lat,lastCoords.lon];
-    if(!ownMarker)ownMarker=L.marker(pos,{icon:directionIcon(lastCoords.heading),zIndexOffset:200}).addTo(mapInstance).bindPopup('La tua posizione');
-    else ownMarker.setLatLng(pos).setIcon(directionIcon(lastCoords.heading));
-    if(!accuracyCircle)accuracyCircle=L.circle(pos,{radius:lastCoords.accuracy||20,fillColor:'#2785df',fillOpacity:.08,color:'#2785df',weight:1}).addTo(mapInstance);
-    else accuracyCircle.setLatLng(pos).setRadius(lastCoords.accuracy||20);
-    if(!ownCentered){mapInstance.setView(pos,16);ownCentered=true;}
-    $('mapStatus').textContent=`La tua posizione · ±${Math.round(lastCoords.accuracy||0)} m ${Number.isFinite(lastCoords.heading)?'· direzione stimata':''}`;
-  }else $('mapStatus').textContent=geolocationError||'Tocca «Trova la mia posizione» per attivare il GPS.';
-  const seen=new Set();
-  for(const m of uniqueContacts()){
-    if(!m.location)continue;
-    const id=m.id;seen.add(id);
-    const pos=[m.location.lat,m.location.lon];
-    const icon=L.divIcon({className:'',iconSize:[24,24],iconAnchor:[12,12],html:`<div class="zyro-contact-pin">${escapeHtml(initials(m.name))}</div>`});
-    const popup=`<b>${escapeHtml(m.name)}</b><div>${escapeHtml(when(m.location.updatedAt))}</div>`;
-    let mark=contactMapMarkers.get(id);
-    if(mark)mark.setLatLng(pos).setPopupContent(popup);
-    else {mark=L.marker(pos,{icon}).addTo(mapInstance).bindPopup(popup);contactMapMarkers.set(id,mark);}
-  }
-  for(const [id,marker] of contactMapMarkers)if(!seen.has(id)){mapInstance.removeLayer(marker);contactMapMarkers.delete(id);}
+    if(!ownCentered){zyroMap.focusOn(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
+    $('mapStatus').textContent=`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`;
+  }else if(contacts.length && !ownCentered){
+    zyroMap.focusOn(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);ownCentered=true;
+    $('mapStatus').textContent='Mappa della tua cerchia · attiva il GPS per localizzarti';
+  }else $('mapStatus').textContent=geolocationError||'Tocca «Trova la mia posizione» per localizzarti';
+  zyroMap.queueDraw();
 }
 function onOrientation(e){
   let direction=Number.isFinite(e.webkitCompassHeading)?e.webkitCompassHeading:Number.isFinite(e.alpha)?(360-e.alpha)%360:null;
   if(direction===null)return;
   compassHeading=direction;
   if(lastCoords && !Number.isFinite(lastCoords.heading)){
-    lastCoords.heading=direction; if(ownMarker)ownMarker.setIcon(directionIcon(direction));
+    lastCoords.heading=direction;renderMap();
   }
 }
 async function orientationPermission(){
@@ -364,8 +478,7 @@ async function init(){
     $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
-  $('openCircles').addEventListener('click',()=>showView('circles'));
-  $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){ownCentered=false;renderMap();}else toast('Richiesta permesso GPS in corso.');}));
+  $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){zyroMap?.focusOn(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
   $('pickNotify').addEventListener('change',renderPickControls);
   $('pickRecipientsList').addEventListener('change',e=>{if(!e.target.matches('[data-pickcontact]'))return;const id=e.target.dataset.pickcontact;if(e.target.checked)pickSelected.add(id);else pickSelected.delete(id);});
   $('pickArm').addEventListener('click',()=>action(armPick));
@@ -379,7 +492,7 @@ async function init(){
   $('audioButton').addEventListener('click',()=>action(async()=>{if(localStream){stopAudio();toast('Microfono disattivato. Il tuo SOS rimane attivo.');}else await startAudio();}));
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;ownMarker?.remove();ownMarker=null;accuracyCircle?.remove();accuracyCircle=null;for(const marker of contactMapMarkers.values())mapInstance?.removeLayer(marker);contactMapMarkers.clear();mapInstance?.setView([42.7,12.5],5);current=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();current=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
