@@ -1,9 +1,10 @@
-# Prototipo per test. Il disco persistente richiede un servizio Render a pagamento.
+# Solo per prototipo dimostrativo, non adatto alla sicurezza personale in produzione.
+# Render Free sospende il servizio e perde i dati locali ai riavvii.
 services:
   - type: web
     name: zyro-360
     runtime: node
-    plan: 0.5c-512mb
+    plan: free
     region: frankfurt
     buildCommand: npm install
     startCommand: npm start
@@ -11,9 +12,3 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
-      - key: DATA_DIR
-        value: /var/data
-    disk:
-      name: zyro-360-data
-      mountPath: /var/data
-      sizeGB: 1
