@@ -11,7 +11,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const dbPath = path.join(dataDir, 'zyro360.json');
-const initial = { users: {}, circles: {}, memberships: [], invites: {}, sessions: {}, alerts: {} };
+const initial = { users: {}, circles: {}, memberships: [], invites: {}, sessions: {}, alerts: {}, messages: {} };
 let db;
 try { db = { ...initial, ...JSON.parse(fs.readFileSync(dbPath, 'utf8')) }; }
 catch (err) { if (err.code !== 'ENOENT') throw err; db = structuredClone(initial); }
@@ -28,7 +28,7 @@ const hash = v => crypto.createHash('sha256').update(v).digest('hex');
 const token = (n = 24) => crypto.randomBytes(n).toString('base64url');
 const now = () => Date.now();
 const cleanText = (s, max = 60) => String(s || '').trim().replace(/[\u0000-\u001F\u007F<>]/g, '').slice(0, max);
-const publicUser = u => ({ id: u.id, name: u.name });
+const publicUser = u => ({ id: u.id, name: u.name, avatar: u.avatar || null });
 function save() { const tmp = `${dbPath}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(db), { mode: 0o600 }); fs.renameSync(tmp, dbPath); }
 function passwordHash(p, salt) { return crypto.scryptSync(p, salt, 64).toString('hex'); }
 function verifyPassword(p, u) { const stored = Buffer.from(u.passwordHash, 'hex'); const calc = Buffer.from(passwordHash(p, u.salt), 'hex'); return stored.length === calc.length && crypto.timingSafeEqual(stored, calc); }
@@ -44,11 +44,11 @@ function online(id) { return connections(id).size > 0; }
 function currentAlert(id) { return Object.values(db.alerts).find(a => a.userId === id && a.active) || null; }
 function canSeeAlert(viewerId, alert) {
   if (!alert || !sharedCircle(viewerId, alert.userId)) return false;
-  return alert.kind !== 'pickpocket' || (Array.isArray(alert.recipients) && alert.recipients.includes(viewerId)) || viewerId === alert.userId;
+  return viewerId === alert.userId || (Array.isArray(alert.recipients) && alert.recipients.includes(viewerId));
 }
 function alertAudience(alert) {
   if (alert.kind === 'pickpocket') return new Set([alert.userId, ...(alert.recipients || []).filter(id => sharedCircle(id, alert.userId))]);
-  return activeRecipients(alert.userId);
+  return new Set([alert.userId, ...(alert.recipients || []).filter(id => sharedCircle(id, alert.userId))]);
 }
 
 function activeRecipients(id) { const recipients = new Set([id]); for (const c of userCircles(id)) for (const member of memberIds(c.id)) recipients.add(member); return recipients; }
@@ -60,16 +60,16 @@ function stateFor(id) {
     members: memberIds(c.id).filter(x => db.users[x]).map(x => {
       const u = db.users[x]; const alert = currentAlert(x);
       const visibleAlert = alert && canSeeAlert(id,alert) ? alert : null;
-      const shared = Boolean(u.sharing || visibleAlert);
+      const shared = Boolean(u.sharing || (visibleAlert?.kind === 'pickpocket' && visibleAlert.recipients?.includes(id)));
       const location = shared && locations.has(x) ? locations.get(x) : null;
       return { ...publicUser(u), online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio, kind: alert.kind || 'sos' } : null };
     })
   }));
   const alerts = Object.values(db.alerts).filter(a => a.active && canSeeAlert(id, a)).map(a => ({
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
-    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), location: locations.get(a.userId) || null
+    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), location: (db.users[a.userId]?.sharing || (a.kind==='pickpocket' && a.recipients?.includes(id))) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length) }, circles, alerts, pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)) }, circles, alerts, pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -80,12 +80,12 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
-  res.set('Permissions-Policy', 'geolocation=(self), microphone=(self), camera=()');
-  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org https://unpkg.com; connect-src 'self' ws: wss:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+  res.set('Permissions-Policy', 'geolocation=(self), microphone=(self), camera=(self)');
+  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org https://tile.openstreetmap.fr https://unpkg.com; connect-src 'self' ws: wss:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
   res.set('Cache-Control', req.path.startsWith('/api/') ? 'no-store' : 'no-cache');
   next();
 });
-app.use(express.json({ limit: '24kb' }));
+app.use(express.json({ limit: '350kb' }));
 // Requests altering private information must originate from this origin (CSRF protection).
 app.use('/api', (req, res, next) => {
   if (['GET','HEAD','OPTIONS'].includes(req.method)) return next();
@@ -106,12 +106,38 @@ function limit(req, res, next) {
 }
 function requireAuth(req, res, next) { req.user = auth(req); if (!req.user) return res.status(401).json({ error:'Accedi per continuare.' }); next(); }
 app.get('/api/health', (_, res) => res.json({ ok: true }));
+// Live tiles requested only by logged-in users. A modest in-memory cache protects the community tile service.
+// For a public production launch replace this best-effort upstream with a contracted map provider.
+const mapTileCache = new Map();
+const tileRequests = new Map();
+app.get('/api/map-tile/:z/:x/:y.png', requireAuth, async (req,res) => {
+  const z=Number(req.params.z), x=Number(req.params.x), y=Number(req.params.y);
+  if (![z,x,y].every(Number.isInteger) || z<0 || z>18 || x<0 || y<0 || x>=2**z || y>=2**z) return res.sendStatus(400);
+  const id=req.user.id, minute=Math.floor(now()/60000), counter=tileRequests.get(id);
+  if(counter?.minute===minute && counter.n>=200) return res.sendStatus(429);
+  tileRequests.set(id,{minute,n:(counter?.minute===minute?counter.n:0)+1});
+  const key=`${z}/${x}/${y}`, cached=mapTileCache.get(key);
+  if (cached && cached.expires>now()) {res.set('Content-Type','image/png');res.set('Cache-Control','private, max-age=604800');return res.send(cached.bytes);}
+  try {
+    const upstream=await fetch(`https://tile.openstreetmap.org/${key}.png`, {
+      headers:{'User-Agent':'ZYRO360/0.4 (https://zyro-360.onrender.com; support via GitHub project Zyro-360)', 'Referer':'https://zyro-360.onrender.com/'},
+      signal:AbortSignal.timeout(9000)
+    });
+    if(!upstream.ok || !upstream.headers.get('content-type')?.includes('image/')) throw Error('Upstream tiles not available');
+    const bytes=Buffer.from(await upstream.arrayBuffer());
+    if(bytes.length<100 || bytes.length>600000) throw Error('Invalid tile');
+    if(mapTileCache.size>400)mapTileCache.delete(mapTileCache.keys().next().value);
+    mapTileCache.set(key,{bytes,expires:now()+604800000});
+    res.set('Content-Type','image/png');res.set('Cache-Control','private, max-age=604800');res.send(bytes);
+  } catch {res.status(502).json({error:'Mappa temporaneamente non raggiungibile.'});}
+});
+
 app.post('/api/register', limit, (req, res) => {
   const name = cleanText(req.body.name, 36), email = String(req.body.email || '').trim().toLowerCase(), password = String(req.body.password || '');
   if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || password.length < 10 || password.length > 128) return res.status(400).json({error:'Inserisci nome, email valida e una password di almeno 10 caratteri.'});
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({error:'Email già registrata.'});
   const id = token(12), salt = token(16);
-  db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [] };
+  db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], sosRecipients: [], avatar: null };
   loginUser(res, id); res.json({ ok:true });
 });
 app.post('/api/login', limit, (req, res) => {
@@ -180,13 +206,13 @@ app.post('/api/circles/delete', requireAuth, (req,res) => {
 app.post('/api/sharing', requireAuth, (req,res) => {
   const enabled = req.body.enabled === true;
   req.user.sharing = enabled;
-  if (!enabled && (!currentAlert(req.user.id) || (currentAlert(req.user.id).kind==='pickpocket' && !currentAlert(req.user.id).recipients?.length))) locations.delete(req.user.id);
+  if (!enabled && !(currentAlert(req.user.id)?.kind==='pickpocket' && currentAlert(req.user.id).recipients?.length)) locations.delete(req.user.id);
   save(); refreshRelated(req.user.id); res.json({ok:true});
 });
 const lastPos = new Map();
 app.post('/api/position', requireAuth, (req,res) => {
   const alert=currentAlert(req.user.id);
-  if (!req.user.sharing && (!alert || (alert.kind==='pickpocket' && !alert.recipients?.length))) return res.status(403).json({error:'Condivisione non attiva.'});
+  if (!req.user.sharing && !(alert?.kind==='pickpocket' && alert.recipients?.length)) return res.status(403).json({error:'Condivisione non attiva.'});
   const lat = Number(req.body.lat), lon = Number(req.body.lon), accuracy = Number(req.body.accuracy);
   if (![lat,lon,accuracy].every(Number.isFinite) || Math.abs(lat)>90 || Math.abs(lon)>180 || accuracy < 0 || accuracy>100000) return res.status(400).json({error:'Coordinate non valide.'});
   const t=now(); if (t-(lastPos.get(req.user.id)||0)<2400) return res.json({ok:true}); lastPos.set(req.user.id,t);
@@ -197,7 +223,7 @@ if (configuredPush) webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto
 async function notifyContacts(id, name, recipients = null, isTheft = false) {
   if (!configuredPush) return;
   const tasks = [];
-  for (const target of (recipients || activeRecipients(id))) {
+  for (const target of (recipients === null ? activeRecipients(id) : recipients)) {
     if (target === id) continue;
     const user = db.users[target];
     for (const sub of user?.pushSubs || []) tasks.push(webpush.sendNotification(sub, JSON.stringify({title:isTheft?'🚨 Possibile furto':'🆘 Richiesta SOS', body:isTheft?`${name}: possibile scippo rilevato. Verifica e contatta la persona.`:`${name} ha attivato un SOS. Apri Zyro 360.`, url:'/'}), {TTL:120, urgency:'high'}).catch(e => { if ([404,410].includes(e.statusCode)) user.pushSubs = user.pushSubs.filter(s => s.endpoint!==sub.endpoint); }));
@@ -212,9 +238,53 @@ app.post('/api/push/subscribe', requireAuth, (req,res) => {
   req.user.pushSubs.push({endpoint:s.endpoint,keys:{p256dh:s.keys.p256dh,auth:s.keys.auth}});
   save(); res.json({ok:true});
 });
+app.post('/api/settings/sos-recipients', requireAuth, limit, (req,res)=> {
+  const ids=req.body.recipients;
+  if(!Array.isArray(ids) || ids.length>60 || ids.some(id=>typeof id!=='string' || id.length>100)) return res.status(400).json({error:'Destinatari non validi.'});
+  const chosen=[...new Set(ids)];
+  if(chosen.some(id=>id===req.user.id || !sharedCircle(id,req.user.id))) return res.status(403).json({error:'Seleziona soltanto persone della tua cerchia.'});
+  req.user.sosRecipients=chosen;save();refreshRelated(req.user.id);res.json({ok:true,recipients:chosen});
+});
+app.post('/api/profile/avatar',requireAuth,limit,(req,res)=>{
+  const avatar=req.body.avatar;
+  if(avatar!==null && (typeof avatar!=='string' || avatar.length>150000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(avatar))) return res.status(400).json({error:'La foto deve essere JPEG e inferiore a 110 KB.'});
+  if(avatar){const buffer=Buffer.from(avatar.split(',')[1],'base64');if(buffer.length>110000 || buffer.length<100 || buffer[0]!==255 || buffer[1]!==216 || buffer[2]!==255)return res.status(400).json({error:'Immagine non valida.'});}
+  req.user.avatar=avatar;save();refreshRelated(req.user.id);res.json({ok:true});
+});
+// Chat: messages are PRIVATE by access checks, but not end-to-end encrypted.
+// Demo storage in one JSON file. A real launch needs a durable database and separate media storage.
+function chatAccess(viewer,type,target){
+  if(type==='circle')return db.circles[target] && memberIds(target).includes(viewer) ? {key:`circle:${target}`, members:memberIds(target)} : null;
+  if(type==='direct' && target!==viewer && db.users[target] && sharedCircle(viewer,target))return {key:`direct:${[viewer,target].sort().join(':')}`, members:[viewer,target]};
+  return null;
+}
+app.get('/api/chat/:type/:target', requireAuth,(req,res)=>{
+  const chat=chatAccess(req.user.id,req.params.type,req.params.target);
+  if(!chat)return res.status(403).json({error:'Non hai accesso a questa conversazione.'});
+  res.set('Cache-Control','no-store');res.json({messages:(db.messages||{})[chat.key]||[]});
+});
+app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
+  const chat=chatAccess(req.user.id,req.params.type,req.params.target);
+  if(!chat)return res.status(403).json({error:'Non hai accesso a questa conversazione.'});
+  const t=now(),lim=throttle.get(`chat:${req.user.id}`)||[];
+  const recent=lim.filter(x=>x>t-60000);if(recent.length>=12)return res.status(429).json({error:'Troppi messaggi. Attendi un momento.'});
+  recent.push(t);throttle.set(`chat:${req.user.id}`,recent);
+  const text=cleanText(req.body.text,1200), image=req.body.image;
+  if(image!=null && (typeof image!=='string' || image.length>160000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(image))) return res.status(400).json({error:'Foto non valida o troppo grande.'});
+  if(image){const binary=Buffer.from(image.split(',')[1],'base64');if(binary.length>115000 || binary.length<100 || binary[0]!==255 || binary[1]!==216 || binary[2]!==255)return res.status(400).json({error:'La foto deve essere inferiore a 115 KB.'});}
+  if(!text && !image)return res.status(400).json({error:'Scrivi un messaggio o aggiungi una foto.'});
+  db.messages ||= {};
+  const message={id:token(9),from:req.user.id,name:req.user.name,text,image:image||null,at:t};
+  db.messages[chat.key] ||= [];db.messages[chat.key].push(message);
+  db.messages[chat.key]=db.messages[chat.key].slice(-60);save();
+  for(const id of chat.members)for(const sock of connections(id))sendSocket(sock,{type:'chat-new',chatType:req.params.type,target:req.params.target,from:req.user.id});
+  res.json({ok:true,message});
+});
 app.post('/api/sos/start', requireAuth, async (req,res) => {
   let alert = currentAlert(req.user.id);
-  if (!alert) { alert={id:token(12),userId:req.user.id,startedAt:now(),active:true,hasAudio:false,kind:'sos'}; db.alerts[alert.id]=alert; save(); refreshRelated(req.user.id); void notifyContacts(req.user.id, req.user.name).catch(()=>{}); }
+  const recipients=[...new Set((req.user.sosRecipients||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)))];
+  if(!recipients.length && !alert)return res.status(400).json({error:'Seleziona prima i destinatari SOS nella sezione Cerchie.'});
+  if (!alert) { alert={id:token(12),userId:req.user.id,recipients,startedAt:now(),active:true,hasAudio:false,kind:'sos'}; db.alerts[alert.id]=alert; save(); for(const id of alertAudience(alert))pushState(id); void notifyContacts(req.user.id, req.user.name, recipients).catch(()=>{}); }
   res.json({ok:true,id:alert.id});
 });
 app.post('/api/sos/stop', requireAuth, (req,res) => {
@@ -224,7 +294,7 @@ app.post('/api/sos/stop', requireAuth, (req,res) => {
   a.active=false; a.hasAudio=false; a.endedAt=now();
   if (!req.user.sharing) locations.delete(req.user.id);
   save(); refreshRelated(req.user.id);
-  for (const id of activeRecipients(req.user.id)) for (const ws of connections(id)) sendSocket(ws,{type:'sos-ended',userId:req.user.id});
+  for (const id of alertAudience(a)) for (const ws of connections(id)) sendSocket(ws,{type:'sos-ended',userId:req.user.id});
   res.json({ok:true});
 });
 // Experimental Pick Pocket: browser sensors and alarm cannot lock Android or resist shutdown.
@@ -281,12 +351,12 @@ wss.on('connection', ws => {
     }
     if (m.type==='listen-request') {
       const owner=String(m.to||''); const a=currentAlert(owner);
-      if (!a || a.kind==='pickpocket' || !a.hasAudio || !sharedCircle(self,owner) || owner===self) return;
+      if (!a || a.kind==='pickpocket' || !a.hasAudio || !canSeeAlert(self,a) || owner===self) return;
       relay(owner,{type:'listen-request',from:self,alertId:a.id},true);
     }
     if (m.type==='rtc') {
       const target=String(m.to||''); const a=currentAlert(self) || currentAlert(target);
-      if (!a || a.kind==='pickpocket' || !sharedCircle(self,target) || ![self,target].includes(a.userId) || self===target) return;
+      if (!a || a.kind==='pickpocket' || !canSeeAlert(self,a) || !canSeeAlert(target,a) || ![self,target].includes(a.userId) || self===target) return;
       const signal=m.signal;
       if (!signal || typeof signal!=='object' || !['offer','answer','candidate'].includes(signal.kind) || JSON.stringify(signal).length>24000) return;
       relay(target,{type:'rtc',from:self,alertId:a.id,signal});
