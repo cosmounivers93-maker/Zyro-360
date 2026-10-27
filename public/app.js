@@ -18,6 +18,9 @@ let listeningTo = null;
 let geolocationError = '';
 let lastAlertKey = '';
 const inviteCodes = new Map();
+let chatRoom=null, chatPhotoData=null;
+let sosPending=null;
+let inviteFromLink=null;
 // Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
 let mapTracking=false, ownCentered=false;
 let zyroMap=null;
@@ -52,6 +55,7 @@ function connectSocket(){
     if(m.type==='state'){setState(m.data);}
     if(m.type==='listen-request') await action(()=>sendOffer(m.from));
     if(m.type==='rtc') await action(()=>handleRTC(m.from,m.signal));
+    if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
   };
   ws.onclose=()=>{if(socket!==ws)return;socket=null;connection(false);if(current)wsRetry=setTimeout(connectSocket,3000);};
@@ -64,8 +68,8 @@ function setState(data){
   const prev = current;
   current=data;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
-  updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderSettings();renderPickControls();
+  updateGeo(null, data.me.sharing || (data.me.alertKind==='pickpocket' && data.me.theftShare) || mapTracking || pickArmed);
+  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
 
@@ -79,14 +83,14 @@ function locationUrl(p){return `https://www.openstreetmap.org/?mlat=${encodeURIC
 function renderHome(){
   if(!current)return;
   const me=current.me, contacts=uniqueContacts(), pick=me.alertKind==='pickpocket', sos=!!me.sos&&!pick;
-  $('greetingName').textContent=me.name.split(' ')[0];$('myAvatar').textContent=initials(me.name);
+  $('greetingName').textContent=me.name.split(' ')[0];setAvatar($('myAvatar'),me); 
   $('totalMembers').textContent=contacts.length;$('totalCircles').textContent=current.circles.length;
   $('shareToggle').checked=!!me.sharing; $('shareToggle').disabled=!!me.sos;
-  const liveGPS=me.sharing||sos||(pick&&me.theftShare);
-  $('myLocationText').textContent= sos?'GPS richiesto durante SOS · attivo fino alla fine dell’allarme':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
+  const liveGPS=me.sharing||(pick&&me.theftShare);
+  $('myLocationText').textContent= sos?'SOS attivo. Posizione condivisa solo se già autorizzata.':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
   $('sosCard').classList.toggle('is-active',!!me.sos);
-  $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS inviato alla tua cerchia':'Hai bisogno di aiuto?';
-  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'L’allarme è visibile alle persone della cerchia. Tieni aperta l’app per GPS e audio live.':'Nessun contatto nella tua cerchia: il tuo SOS non raggiunge nessuno. In emergenza chiama il 112.'):'Premi il pulsante per avvisare la tua cerchia e condividere la tua posizione in tempo reale.';
+  $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS inviato ai contatti selezionati':'Hai bisogno di aiuto?';
+  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'Le persone selezionate vedono l’allarme. Premi «Attiva microfono» se vuoi trasmettere audio.':'Nessun contatto nella tua cerchia: il tuo SOS non raggiunge nessuno. In emergenza chiama il 112.'):'Premi SOS per avvisare soltanto i destinatari selezionati. La condivisione GPS è indipendente.';
   $('sosButton').disabled=!!me.sos;
   $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Attiva SOS');
   $('sosActiveActions').classList.toggle('hidden',!sos);
@@ -95,7 +99,7 @@ function renderHome(){
   $('contactsList').innerHTML=contacts.length?contacts.map((u,i)=>{
     const status=u.sos?(u.sos.kind==='pickpocket'?'🚨 POSSIBILE FURTO':'🆘 SOS ATTIVO'):u.online?(u.sharing?'Posizione attiva':'Online'):'Offline';
     const loc=u.location, time=loc?when(loc.updatedAt):(u.sharing?'Posizione in attesa':'Posizione non condivisa');
-    return `<div class="contact-card"><div class="contact-avatar ${i%2?'alt':''}">${escapeHtml(initials(u.name))}</div><div class="contact-info"><b>${escapeHtml(u.name)}</b><small>${escapeHtml(time)}</small></div><div class="contact-actions"><span class="status-chip ${u.sos?'alert':!u.online?'off':''}">${escapeHtml(status)}</span>${loc?`<a class="mini-btn" target="_blank" rel="noopener noreferrer" href="${locationUrl(loc)}">📍 Mappa</a>`:''}${u.sos?.hasAudio?`<button type="button" class="mini-btn audio" data-listen="${escapeHtml(u.id)}">🎧 Ascolta</button>`:''}</div></div>`;
+    return `<div class="contact-card"><div class="contact-avatar ${i%2?'alt':''}">${avatarHTML(u)}</div><div class="contact-info"><b>${escapeHtml(u.name)}</b><small>${escapeHtml(time)}</small></div><div class="contact-actions"><span class="status-chip ${u.sos?'alert':!u.online?'off':''}">${escapeHtml(status)}</span>${loc?`<a class="mini-btn" target="_blank" rel="noopener noreferrer" href="${locationUrl(loc)}">📍 Mappa</a>`:''}${u.sos?.hasAudio?`<button type="button" class="mini-btn audio" data-listen="${escapeHtml(u.id)}">🎧 Ascolta</button>`:''}</div></div>`;
   }).join(''):`<div class="empty-state"><div class="empty-symbol">♧</div><strong>La tua cerchia inizia da qui</strong>Aggiungi le persone di cui ti fidi per condividere la posizione e ricevere SOS.</div>`;
   const otherAlerts=current.alerts.filter(a=>a.userId!==me.id);
   $('activeAlerts').classList.toggle('hidden',!otherAlerts.length);
@@ -103,11 +107,11 @@ function renderHome(){
   document.querySelectorAll('[data-listen]').forEach(btn=>btn.addEventListener('click',()=>action(()=>listenTo(btn.dataset.listen))));
   renderMap();
 }
-function inviteBox(code){return `<div class="invite-code-box"><small>CODICE MONOUSO · VALIDO 24 ORE</small><code>${escapeHtml(code)}</code><button type="button" class="copy-code">Copia codice</button></div>`;}
+function inviteBox(code){const link=location.origin+'/?invite='+encodeURIComponent(code);return `<div class="invite-code-box"><small>LINK E CODICE MONOUSO · VALIDI 24 ORE</small><code>${escapeHtml(code)}</code><button type="button" class="copy-code">Copia codice</button><input readonly aria-label="Link invito" value="${escapeHtml(link)}"><div class="invite-share-actions"><button type="button" class="copy-invite-link">🔗 Copia link</button><button type="button" class="share-invite-link">↗ Condividi</button></div></div>`;}
 function renderCircles(){
   if(!current)return;
   const list=$('circlesList');
-  list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions"><button type="button" data-invite="${escapeHtml(c.id)}">✚ Genera codice invito</button>${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
+  list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions"><button type="button" data-chatcircle="${escapeHtml(c.id)}">💬 Chat gruppo</button><button type="button" data-invite="${escapeHtml(c.id)}">✚ Genera codice invito</button>${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
   list.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
     const r=await post('/api/invites',{circleId:b.dataset.invite});
     const target=b.closest('.circle-card').querySelector('.invite-target');
@@ -115,12 +119,57 @@ function renderCircles(){
     bindCopyCodes(target);
   })));
   bindCopyCodes(list);
+  list.querySelectorAll('[data-chatcircle]').forEach(b=>b.addEventListener('click',()=>openChat('circle',b.dataset.chatcircle)));
   list.querySelectorAll('[data-leave]').forEach(b=>b.addEventListener('click',()=>action(async()=>{if(!confirm('Vuoi davvero uscire da questa cerchia?'))return;await post('/api/circles/leave',{circleId:b.dataset.leave});await refresh();toast('Hai lasciato la cerchia.');})));
   list.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',()=>action(async()=>{if(!confirm('Eliminare definitivamente questa cerchia per tutti i membri?'))return;await post('/api/circles/delete',{circleId:b.dataset.delete});await refresh();toast('Cerchia eliminata.');})));
 }
-function bindCopyCodes(root){root.querySelectorAll('.copy-code').forEach(btn=>btn.addEventListener('click',async()=>{const code=btn.closest('.invite-code-box')?.querySelector('code')?.textContent;try{await navigator.clipboard.writeText(code);toast('Codice copiato. Condividilo solo con una persona fidata.');}catch{toast('Seleziona e copia il codice mostrato.');}}));}
-function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;$('profileAvatar').textContent=initials(current.me.name);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
-function showView(view){activeView=view;for(const v of ['home','circles','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();zyroMap?.invalidateSize();});}}
+function bindCopyCodes(root){
+  root.querySelectorAll('.copy-code').forEach(btn=>btn.addEventListener('click',()=>copyInvite(btn.closest('.invite-code-box')?.querySelector('code')?.textContent,'Codice copiato.')));
+  root.querySelectorAll('.copy-invite-link').forEach(btn=>btn.addEventListener('click',()=>copyInvite(btn.closest('.invite-code-box')?.querySelector('input')?.value,'Link copiato. Invialo a una persona fidata.')));
+  root.querySelectorAll('.share-invite-link').forEach(btn=>btn.addEventListener('click',()=>action(async()=>{const link=btn.closest('.invite-code-box')?.querySelector('input')?.value;if(navigator.share)await navigator.share({title:'Invito ZYRO 360',text:'Entra nella mia cerchia privata di ZYRO 360',url:link});else await copyInvite(link,'Link copiato. Puoi incollarlo su WhatsApp o Telegram.');})));
+}
+async function copyInvite(value,message){try{await navigator.clipboard.writeText(value);toast(message);}catch{toast('Tieni premuto sul testo per copiarlo.',true);}}
+function setAvatar(el,user){const image=user.avatar;if(image?.startsWith('data:image/jpeg;base64,')){el.textContent='';el.style.backgroundImage=`url("${image}")`;el.classList.add('has-photo');}else{el.style.backgroundImage='';el.textContent=initials(user.name);el.classList.remove('has-photo');}}
+function avatarHTML(user){return user.avatar?.startsWith('data:image/jpeg;base64,') ? `<img src="${user.avatar}" alt="" class="avatar-image">` : escapeHtml(initials(user.name));}
+function renderSOSRecipients(){
+  if(!current)return;
+  const contacts=uniqueContacts(), selected=new Set(sosPending===null ? (current.me.sosRecipients||[]) : sosPending);
+  const node=$('sosRecipientList');
+  node.innerHTML=contacts.length?contacts.map(u=>`<label class="recipient-line"><input type="checkbox" data-sos-to="${escapeHtml(u.id)}" ${selected.has(u.id)?'checked':''}><span>${avatarHTML(u)} ${escapeHtml(u.name)}</span></label>`).join(''):'<p class="setting-description">Invita prima una persona nella cerchia.</p>';
+  $('sosPushNote').textContent=current.pushEnabled?'Le notifiche push richiedono che i destinatari le abilitino sul loro telefono.':'⚠ Notifiche push non configurate su Render: gli allarmi possono essere visualizzati solo nell’app aperta. Non usarli per emergenze reali.';
+}
+async function imageData(file,maxPx=520,maxBytes=105000){
+  if(!file?.type?.startsWith('image/'))throw Error('Seleziona una fotografia.');
+  if(file.size>12*1024*1024)throw Error('La foto originale è troppo grande (massimo 12 MB).');
+  const url=URL.createObjectURL(file);
+  try{
+    const img=new Image();img.src=url;await img.decode();
+    const scale=Math.min(1,maxPx/Math.max(img.width,img.height));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));
+    canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+    for(const q of [.78,.60,.44,.3]){const data=canvas.toDataURL('image/jpeg',q);if(data.length<=maxBytes*1.33)return data;}
+    throw Error('Foto ancora troppo grande. Scegline una più piccola.');
+  }finally{URL.revokeObjectURL(url);}
+}
+async function saveAvatar(file){const avatar=await imageData(file,400,100000);await post('/api/profile/avatar',{avatar});await refresh();toast('Foto profilo aggiornata.');}
+function renderChatRooms(){
+  if(!current)return;
+  const circles=current.circles, contacts=uniqueContacts();
+  $('chatRooms').innerHTML=`<p class="chat-section-label">👨‍👩‍👧‍👦 Gruppi famiglia</p>`+(circles.length?circles.map(c=>`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon">◎</span><span><b>${escapeHtml(c.name)}</b><small>${c.members.length} membri · chat di gruppo</small></span><span>›</span></button>`).join(''):'<p class="setting-description">Crea una cerchia per avere la sua chat.</p>')+`<p class="chat-section-label">💬 Chat amici</p>`+(contacts.length?contacts.map(u=>`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon">${avatarHTML(u)}</span><span><b>${escapeHtml(u.name)}</b><small>Conversazione privata</small></span><span>›</span></button>`).join(''):'<p class="setting-description">Invita gli amici per messaggiare.</p>');
+  $('chatRooms').querySelectorAll('.chat-room').forEach(b=>b.addEventListener('click',()=>openChat(b.dataset.typ,b.dataset.id)));
+}
+function openChat(type,id){chatRoom={type,id};showView('chats');$('chatConversation').classList.remove('hidden');const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);$('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';$('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · membri della cerchia':'Chat privata · solo voi due';loadChat().catch(e=>toast(e.message,true));}
+async function loadChat(){
+  const r=chatRoom;if(!r||!current)return;
+  const response=await api(`/api/chat/${encodeURIComponent(r.type)}/${encodeURIComponent(r.id)}`);
+  if(chatRoom!==r)return;
+  const node=$('chatMessages');node.innerHTML=response.messages.length?response.messages.map(m=>`<article class="chat-bubble ${m.from===current.me.id?'mine':''}"><small>${escapeHtml(m.name)} · ${new Date(m.at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}</small>${m.text?`<p>${escapeHtml(m.text)}</p>`:''}${m.image?`<img loading="lazy" src="${m.image}" alt="Foto nella conversazione">`:''}</article>`).join(''):'<p class="chat-empty">Nessun messaggio. Inizia tu la conversazione!</p>';
+  node.scrollTop=node.scrollHeight;
+}
+async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
+
+function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
+function showView(view){activeView=view;for(const v of ['home','circles','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();zyroMap?.invalidateSize();});}}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;geolocationError='';renderMap();return;}
   if(watchId!==null)return;
@@ -128,7 +177,7 @@ function updateGeo(oldOn,newOn){
   geolocationError='';
   watchId=navigator.geolocation.watchPosition(async(p)=>{
     lastCoords={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy,heading:Number.isFinite(p.coords.heading)?p.coords.heading:compassHeading};geolocationError='';
-    const canShare=!!current?.me?.sharing || (!!current?.me?.sos && (current.me.alertKind!=='pickpocket' || !!current.me.theftShare));
+    const canShare=!!current?.me?.sharing || (current?.me?.alertKind==='pickpocket' && !!current.me.theftShare);
     if(canShare && Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
     renderHome();
   },err=>{geolocationError=`GPS: ${err.message||'permesso negato'}`;renderHome();toast(geolocationError,true);},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
@@ -137,8 +186,8 @@ async function refresh(){if(!current)return;const data=await api('/api/state');s
 async function startSOS(){
   // Send the alarm first: microphone access must not delay the emergency alert.
   await post('/api/sos/start');await refresh();
-  toast(uniqueContacts().length?'SOS attivato. I contatti collegati possono vedere il tuo allarme.':'SOS attivo, ma non hai contatti collegati alla cerchia: chiama 112 in emergenza.',!uniqueContacts().length);
-  try{await startAudio();}catch(e){toast(`SOS attivo ma microfono non disponibile: ${e.message}`,true);}
+  toast('Allerta SOS inviata al server ai contatti selezionati. Le notifiche push non sono garantite.');
+  toast(current.pushEnabled?'Se vuoi trasmettere l’audio premi «Attiva microfono».':'Attenzione: push non configurate sul server. Avvisa la persona anche con una chiamata.',!current.pushEnabled);
 }
 async function stopSOS(){if(!confirm('Confermi di voler terminare l’allarme SOS?'))return;await post('/api/sos/stop');stopAudio();await refresh();toast('SOS terminato.');}
 async function startAudio(){
@@ -298,9 +347,16 @@ class ZyroNativeMap {
       if(!img){
         img=document.createElement('img');img.className='zyro-map-tile';img.alt='';img.draggable=false;
         img.decoding='async';img.loading='eager';
+        const route=`${z}/${normalizedX}/${row}.png`;
+        let source=0;
         img.addEventListener('load',()=>{this.loaded++;this.updateTileStatus();});
-        img.addEventListener('error',()=>{this.failed++;this.updateTileStatus();});
-        img.src=`https://tile.openstreetmap.org/${z}/${normalizedX}/${row}.png`;
+        img.addEventListener('error',()=>{
+          source++;
+          if(source===1){img.src=`https://tile.openstreetmap.org/${route}`;return;}
+          if(source===2){img.src=`https://tile.openstreetmap.fr/hot/${route}`;return;}
+          this.failed++;this.updateTileStatus();
+        });
+        img.src=`/api/map-tile/${route}`;
         this.tilesByKey.set(key,img);this.tiles.append(img);
       }
       img.style.transform=`translate3d(${Math.round(col*MAP_TILE_SIZE-left)}px,${Math.round(row*MAP_TILE_SIZE-top)}px,0)`;
@@ -472,10 +528,12 @@ async function previewSiren(){
   setTimeout(()=>{if(!theftTriggered)stopSiren();},2000);
 }
 async function init(){
+  const params=new URLSearchParams(location.search);inviteFromLink=params.get('invite');
+  if(inviteFromLink && /^[A-Fa-f0-9]{18}$/.test(inviteFromLink)){history.replaceState(null,'',location.pathname);$('inviteInput').value=inviteFromLink.toUpperCase();}else inviteFromLink=null;
   document.querySelectorAll('.auth-tab').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
   $('authForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{
     const payload={email:$('email').value.trim(),password:$('password').value};if(authMode==='register')payload.name=$('name').value.trim();
-    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
+    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
   $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){zyroMap?.focusOn(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
@@ -485,16 +543,24 @@ async function init(){
   $('pickTest').addEventListener('click',()=>action(previewSiren));
   $('theftStop').addEventListener('click',()=>action(stopTheft));
   $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/circles',{name:$('circleName').value});$('circleName').value='';await refresh();toast('Cerchia creata! Ora puoi generare un invito.');});});
-  $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/invites/join',{code:$('inviteInput').value});$('inviteInput').value='';await refresh();toast('Ora fai parte della cerchia!');});});
+  $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/invites/join',{code:$('inviteInput').value});$('inviteInput').value='';await refresh();inviteFromLink=null;toast('Ora fai parte della cerchia!');});});
   $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
   $('sosButton').addEventListener('click',()=>action(startSOS));
   $('stopSOS').addEventListener('click',()=>action(stopSOS));
   $('audioButton').addEventListener('click',()=>action(async()=>{if(localStream){stopAudio();toast('Microfono disattivato. Il tuo SOS rimane attivo.');}else await startAudio();}));
+  $('sosRecipientList').addEventListener('change',()=>{sosPending=[...$('sosRecipientList').querySelectorAll('[data-sos-to]:checked')].map(x=>x.dataset.sosTo);});
+  $('saveSOSRecipients').addEventListener('click',()=>action(async()=>{const recipients=[...$('sosRecipientList').querySelectorAll('[data-sos-to]:checked')].map(x=>x.dataset.sosTo);await post('/api/settings/sos-recipients',{recipients});sosPending=null;await refresh();toast('Destinatari SOS salvati.');}));
+  for(const id of ['avatarCamera','avatarGallery'])$(id).addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(()=>saveAvatar(file));e.target.value='';});
+  $('avatarRemove').addEventListener('click',()=>action(async()=>{await post('/api/profile/avatar',{avatar:null});await refresh();toast('Foto profilo rimossa.');}));
+  $('chatClose').addEventListener('click',()=>{chatRoom=null;$('chatConversation').classList.add('hidden');});
+  $('chatForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const text=$('chatText').value.trim();if(!text&&!chatPhotoData)return;await sendChat(text,chatPhotoData);});});
+  $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});
+  document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();current=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js').catch(()=>{});
-  try{const data=await api('/api/state');setState(data);connectSocket();}catch{ /* Guest sees login */ }
+  try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
   window.addEventListener('pagehide',()=>{ /* Browsers may suspend GPS, sensors and audio: never promise background safety. */ });
