@@ -1007,3 +1007,30 @@ html[data-theme="dark"] body.zyro-chat-full #chatConversation .chat-compose,
 html[data-theme="dark"] body.zyro-chat-full #chatPendingPhoto:not(:empty){background:#0b2538;border-color:#255566}
 html[data-theme="dark"] body.zyro-chat-full #chatText{background:#123349;border-color:#2b6370;color:#ecfafa}
 html[data-theme="dark"] body.zyro-chat-full .chat-older{background:#113d50;color:#baf7e8;border-color:#2f807a}
+
+/* V15.4 — private administrator interface; never display for unprivileged accounts. */
+.zyro-admin-panel{margin:18px 0;padding:20px 16px;border-radius:24px;border:1px solid #2bb8a774;background:linear-gradient(165deg,#f0fffc,#edf5fa);box-shadow:0 12px 34px #0f3f4814;color:#163746}
+.zyro-admin-panel.hidden{display:none!important}
+.zyro-admin-head{display:flex;align-items:flex-start;gap:12px}
+.zyro-admin-lock{font-size:27px}
+.zyro-admin-head h2{font-size:20px;margin:4px 0 7px}.zyro-admin-head p{margin:0;color:#576e7d;font-size:12px;line-height:1.6}
+.zyro-admin-toolbar{display:grid;gap:10px;margin:20px 0 10px}
+.zyro-admin-toolbar input{border:1px solid #d1e7e8;background:white;border-radius:14px;font:inherit;padding:13px;width:100%;min-width:0}
+.zyro-admin-users,.zyro-admin-reports{display:grid;gap:11px;margin-top:12px}
+.zyro-admin-user,.zyro-admin-report{border:1px solid #d5e7e9;border-radius:17px;padding:13px;background:white;min-width:0}
+.zyro-admin-user-title{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.zyro-admin-user-title b{font-size:14px}.zyro-admin-user>p,.zyro-admin-report p{font-size:12px;color:#657f8c;overflow-wrap:anywhere;margin:5px 0 10px}
+.zyro-admin-chip{font-size:10px;padding:5px 9px;border-radius:30px;background:#eef3f8;color:#40546c;font-weight:800}
+.zyro-admin-chip.is-banned{background:#ffe7ec;color:#a32d49}.zyro-admin-chip.is-gift{background:#ddf8ed;color:#087854}
+.zyro-admin-meta{display:grid;grid-template-columns:84px minmax(0,1fr);gap:8px 7px;font-size:11px;align-items:center}
+.zyro-admin-meta small{color:#66808c}.zyro-admin-meta code,.zyro-admin-meta span{overflow-wrap:anywhere;user-select:text;font-size:11px}
+.zyro-admin-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:14px}
+.zyro-admin-actions button,.zyro-admin-report button{border:1px solid #8adad0;background:#ebfbf7;border-radius:10px;padding:10px 11px;color:#096d62;font-weight:800;font-size:11px}
+.zyro-admin-actions button:first-child{background:#fff1f3;border-color:#f2cbd2;color:#af3755}
+.zyro-admin-reports h3{font-size:15px;margin:8px 0 0}
+.zyro-admin-logs{margin:16px 0;border-top:1px solid #cbe7e9;padding:13px 2px;font-size:12px}.zyro-admin-logs p{overflow-wrap:anywhere}
+[data-theme="dark"] .zyro-admin-panel,body.dark-theme .zyro-admin-panel{background:linear-gradient(150deg,#0c2337,#133b47);color:#f0ffff;border-color:#216475}
+[data-theme="dark"] .zyro-admin-user,[data-theme="dark"] .zyro-admin-report,body.dark-theme .zyro-admin-user,body.dark-theme .zyro-admin-report{background:#122e3d;color:#fff;border-color:#335466}
+
+.zyro-report-panel select,.zyro-report-panel textarea{width:100%;padding:12px;border-radius:12px;background:#fff;border:1px solid #cfe0e3;font:inherit;color:#183b4e;box-sizing:border-box}
+.zyro-report-panel textarea{resize:vertical;min-height:74px}

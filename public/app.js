@@ -1,6 +1,8 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let current = null;
+let adminUsersCache = [];
+let adminLoaded = false;
 let socket = null;
 let wsRetry = null;
 let watchId = null;
@@ -152,6 +154,7 @@ function connectSocket(){
     if(m.type==='state'){setState(m.data);}
     if(m.type==='listen-request') await action(()=>sendOffer(m.from));
     if(m.type==='rtc') await action(()=>handleRTC(m.from,m.signal));
+    if(m.type==='account-banned'){alert(m.notice||'Account sospeso.');location.reload();return;}
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
   };
@@ -166,13 +169,84 @@ function setState(data){
   current=data;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();
+  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
 
   const key = data.alerts.filter(a=>a.userId!==data.me.id).map(a=>a.id).sort().join(',');
   if(prev && key && key !== lastAlertKey) toast('🆘 Nuovo SOS nella tua cerchia.',true);
   lastAlertKey=key;
+}
+// Admin UI is only an interface. Every admin endpoint separately verifies the owner's server-side user ID.
+function renderAdminAccess(){
+ const admin=Boolean(current?.me?.isAdmin);
+ $('zyroAdminPanel').classList.toggle('hidden',!admin);
+ $('myAccountId').textContent=current?.me?.id||'';
+ if(!admin){adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
+}
+function renderReportContacts(){
+ const select=$('reportUser');if(!select)return;
+ const contacts=uniqueContacts(),v=select.value;
+ const signature=contacts.map(u=>`${u.id}:${u.name}`).sort().join('|');
+ if(select.dataset.signature===signature)return;
+ select.dataset.signature=signature;
+ select.innerHTML='<option value="">Seleziona un contatto</option>'+contacts.map(u=>`<option value="${escapeHtml(u.id)}">${escapeHtml(u.name)}</option>`).join('');
+ select.value=contacts.some(u=>u.id===v)?v:'';
+}
+async function submitReport(){
+ const userId=$('reportUser').value,reason=$('reportReason').value.trim();
+ if(!userId)throw Error('Seleziona il contatto da segnalare.');
+ if(reason.length<12)throw Error('Descrivi il motivo in almeno 12 caratteri.');
+ if(!confirm('Inviare una segnalazione privata all’amministratore?'))return;
+ const result=await post('/api/report',{userId,reason});
+ $('reportReason').value='';toast(result.message||'Segnalazione inviata.');
+}
+function fmtAdminDate(n){return n?new Date(n).toLocaleString('it-IT'):'Non disponibile';}
+function renderAdminUsers(){
+ const term=$('adminFilter').value.trim().toLowerCase();
+ const users=adminUsersCache.filter(u=>[u.name,u.email,u.id].some(v=>String(v||'').toLowerCase().includes(term)));
+ $('adminUsers').innerHTML=users.length?users.map(u=>`<article class="zyro-admin-user">
+ <div class="zyro-admin-user-title"><b>${escapeHtml(u.name)}</b><span class="zyro-admin-chip ${u.bannedAt?'is-banned':u.premiumGiftLifetime?'is-gift':''}">${u.bannedAt?'Sospeso':u.premiumGiftLifetime?'Premium a vita':u.premiumActive?'Premium attivo':'Standard'}</span></div>
+ <p>${escapeHtml(u.email)}</p><div class="zyro-admin-meta"><small>ID</small><code>${escapeHtml(u.id)}</code><small>Ultimo IP</small><code>${escapeHtml(u.lastLoginIp||'Non disponibile')}</code><small>Ultimo accesso</small><span>${escapeHtml(fmtAdminDate(u.lastLoginAt))}</span></div>
+ ${u.id===current.me.id?'<small>Account proprietario — non sospendibile.</small>':`<div class="zyro-admin-actions"><button type="button" data-admin-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button><button type="button" data-admin-gift="${escapeHtml(u.id)}">${u.premiumGiftLifetime?'Revoca regalo Premium':'Regala Premium a vita'}</button></div>`}
+ </article>`).join(''):'<p class="setting-description">Nessun account corrispondente alla ricerca.</p>';
+ $('adminUsers').querySelectorAll('[data-admin-ban]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeBan(b.dataset.adminBan))));
+ $('adminUsers').querySelectorAll('[data-admin-gift]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeGift(b.dataset.adminGift))));
+}
+async function adminLoad(){
+ if(!current?.me?.isAdmin)return;
+ $('adminStatus').textContent='Caricamento account e segnalazioni…';
+ const data=await api('/api/admin/users');
+ adminUsersCache=data.users||[];adminLoaded=true;renderAdminUsers();
+ $('adminReports').innerHTML=(data.reports||[]).length?`<h3>Segnalazioni recenti</h3>`+(data.reports||[]).map(r=>`<div class="zyro-admin-report"><b>${escapeHtml(r.reason)}</b><p>ID segnalato: ${escapeHtml(r.userId)} · ID segnalante: ${escapeHtml(r.reporterId)}</p><small>${fmtAdminDate(r.at)} · ${escapeHtml(r.status)}</small>${r.status==='open'?`<button type="button" data-admin-review="${escapeHtml(r.id)}">Segna come esaminata</button>`:''}</div>`).join(''):'';
+ $('adminReports').querySelectorAll('[data-admin-review]').forEach(b=>b.addEventListener('click',()=>action(()=>adminReview(b.dataset.adminReview))));
+ $('adminAudit').innerHTML=(data.audit||[]).map(a=>`<p><b>${escapeHtml(a.kind)}</b> · ${escapeHtml(a.for||'')} · ${escapeHtml(fmtAdminDate(a.at))}</p>`).join('')||'<p>Nessuna azione registrata.</p>';
+ $('adminStatus').textContent=`${adminUsersCache.length} account registrati. Dati visibili esclusivamente al proprietario.`;
+}
+async function adminChangeBan(id){
+ const u=adminUsersCache.find(x=>x.id===id);if(!u)return;
+ const ban=!u.bannedAt;
+ const reason=ban?prompt(`Motivo della sospensione di ${u.name}:`):'Rimozione della sospensione';
+ if(reason===null||ban&&reason.trim().length<8){if(reason!==null)toast('Inserisci una motivazione di almeno 8 caratteri.',true);return;}
+ if(!confirm(`${ban?'Sospendere':'Riattivare'} l’account ${u.name}?`))return;
+ const password=prompt('Conferma l’operazione con la password del tuo account amministratore:');
+ if(password===null||!password)return;
+ await post('/api/admin/ban',{userId:id,banned:ban,reason,password});
+ await adminLoad();toast(ban?'Account sospeso. Accesso revocato.':'Account riattivato.');
+}
+async function adminChangeGift(id){
+ const u=adminUsersCache.find(x=>x.id===id);if(!u)return;
+ const enabled=!u.premiumGiftLifetime;
+ if(!confirm(`${enabled?'Regalare Premium per sempre':'Revocare il regalo Premium'} a ${u.name}?`))return;
+ const password=prompt('Conferma con la password del tuo account amministratore:');
+ if(password===null||!password)return;
+ await post('/api/admin/premium-gift',{userId:id,enabled,password});
+ await adminLoad();toast(enabled?'Premium a vita concesso.':'Regalo Premium revocato.');
+}
+async function adminReview(reportId){
+ const password=prompt('Conferma con la password del tuo account amministratore:');if(!password)return;
+ await post('/api/admin/report-resolve',{reportId,password,status:'reviewed'});
+ await adminLoad();toast('Segnalazione esaminata.');
 }
 function uniqueContacts(){const contacts=new Map();for(const c of current?.circles||[])for(const m of c.members)if(m.id!==current.me.id)contacts.set(m.id,m);return [...contacts.values()];}
 function when(ts){if(!ts)return 'Nessuna posizione';const diff=Date.now()-ts;if(diff<60000)return 'Aggiornata ora';if(diff<3600000)return `${Math.round(diff/60000)} min fa`;return `${Math.round(diff/3600000)} ore fa`;}
@@ -818,7 +892,7 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.premiumActive?`Premium attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`:'Abbonamento Premium non attivo. Acquisti Play Store non ancora configurati: non è possibile inviare SOS Premium.';
+ $('premiumStatus').textContent=me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`Premium attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Abbonamento Premium non attivo. Acquisti Play Store non ancora configurati: non è possibile inviare SOS Premium.';
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
   const root=$(container);const members=uniqueContacts();const signature=members.map(x=>x.id).join(',');
@@ -894,11 +968,15 @@ async function init(){
   $('chatForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const text=$('chatText').value.trim();if(!text&&!chatPhotoData)return;await sendChat(text,chatPhotoData);});});
   $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
+  $('reportSubmit').addEventListener('click',()=>action(submitReport));
+  $('adminLoad').addEventListener('click',()=>action(adminLoad));
+  $('adminFilter').addEventListener('input',renderAdminUsers);
+  $('copyMyId').addEventListener('click',async()=>{if(!current)return;try{await navigator.clipboard.writeText(current.me.id);toast('ID account copiato.');}catch{toast('Seleziona e copia il tuo ID visualizzato sopra.',true);}});
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=15.2-push-test').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=15.4-admin').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});

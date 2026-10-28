@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v15.3-chat-fullscreen">
+  <meta name="zyro-ui-build" content="v15.4-admin-privato">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="/style.css?v=15.3-chat">
+  <link rel="stylesheet" href="/style.css?v=15.4-admin">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -209,8 +209,24 @@
           <p id="pushTestStatus" class="setting-description" role="status" aria-live="polite">Richiede due account collegati in una cerchia e le notifiche abilitate sul telefono destinatario.</p>
         </div>
       </div>
-      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento. Per la sicurezza degli account, al login ZYRO 360 registra l’ultimo indirizzo IP per un massimo di 30 giorni; soltanto l’amministratore può consultarlo per verificare segnalazioni e abusi.</p></div>
       <div class="panel"><div class="panel-title"><span class="panel-icon warm">☏</span><div><h2>Numeri di emergenza</h2><p>In Italia e nell'UE il numero unico è 112</p></div></div><a href="tel:112" class="btn btn-outline btn-wide">Chiama il 112</a></div>
+      <section class="panel zyro-report-panel" aria-label="Segnala un uso scorretto">
+        <div class="panel-title"><span class="panel-icon">🛡</span><div><h2>Segnala un abuso</h2><p>Puoi segnalare un membro della tua cerchia per un comportamento scorretto. La segnalazione è riservata all’amministratore.</p></div></div>
+        <label class="field"><span>Utente da segnalare</span><select id="reportUser"><option value="">Seleziona un contatto</option></select></label>
+        <label class="field"><span>Motivo della segnalazione</span><textarea id="reportReason" rows="3" maxlength="400" placeholder="Spiega cosa è successo (senza condividere dati non necessari)"></textarea></label>
+        <button class="btn btn-outline btn-wide" id="reportSubmit" type="button">Invia segnalazione</button>
+      </section>
+      <section id="zyroAdminPanel" class="zyro-admin-panel hidden" aria-label="Gestione riservata amministratore">
+        <div class="zyro-admin-head"><span class="zyro-admin-lock">🔐</span><div><span class="mini-overline">ACCESSO ESCLUSIVO</span><h2>Centro amministratore</h2><p>Gestione privata degli utenti, segnalazioni e regali Premium. Solo per l'account proprietario autorizzato dal server.</p></div></div>
+        <div class="zyro-admin-toolbar"><button id="adminLoad" class="btn btn-dark" type="button">Aggiorna utenti</button><input id="adminFilter" type="search" aria-label="Cerca un account" placeholder="Cerca per nome, email o ID"></div>
+        <p id="adminStatus" class="setting-description" role="status">Il server verifica le tue autorizzazioni a ogni richiesta.</p>
+        <div id="adminReports" class="zyro-admin-reports"></div>
+        <div id="adminUsers" class="zyro-admin-users"></div>
+        <details class="zyro-admin-logs"><summary>Registro attività amministrative</summary><div id="adminAudit"></div></details>
+        <p class="setting-description">Gli indirizzi IP sono riservati, raccolti all'accesso e conservati al massimo 30 giorni per la gestione degli abusi. È necessario un archivio persistente e un'informativa privacy adeguata prima del lancio pubblico.</p>
+      </section>
+      <div class="panel"><div class="panel-title"><span class="panel-icon">🪪</span><div><h2>Il tuo ID account</h2><p>Il codice identificativo del tuo account ZYRO 360.</p></div></div><p id="myAccountId" class="setting-description" style="overflow-wrap:anywhere"></p><button id="copyMyId" type="button" class="btn btn-outline">Copia ID</button></div>
       <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
       <section class="how-it-works" id="zyroHelp" aria-labelledby="howTitle">
         <div class="how-heading"><span class="how-icon">?</span><div><p class="eyebrow muted">GUIDA E TRASPARENZA</p><h2 id="howTitle">Come funziona ZYRO 360?</h2><p>Tutto quello che devi sapere su protezione, privacy e uso corretto.</p></div></div>
@@ -238,6 +254,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=15.3-chat" defer></script>
+<script src="/app.js?v=15.4-admin" defer></script>
 </body>
 </html>

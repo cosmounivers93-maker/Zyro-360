@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='zyro-360-v15.3-full-chat';
+const CACHE='zyro-360-v15.4-admin';
 const ASSETS=['/','/index.html','/style.css','/app.js','/manifest.webmanifest','/assets/icon192.png','/assets/icon512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(async cache=>{await Promise.all(ASSETS.map(async url=>{try{await cache.add(url);}catch{/* Asset opzionale mancante: installa comunque l'aggiornamento. */}}));}));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
