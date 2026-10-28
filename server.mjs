@@ -72,7 +72,7 @@ const token = (n = 24) => crypto.randomBytes(n).toString('base64url');
 const now = () => Date.now();
 // Only a verified, server-side purchase may set premiumUntil. Never trust premium=true from a browser.
 // Actual Play Billing purchase verification is NOT configured in this web prototype.
-const premiumActive = user => user?.premiumGiftLifetime === true || Number(user?.premiumUntil || 0) > now();
+const premiumActive = user => isAdmin(user) || user?.premiumGiftLifetime === true || Number(user?.premiumUntil || 0) > now();
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
@@ -133,14 +133,15 @@ function stateFor(id) {
       const visibleAlert = alert && canSeeAlert(id,alert) ? alert : null;
       const shared = Boolean(u.sharing || (visibleAlert?.kind === 'pickpocket' && visibleAlert.recipients?.includes(id)));
       const location = (shared || (visibleAlert?.kind==='sos' && visibleAlert.recipients?.includes(id))) && locations.has(x) ? locations.get(x) : null;
-      return { ...publicUser(u), online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio, kind: alert.kind || 'sos' } : null };
+      const membership = db.memberships.find(m => m.circleId === c.id && m.userId === x);
+      return { ...publicUser(u), invitedByMe: membership?.invitedBy === id, joinedAt:membership?.joinedAt||null, online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio, kind: alert.kind || 'sos' } : null };
     })
   }));
   const alerts = Object.values(db.alerts).filter(a => a.active && canSeeAlert(id, a)).map(a => ({
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
     startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (db.users[a.userId]?.sharing || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -276,11 +277,17 @@ app.get('/api/admin/users',requireAuth,requireAdmin,(req,res)=>{
 // Reports are accepted only for another user actually sharing a circle with the reporter.
 app.post('/api/report',requireAuth,limit,(req,res)=>{
  const target=String(req.body.userId||''),reason=cleanText(req.body.reason,400);
+ if(isAdmin(req.user))return res.status(403).json({error:'Il proprietario riceve e gestisce le segnalazioni nel Centro amministratore.'});
  if(target===req.user.id||!db.users[target]||!sharedCircle(req.user.id,target))return res.status(403).json({error:'Puoi segnalare soltanto un altro membro della tua cerchia.'});
  if(reason.length<12)return res.status(400).json({error:'Descrivi brevemente il motivo della segnalazione (almeno 12 caratteri).'});
  db.userReports.push({id:token(9),reporterId:req.user.id,userId:target,reason,at:now(),status:'open'});
  if(db.userReports.length>300)db.userReports.splice(0,db.userReports.length-300);
- save();res.json({ok:true,message:'Segnalazione ricevuta. Sarà esaminata dall’amministratore.'});
+ save();
+ if (ADMIN_ID && db.users[ADMIN_ID]) {
+   for (const ws of connections(ADMIN_ID)) sendSocket(ws,{type:'admin-new-report'});
+   void sendEventPush([ADMIN_ID],'Nuova segnalazione • ZYRO 360','Un utente ha inviato una segnalazione da esaminare.');
+ }
+ res.json({ok:true,message:'Segnalazione ricevuta. Sarà esaminata dall’amministratore.'});
 });
 app.post('/api/admin/ban',requireAuth,requireAdmin,limit,(req,res)=>{
  if(!adminPassword(req,res))return;
@@ -318,7 +325,7 @@ app.post('/api/circles', requireAuth, limit, (req,res) => {
   if (name.length < 2) return res.status(400).json({error:'Dai un nome alla cerchia.'});
   if (userCircles(req.user.id).length >= MAX_USER_CIRCLES) return res.status(400).json({error:'Limite cerchie raggiunto.'});
   const id = token(12); db.circles[id] = {id, name, ownerId:req.user.id, createdAt:now()};
-  db.memberships.push({circleId:id, userId:req.user.id}); save(); refreshRelated(req.user.id); res.json({ok:true, circleId:id});
+  db.memberships.push({circleId:id, userId:req.user.id, joinedAt:now()}); save(); refreshRelated(req.user.id); res.json({ok:true, circleId:id});
 });
 app.post('/api/invites', requireAuth, limit, (req,res) => {
   const id = String(req.body.circleId || '');
@@ -334,7 +341,7 @@ app.post('/api/invites/join', requireAuth, limit, (req,res) => {
   if (userCircles(req.user.id).length >= MAX_USER_CIRCLES) return res.status(400).json({error:'Limite cerchie raggiunto.'});
   if (memberIds(inv.circleId).includes(req.user.id)) return res.status(400).json({error:'Sei già nella cerchia.'});
   if (memberIds(inv.circleId).length >= 30) return res.status(400).json({error:'Cerchia piena.'});
-  db.memberships.push({circleId:inv.circleId,userId:req.user.id}); delete db.invites[key]; save();
+  db.memberships.push({circleId:inv.circleId,userId:req.user.id,invitedBy:inv.createdBy,joinedAt:now()}); delete db.invites[key]; save();
   for (const id of memberIds(inv.circleId)) refreshRelated(id);
   res.json({ok:true});
 });

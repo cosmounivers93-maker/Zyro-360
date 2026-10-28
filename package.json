@@ -1,6 +1,6 @@
 {
   "name": "zyro-360",
-  "version": "0.15.5",
+  "version": "0.16.0",
   "private": true,
   "description": "MVP di rete di sicurezza tra persone di fiducia",
   "type": "module",
