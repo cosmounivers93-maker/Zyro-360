@@ -208,3 +208,45 @@
 .photo-privacy-note svg{width:17px;height:17px;flex:none;color:#24a68f}
 @media(max-width:390px){.chat-hero{min-height:212px}.chat-hero h1{font-size:38px}.chat-hero-graphic{right:6px;transform:scale(.89);transform-origin:right top}.profile-identity-card{padding:22px 13px;gap:11px}.profile-avatar-wrap,.profile-identity-card .profile-avatar{width:93px;height:93px}.profile-id-copy strong{font-size:18px}}
 @media(max-width:340px){.chat-hero-graphic{opacity:.52}.profile-id-copy strong{font-size:16px}.profile-avatar-wrap,.profile-identity-card .profile-avatar{width:80px;height:80px}.profile-photo-editor{padding:15px 12px}}
+
+/* ZYRO 360 V6 – five coherent destinations and smooth touch map */
+.bottom-nav{gap:0!important;justify-content:space-around;padding:7px 3px max(8px,env(safe-area-inset-bottom))!important}
+.bottom-nav .nav-item{flex:1 1 20%;min-width:0!important;max-width:none!important;gap:3px;padding:7px 2px;font-size:10px;white-space:nowrap}
+.bottom-nav .nav-icon{font-size:23px;line-height:1.2;height:28px;display:grid;place-items:center}
+.nav-mode-icon svg{width:24px;height:24px;display:block}
+.modes-page .greeting{margin-top:22px}
+.modes-page .page-heading{margin:0}
+.mode-heading{position:relative;overflow:hidden;background:linear-gradient(125deg,#091a34,#103852 72%,#0b6070);color:white;margin:-2px -1px 23px;border-radius:23px;padding:29px 24px 25px;box-shadow:0 16px 30px rgba(10,33,58,.14)}
+.mode-heading .eyebrow{color:#79dacc;font-size:11px;font-weight:800;letter-spacing:1.9px}
+.mode-heading h1{font-size:34px;margin:11px 0 7px;letter-spacing:-1.2px}
+.mode-heading h1 span{color:#5cdfc5}
+.mode-heading p:last-child{color:#cfe3e9;font-size:13px;line-height:1.5;max-width:280px;margin:0}
+.mode-heading-emblem{position:absolute;right:20px;top:12px;font-size:83px;color:#53d6c1;opacity:.16}
+.circles-clean-page>.page-heading{margin-bottom:20px}
+.circles-clean-page>.page-heading h1{font-size:34px}
+.modes-page .contacts-list{margin-bottom:15px}
+.map-tiles,.map-pins{transform-origin:center center;will-change:transform;contain:layout style}
+.map-zoom-controls{position:absolute;z-index:12;right:14px;top:74px;display:flex;flex-direction:column;gap:0;border:1px solid #dae7e8;background:#fff;box-shadow:0 5px 16px #193d4530;border-radius:14px;overflow:hidden}
+.map-zoom-controls button{border:0;background:#fff;color:#18354a;width:42px;height:42px;font-size:25px;font-weight:500;line-height:1}
+.map-zoom-controls button+button{border-top:1px solid #e2e9ee}
+.map-zoom-controls button:active{background:#e7f7f3}
+.how-it-works{margin:22px 0 30px;border-radius:23px;background:#fff;box-shadow:0 13px 35px #15394a0e;border:1px solid #dfebec;padding:22px 20px}
+.how-heading{display:flex;gap:14px;align-items:flex-start;margin-bottom:14px}
+.how-heading h2{font-size:19px;line-height:1.26;color:#12283f;margin:4px 0 6px}
+.how-heading p:last-child{font-size:12px;color:#75899a;line-height:1.5;margin:0}
+.how-icon{width:40px;height:40px;flex:none;display:grid;place-items:center;background:#dff8f2;color:#098976;border-radius:14px;font-size:24px;font-weight:800}
+.how-it-works details{border-top:1px solid #ebf0f2;padding:0}
+.how-it-works summary{padding:16px 0;list-style:none;cursor:pointer;display:flex;justify-content:space-between;gap:9px;align-items:center;color:#17344b;font-size:13px;font-weight:750}
+.how-it-works summary::-webkit-details-marker{display:none}
+.how-it-works summary span{font-size:18px;color:#1eaa99;transition:transform .2s}
+.how-it-works details[open] summary span{transform:rotate(45deg)}
+.how-content{background:#f5fafb;padding:14px 15px;border-radius:12px;margin-bottom:13px;font-size:12px;line-height:1.8;color:#4a6477}
+.how-content p{margin:0 0 10px}
+.how-content p:last-child{margin-bottom:0}
+.how-content a{color:#097d77;font-weight:700}
+.law-links{display:flex;flex-direction:column;gap:7px;margin-top:13px}
+.law-links a{display:block;padding:10px;border:1px solid #d4e9e5;border-radius:10px;text-decoration:none;background:#fff}
+.how-caveat{color:#78909b;font-size:10px;line-height:1.7;margin:15px 0 0}
+@media(max-width:400px){.bottom-nav .nav-item{font-size:9px}.bottom-nav .nav-icon{font-size:22px}.bottom-nav{padding-left:1px!important;padding-right:1px!important}.mode-heading{padding:24px 18px}.how-it-works{padding:19px 14px}}
+/* Permit overscanned tiles to slide under the viewport's parent clipping during a pan. */
+.map-tiles,.map-pins{overflow:visible!important}

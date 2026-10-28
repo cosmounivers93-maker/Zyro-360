@@ -180,7 +180,7 @@ async function loadChat(){
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
 function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
-function showView(view){activeView=view;for(const v of ['home','circles','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();zyroMap?.invalidateSize();});}}
+function showView(view){activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();zyroMap?.invalidateSize();});}}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;geolocationError='';renderMap();return;}
   if(watchId!==null)return;
@@ -288,7 +288,7 @@ async function maybeInitGoogleMap(){
     });
     $('googleMap').classList.remove('hidden');
     $('mapTiles').classList.add('hidden');$('mapPins').classList.add('hidden');
-    $('mapAttribution').classList.add('hidden');$('mapUnavailable').classList.add('hidden');
+    $('mapAttribution').classList.add('hidden');$('mapUnavailable').classList.add('hidden');$('mapZoomControls')?.classList.add('hidden');
     document.querySelector('.map-top-label').lastChild.textContent=' GOOGLE MAPS · LIVE';
     syncGoogleMap();
   }catch(error){console.warn('Google Maps non disponibile. Cartografia alternativa attiva.',error);}
@@ -334,6 +334,8 @@ class ZyroNativeMap {
     this.element=element;this.tiles=$('mapTiles');this.pins=$('mapPins');
     this.center={lat:41.65,lon:12.48};this.zoom=6;this.tilesByKey=new Map();
     this.pointerStart=null;this.fingers=new Map();this.pinchStart=null;
+    this.drawOrigin=null;this.panFrame=null;this.velocity={x:0,y:0};this.inertiaFrame=null;this.pinchFactor=1;
+    this.pointerLast=null;
     this.loaded=0;this.failed=0;this.drawQueued=false;
     this.lastTap=0;this.own=null;this.contacts=[];
     element.addEventListener('pointerdown',e=>this.onDown(e));
@@ -349,11 +351,12 @@ class ZyroNativeMap {
   onDown(e){
     // Don't intercept links or buttons in the map overlays.
     if(e.target.closest('a,button,.map-attribution'))return;
+    if(this.inertiaFrame){cancelAnimationFrame(this.inertiaFrame);this.inertiaFrame=null;}
     this.element.setPointerCapture?.(e.pointerId);
     this.fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(this.fingers.size===1)this.pointerStart={x:e.clientX,y:e.clientY,center:{...this.center}};
+    if(this.fingers.size===1){this.pointerStart={x:e.clientX,y:e.clientY,center:{...this.center}};this.pointerLast={x:e.clientX,y:e.clientY,ts:performance.now()};this.velocity={x:0,y:0};}
     if(this.fingers.size===2){
-      const [a,b]=[...this.fingers.values()];this.pinchStart={distance:Math.hypot(a.x-b.x,a.y-b.y),zoom:this.zoom};this.pointerStart=null;
+      const [a,b]=[...this.fingers.values()];this.pinchStart={distance:Math.hypot(a.x-b.x,a.y-b.y),zoom:this.zoom};this.pointerStart=null;this.pointerLast=null;
     }
   }
   onMove(e){
@@ -362,27 +365,59 @@ class ZyroNativeMap {
     if(this.fingers.size===2 && this.pinchStart){
       const [a,b]=[...this.fingers.values()];const dist=Math.hypot(a.x-b.x,a.y-b.y);
       if(dist>0 && this.pinchStart.distance>0){
-        const next=this.pinchStart.zoom+Math.round(Math.log2(dist/this.pinchStart.distance)*1.5);
-        this.setZoom(next);
+        this.pinchFactor=Math.max(.65,Math.min(2.6,dist/this.pinchStart.distance));
+        this.previewMap(this.pinchFactor);
       }
       return;
     }
     if(!this.pointerStart)return;
     const p=worldPoint(this.pointerStart.center.lat,this.pointerStart.center.lon,this.zoom);
     this.center=geoPoint(p.x+this.pointerStart.x-e.clientX,p.y+this.pointerStart.y-e.clientY,this.zoom);
-    this.queueDraw();
+    const now=performance.now();
+    if(this.pointerLast){const dt=now-this.pointerLast.ts;if(dt>0 && dt<120){this.velocity.x=.7*this.velocity.x+.3*(e.clientX-this.pointerLast.x)/dt;this.velocity.y=.7*this.velocity.y+.3*(e.clientY-this.pointerLast.y)/dt;}}
+    this.pointerLast={x:e.clientX,y:e.clientY,ts:now};
+    this.previewMap();
   }
   onUp(e){
     if(!this.fingers.has(e.pointerId))return;
     this.fingers.delete(e.pointerId);
     if(this.fingers.size===0){
-      this.pointerStart=null;this.pinchStart=null;
+      const didPinch=!!this.pinchStart;
+      const zoomPreview=this.pinchFactor;
+      this.pointerStart=null;this.pinchStart=null;this.pointerLast=null;this.pinchFactor=1;
+      if(didPinch){this.setZoom(this.zoom+Math.round(Math.log2(zoomPreview)));this.queueDraw();return;}
       if(e.type==='pointerup'){
-        const now=Date.now();if(now-this.lastTap<310){this.setZoom(this.zoom+1);this.lastTap=0;}else this.lastTap=now;
+        const now=Date.now();if(now-this.lastTap<310){this.setZoom(this.zoom+1);this.lastTap=0;this.queueDraw();return;}else this.lastTap=now;
+        this.startInertia();
       }
+      this.queueDraw();
     }else if(this.fingers.size===1){
       const a=[...this.fingers.values()][0];this.pointerStart={x:a.x,y:a.y,center:{...this.center}};this.pinchStart=null;
     }
+  }
+  previewMap(scale=1){
+    if(!this.drawOrigin){this.queueDraw();return;}
+    const here=worldPoint(this.center.lat,this.center.lon,this.zoom);
+    const dx=this.drawOrigin.x-here.x,dy=this.drawOrigin.y-here.y;
+    // One GPU-friendly transform for all visible tiles, instead of re-positioning every image per finger movement.
+    const matrix=`translate3d(${Math.round(dx)}px,${Math.round(dy)}px,0) scale(${scale})`;
+    this.tiles.style.transform=matrix;this.pins.style.transform=matrix;
+    if(Math.abs(dx)>170||Math.abs(dy)>170){this.queueDraw();}
+  }
+  startInertia(){
+    if(this.fingers.size||Math.hypot(this.velocity.x,this.velocity.y)<.13)return;
+    let vx=this.velocity.x,vy=this.velocity.y,last=performance.now(),frames=0;
+    const step=(now)=>{
+      if(this.fingers.size)return;
+      const dt=Math.min(34,now-last);last=now;frames++;
+      vx*=Math.pow(.90,dt/16);vy*=Math.pow(.90,dt/16);
+      const center=worldPoint(this.center.lat,this.center.lon,this.zoom);
+      this.center=geoPoint(center.x-vx*dt,center.y-vy*dt,this.zoom);
+      this.previewMap();
+      if(Math.hypot(vx,vy)>.085&&frames<40)this.inertiaFrame=requestAnimationFrame(step);
+      else{this.inertiaFrame=null;this.queueDraw();}
+    };
+    this.inertiaFrame=requestAnimationFrame(step);
   }
   setZoom(zoom){
     const value=Math.max(MIN_MAP_ZOOM,Math.min(MAX_MAP_ZOOM,Math.round(zoom)));
@@ -394,16 +429,18 @@ class ZyroNativeMap {
     this.center={lat:clampLatitude(lat),lon};this.zoom=Math.max(MIN_MAP_ZOOM,Math.min(MAX_MAP_ZOOM,Math.round(zoom)));
     this.queueDraw();
   }
-  reset(){this.own=null;this.contacts=[];this.center={lat:41.65,lon:12.48};this.zoom=6;this.queueDraw();}
+  reset(){if(this.inertiaFrame)cancelAnimationFrame(this.inertiaFrame);this.own=null;this.contacts=[];this.center={lat:41.65,lon:12.48};this.zoom=6;this.queueDraw();}
   invalidateSize(){this.queueDraw();}
   queueDraw(){if(this.drawQueued)return;this.drawQueued=true;requestAnimationFrame(()=>{this.drawQueued=false;this.draw();});}
   draw(){
     const w=this.element.clientWidth,h=this.element.clientHeight;
     if(!w || !h)return;
     const z=this.zoom, n=2**z, size=MAP_TILE_SIZE*n, center=worldPoint(this.center.lat,this.center.lon,z);
+    this.tiles.style.transform='';this.pins.style.transform='';this.drawOrigin=center;
     const left=center.x-w/2,top=center.y-h/2;
-    const colMin=Math.floor(left/MAP_TILE_SIZE),colMax=Math.floor((left+w)/MAP_TILE_SIZE);
-    const rowMin=Math.max(0,Math.floor(top/MAP_TILE_SIZE)),rowMax=Math.min(n-1,Math.floor((top+h)/MAP_TILE_SIZE));
+    const pad=MAP_TILE_SIZE;
+    const colMin=Math.floor((left-pad)/MAP_TILE_SIZE),colMax=Math.floor((left+w+pad)/MAP_TILE_SIZE);
+    const rowMin=Math.max(0,Math.floor((top-pad)/MAP_TILE_SIZE)),rowMax=Math.min(n-1,Math.floor((top+h+pad)/MAP_TILE_SIZE));
     const seen=new Set();
     for(let col=colMin;col<=colMax;col++)for(let row=rowMin;row<=rowMax;row++){
       const normalizedX=((col%n)+n)%n, key=`${z}/${normalizedX}/${row}/${col}`;
@@ -605,6 +642,8 @@ async function init(){
     $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+  $('mapZoomIn').addEventListener('click',()=>{if(googleMap){googleMap.setZoom(Math.min(20,googleMap.getZoom()+1));}else zyroMap?.setZoom(zyroMap.zoom+1);});
+  $('mapZoomOut').addEventListener('click',()=>{if(googleMap){googleMap.setZoom(Math.max(3,googleMap.getZoom()-1));}else zyroMap?.setZoom(zyroMap.zoom-1);});
   $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){zyroMap?.focusOn(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));focusGoogleMap(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
   $('pickNotify').addEventListener('change',renderPickControls);
   $('pickRecipientsList').addEventListener('change',e=>{if(!e.target.matches('[data-pickcontact]'))return;const id=e.target.dataset.pickcontact;if(e.target.checked)pickSelected.add(id);else pickSelected.delete(id);});
@@ -630,7 +669,7 @@ async function init(){
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();googleMarkers.forEach(m=>m.setMap(null));googleMarkers=[];googleMap=null;$('googleMap').classList.add('hidden');$('mapTiles').classList.remove('hidden');$('mapPins').classList.remove('hidden');$('mapAttribution').classList.remove('hidden');googleInitAttempted=false;current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=5.1-layout-fix').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=6.0-modes-smoothmap').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
