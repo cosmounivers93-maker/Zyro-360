@@ -81,9 +81,9 @@ app.use((req, res, next) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.set('Permissions-Policy', 'geolocation=(self), microphone=(self), camera=(self)');
-  // Google Maps loads dependencies from several Google domains; keep the allowlist aligned with official Google Maps CSP guidance.
-  // For a production safety app, migrate to nonce-based strict CSP (see Google's CSP guide).
-  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com https://*.googleusercontent.com blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.googleapis.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com https://*.googleusercontent.com; connect-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com ws: wss:; frame-src https://*.google.com; worker-src 'self' blob:; font-src 'self' data: https://fonts.gstatic.com https://*.gstatic.com; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+  // ZYRO MAP V14 uses a single MapLibre engine, CDN assets and OpenFreeMap tiles.
+  // In production, pin/vendor SDK assets and audit Content Security Policy.
+  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob: https://tiles.openfreemap.org; connect-src 'self' https://tiles.openfreemap.org ws: wss:; worker-src 'self' blob:; font-src 'self' data: https://tiles.openfreemap.org; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
   res.set('Cache-Control', req.path.startsWith('/api/') ? 'no-store' : 'no-cache');
   next();
 });
@@ -108,8 +108,6 @@ function limit(req, res, next) {
 }
 function requireAuth(req, res, next) { req.user = auth(req); if (!req.user) return res.status(401).json({ error:'Accedi per continuare.' }); next(); }
 app.get('/api/health', (_, res) => res.json({ ok: true }));
-// Google Maps JavaScript API browser key (must be Google Cloud domain- and API-restricted).
-app.get('/api/map-config', requireAuth, (_,res)=>res.json({googleMapsKey:process.env.GOOGLE_MAPS_API_KEY||null}));
 // Live tiles requested only by logged-in users. A modest in-memory cache protects the community tile service.
 // For a public production launch replace this best-effort upstream with a contracted map provider.
 const mapTileCache = new Map();
