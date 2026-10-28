@@ -406,7 +406,34 @@ function updateGlassHeading(pin,heading){
  // The angle is intentionally NOT wrapped: a 359°->1° turn must move only 2°.
  if(valid)arrow.style.transform=`rotate(${heading}deg)`;
 }
-function stableMarker(isSelf,heading,name,alert=false){
+// V15.1: the public profile photo is shown only for authenticated users and
+// contacts whose locations the server has authorized in /api/state.
+function usableMapAvatar(user){
+ const s=user?.avatar;
+ return typeof s==='string'&&s.length<=150000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s)?s:null;
+}
+function updateMapAvatar(pin,user,isSelf){
+ const src=usableMapAvatar(user),name=String(user?.name||'Contatto');
+ const holder=pin.querySelector(isSelf?'.zyro-gl-core':'.zyro-atlas-initial');
+ if(!holder)return;
+ // Moving the map must not rebuild the photo; update only after profile changes.
+ if(pin._zyroAvatar===src && pin._zyroAvatarName===name)return;
+ pin._zyroAvatar=src;pin._zyroAvatarName=name;
+ holder.replaceChildren();
+ holder.classList.toggle('zyro-map-has-avatar',!!src);
+ if(src){
+  const img=document.createElement('img');img.className='zyro-map-profile-photo';
+  img.src=src;img.alt='';img.draggable=false;img.decoding='async';
+  holder.append(img);
+ }else{
+  const initial=document.createElement('b');initial.className='zyro-map-profile-initial';
+  initial.textContent=initials(name);holder.append(initial);
+ }
+ pin.title=isSelf?`${name} — il tuo GPS`:`${name} — posizione condivisa`;
+ pin.setAttribute('aria-label',pin.title);
+}
+function stableMarker(isSelf,heading,user,alert=false){
+ const name=String(user?.name|| (isSelf?'Tu':'Contatto'));
  const el=document.createElement('div');el.className=isSelf?'zyro-gl-location':'zyro-gl-contact';
  if(alert)el.classList.add('zyro-contact-alert');
  if(isSelf){
@@ -424,9 +451,12 @@ function stableMarker(isSelf,heading,name,alert=false){
   </svg>`;
   el.append(ring,arrow,core);updateGlassHeading(el,heading);
  }else{
-  const badge=document.createElement('span'),letter=document.createElement('b'),tag=document.createElement('span');badge.className='zyro-atlas-initial';letter.textContent=String(name||'?').trim()[0]?.toUpperCase()||'?';badge.append(letter);tag.className='zyro-atlas-contact-name';tag.textContent=String(name||'Contatto').slice(0,22);el.append(badge,tag);
+  const badge=document.createElement('span'),tag=document.createElement('span');
+  badge.className='zyro-atlas-initial';tag.className='zyro-atlas-contact-name';
+  tag.textContent=name.slice(0,22);el.append(badge,tag);
  }
- el.title=isSelf?'Tu — posizione GPS':String(name||'Contatto');el.setAttribute('aria-label',el.title);return el;
+ updateMapAvatar(el,user,isSelf);
+ return el;
 }
 class ZyroRasterMap{
  constructor(container,center,zoom,onTile,onError){
@@ -537,17 +567,18 @@ class ZyroRasterMap{
  }
  drawPins(w,h,center){
   if(!current)return;
-  const places=[];for(const c of uniqueContacts())if(mapValidPoint(c.location))places.push({id:'contact:'+c.id,p:c.location,name:c.name,alert:!!c.sos,own:false});
-  if(mapValidPoint(lastCoords))places.push({id:'me',p:lastCoords,name:'Tu',own:true});
+  const places=[];for(const c of uniqueContacts())if(mapValidPoint(c.location))places.push({id:'contact:'+c.id,p:c.location,user:c,alert:!!c.sos,own:false});
+  if(mapValidPoint(lastCoords))places.push({id:'me',p:lastCoords,user:current.me,own:true});
   const present=new Set();
   for(const p of places){
    const pos=toWorld(p.p.lat,p.p.lon,this.zoom);let dx=pos.x-center.x;const world=worldWidth(this.zoom);
    if(dx>world/2)dx-=world;if(dx< -world/2)dx+=world;
    const x=w/2+dx,y=h/2+pos.y-center.y;present.add(p.id);
-   let pin=this.pinNodes.get(p.id);if(!pin){pin=stableMarker(p.own,p.p.heading,p.name,p.alert);pin.classList.add('zyro-raster-pin');this.pinNodes.set(p.id,pin);this.pinLayer.appendChild(pin);}
-   pin.style.transform=`translate3d(${Math.round(x)}px,${Math.round(y)}px,0) translate(-50%,-50%)`;
+   let pin=this.pinNodes.get(p.id);if(!pin){pin=stableMarker(p.own,p.p.heading,p.user,p.alert);pin.classList.add('zyro-raster-pin');this.pinNodes.set(p.id,pin);this.pinLayer.appendChild(pin);}
+   pin.style.transform=`translate3d(${Math.round(x)}px,${Math.round(y)}px,0) ${p.own?'translate(-50%,-50%)':'translate(-50%,-22px)'}`;
    pin.style.display=(x< -70||x>w+70||y< -70||y>h+70)?'none':'';
    pin.classList.toggle('zyro-contact-alert',!!p.alert);
+   updateMapAvatar(pin,p.user,p.own);
    if(p.own)updateGlassHeading(pin,p.p.heading);
   }
   for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
@@ -801,7 +832,7 @@ async function init(){
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=15.0-journeys-premium-prototype').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=15.1-profile-map-pins').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
