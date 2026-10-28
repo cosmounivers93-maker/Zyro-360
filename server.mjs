@@ -321,6 +321,35 @@ app.post('/api/push/subscribe', requireAuth, (req,res) => {
   req.user.pushSubs.push({endpoint:s.endpoint,keys:{p256dh:s.keys.p256dh,auth:s.keys.auth}});
   save(); res.json({ok:true});
 });
+// V15.2: safe non-emergency push delivery test between members of a shared circle.
+// This test NEVER starts an SOS and NEVER shares location or microphone data.
+const lastPushTestByUser = new Map();
+app.post('/api/push/test', requireAuth, limit, async (req,res) => {
+  if (!configuredPush) return res.status(503).json({error:'Notifiche push non configurate sul server.'});
+  const targetId = typeof req.body?.recipientId === 'string' ? req.body.recipientId : '';
+  if (!targetId || targetId === req.user.id || !db.users[targetId] || !sharedCircle(req.user.id,targetId))
+    return res.status(403).json({error:'Scegli un contatto appartenente alla tua cerchia.'});
+  const subs = [...(db.users[targetId].pushSubs || [])];
+  if (!subs.length) return res.status(409).json({error:'Questo contatto non risulta iscritto alle notifiche push. Deve aprire Profilo e premere Attiva notifiche.'});
+  // One outgoing test per sender per minute. Prevent accidental notification spam.
+  const t = now(), previous = lastPushTestByUser.get(req.user.id) || 0;
+  if (t - previous < 60000) return res.status(429).json({error:'Attendi almeno un minuto prima di inviare un’altra notifica di prova.'});
+  lastPushTestByUser.set(req.user.id,t);
+  // This is an ordinary test notification, NOT an SOS/emergency alert.
+  const payload = JSON.stringify({kind:'test',title:'🔔 Test ZYRO 360',body:`${cleanText(req.user.name,36)} ti ha inviato una notifica di prova. Nessuna emergenza.`,url:'/'});
+  let accepted = 0;
+  await Promise.allSettled(subs.map(async sub => {
+    try { await webpush.sendNotification(sub,payload,{TTL:120,urgency:'normal'}); accepted++; }
+    catch (err) {
+      if ([404,410].includes(err.statusCode)) {
+        db.users[targetId].pushSubs = (db.users[targetId].pushSubs||[]).filter(s=>s.endpoint!==sub.endpoint);
+      }
+    }
+  }));
+  if (accepted < subs.length) save();
+  res.json({ok:true,accepted,attempted:subs.length,notice:accepted>0?'Notifica accettata dal servizio push. La ricezione sul telefono non è ancora confermata.':'Nessun servizio push ha accettato la notifica. Controlla l’iscrizione sul telefono destinatario.'});
+});
+
 app.post('/api/settings/sos-recipients', requireAuth, limit, (req,res)=> {
   const ids=req.body.recipients;
   if(!Array.isArray(ids) || ids.length>60 || ids.some(id=>typeof id!=='string' || id.length>100)) return res.status(400).json({error:'Destinatari non validi.'});
