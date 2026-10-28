@@ -28,6 +28,8 @@ let stableMap=null, stableMapState='idle', stableLoadTimer=null, stableRetryTime
 let stableAttempts=0, stableBootId=0, stableResizeObserver=null;
 const stableMarkers=new Map();
 let compassHeading = null;
+let gpsCourseActive = false;
+let lastCompassUpdate = 0;
 const ZYRO_THEME_KEY='zyro360-appearance-v8';
 let zyroTheme='dark';
 // Pick Pocket is a foreground browser experiment, not an Android system lock.
@@ -194,7 +196,10 @@ function updateGeo(oldOn,newOn){
   if(!navigator.geolocation){geolocationError='GPS non disponibile su questo browser';toast(geolocationError,true);return;}
   geolocationError='';
   watchId=navigator.geolocation.watchPosition(async(p)=>{
-    lastCoords={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy,heading:Number.isFinite(p.coords.heading)?p.coords.heading:compassHeading};geolocationError='';
+    // A navigation arrow is shown only for a known movement bearing or a supported compass heading.
+    const gpsSpeed=p.coords.speed;
+    gpsCourseActive=Number.isFinite(p.coords.heading)&&(!Number.isFinite(gpsSpeed)||gpsSpeed>=0.6);
+    lastCoords={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy,heading:gpsCourseActive?p.coords.heading:compassHeading};geolocationError='';
     const canShare=!!current?.me?.sharing || (current?.me?.alertKind==='pickpocket' && !!current.me.theftShare);
     if(canShare && Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
     renderHome();
@@ -289,11 +294,34 @@ function mapShowFailure(message){$('mapUnavailable')?.classList.remove('hidden')
 function mapHideFailure(){$('mapUnavailable')?.classList.add('hidden');}
 function clearMapTimers(){clearTimeout(stableLoadTimer);clearTimeout(stableRetryTimer);stableLoadTimer=null;stableRetryTimer=null;}
 function removeStableMap(){stableBootId++;clearMapTimers();try{stableMap?.remove();}catch{}stableMap=null;stableMapState='idle';stableMarkers.clear();$('zyroVectorMap')?.replaceChildren();}
+// One translucent glass arrow represents the actual GPS/course or permitted compass bearing.
+// The translucent ring remains visible when heading is not supported by the device.
+function updateGlassHeading(pin,heading){
+ const arrow=pin.querySelector('.zyro-gl-arrow');if(!arrow)return;
+ const valid=typeof heading==='number'&&Number.isFinite(heading);
+ pin.classList.toggle('zyro-heading-unknown',!valid);
+ if(valid)arrow.style.transform=`rotate(${((heading%360)+360)%360}deg)`;
+}
 function stableMarker(isSelf,heading,name,alert=false){
  const el=document.createElement('div');el.className=isSelf?'zyro-gl-location':'zyro-gl-contact';
  if(alert)el.classList.add('zyro-contact-alert');
- if(isSelf){const ring=document.createElement('span'),arrow=document.createElement('span'),core=document.createElement('span');ring.className='zyro-gl-ring';arrow.className='zyro-gl-arrow';core.className='zyro-gl-core';arrow.style.transform=`rotate(${Number.isFinite(heading)?heading:0}deg)`;el.append(ring,arrow,core);}
- else{const badge=document.createElement('span'),letter=document.createElement('b'),tag=document.createElement('span');badge.className='zyro-atlas-initial';letter.textContent=String(name||'?').trim()[0]?.toUpperCase()||'?';badge.append(letter);tag.className='zyro-atlas-contact-name';tag.textContent=String(name||'Contatto').slice(0,22);el.append(badge,tag);}
+ if(isSelf){
+  const ring=document.createElement('span'),arrow=document.createElement('span'),core=document.createElement('span');
+  ring.className='zyro-gl-ring';arrow.className='zyro-gl-arrow';core.className='zyro-gl-core';
+  arrow.setAttribute('aria-hidden','true');
+  arrow.innerHTML=`<svg viewBox="0 0 72 72" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+   <linearGradient id="zyroGlassNavFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6ffff" stop-opacity=".72"/><stop offset=".48" stop-color="#5cd8ff" stop-opacity=".32"/><stop offset="1" stop-color="#098acc" stop-opacity=".17"/></linearGradient>
+   <linearGradient id="zyroGlassNavFacet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#bff8ff" stop-opacity=".65"/><stop offset="1" stop-color="#24b8ff" stop-opacity=".08"/></linearGradient>
+  </defs>
+  <path d="M36 3 L55 56 Q56 60 52 58 L36 49 L20 58 Q16 60 17 56 Z" fill="url(#zyroGlassNavFill)" stroke="#e2ffff" stroke-opacity=".86" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M36 7 L36 48 L20 55 Z" fill="url(#zyroGlassNavFacet)"/>
+  <path d="M36 8 L50 51" stroke="#ccfbff" stroke-opacity=".5" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>`;
+  el.append(ring,arrow,core);updateGlassHeading(el,heading);
+ }else{
+  const badge=document.createElement('span'),letter=document.createElement('b'),tag=document.createElement('span');badge.className='zyro-atlas-initial';letter.textContent=String(name||'?').trim()[0]?.toUpperCase()||'?';badge.append(letter);tag.className='zyro-atlas-contact-name';tag.textContent=String(name||'Contatto').slice(0,22);el.append(badge,tag);
+ }
  el.title=isSelf?'Tu — posizione GPS':String(name||'Contatto');el.setAttribute('aria-label',el.title);return el;
 }
 class ZyroRasterMap{
@@ -367,7 +395,7 @@ class ZyroRasterMap{
    pin.style.transform=`translate3d(${Math.round(x)}px,${Math.round(y)}px,0) translate(-50%,-50%)`;
    pin.style.display=(x< -70||x>w+70||y< -70||y>h+70)?'none':'';
    pin.classList.toggle('zyro-contact-alert',!!p.alert);
-   const arrow=pin.querySelector('.zyro-gl-arrow');if(arrow&&Number.isFinite(Number(p.p.heading)))arrow.style.transform=`rotate(${Number(p.p.heading)}deg)`;
+   if(p.own)updateGlassHeading(pin,p.p.heading);
   }
   for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
  }
@@ -406,11 +434,18 @@ function renderMap(){
  else if(stableMapState==='ready')mapStatus(geolocationError||'Posizione non attiva');
 }
 function onOrientation(e){
-  let direction=Number.isFinite(e.webkitCompassHeading)?e.webkitCompassHeading:Number.isFinite(e.alpha)?(360-e.alpha)%360:null;
+  // Relative alpha alone is not a reliable North reference. Avoid displaying a false arrow.
+  const direction=Number.isFinite(e.webkitCompassHeading)?e.webkitCompassHeading:
+    (e.absolute===true&&Number.isFinite(e.alpha)?(360-e.alpha)%360:null);
   if(direction===null)return;
   compassHeading=direction;
-  if(lastCoords && !Number.isFinite(lastCoords.heading)){
-    lastCoords.heading=direction;renderMap();
+  if(lastCoords && !gpsCourseActive){
+    const previous=lastCoords.heading;
+    const delta=Number.isFinite(previous)?Math.abs(((direction-previous+540)%360)-180):360;
+    const now=Date.now();
+    if(delta>=3 && now-lastCompassUpdate>=130){
+      lastCompassUpdate=now;lastCoords.heading=direction;stableMap?.schedule();
+    }
   }
 }
 async function orientationPermission(){
@@ -419,7 +454,9 @@ async function orientationPermission(){
       const granted=await window.DeviceOrientationEvent.requestPermission();if(granted!=='granted')return;
     }
     window.removeEventListener('deviceorientation',onOrientation);
+    window.removeEventListener('deviceorientationabsolute',onOrientation);
     window.addEventListener('deviceorientation',onOrientation);
+    window.addEventListener('deviceorientationabsolute',onOrientation);
   }catch{ /* Compass is optional. */ }
 }
 function renderPickControls(){
@@ -565,7 +602,7 @@ async function init(){
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=14.2-map-2d').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=14.3-glass-pointer').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
