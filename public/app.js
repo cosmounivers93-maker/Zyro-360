@@ -23,7 +23,7 @@ let sosPending=null;
 let inviteFromLink=null;
 // Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
 let mapTracking=false, ownCentered=false;
-// Single cartography engine: MapLibre only. No custom tile/pointer listeners.
+// One 2D map engine; no WebGL or external JavaScript.
 let stableMap=null, stableMapState='idle', stableLoadTimer=null, stableRetryTimer=null;
 let stableAttempts=0, stableBootId=0, stableResizeObserver=null;
 const stableMarkers=new Map();
@@ -269,203 +269,141 @@ async function enablePush(){
 }
 function base64ToBytes(base64){const padding='='.repeat((4-base64.length%4)%4);const binary=atob((base64+padding).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(binary,x=>x.charCodeAt(0));}
 function setMode(m){authMode=m;document.querySelectorAll('.auth-tab').forEach(b=>{const yes=b.dataset.mode===m;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));});$('nameField').classList.toggle('hidden',m==='login');$('name').required=m==='register';$('password').autocomplete=m==='register'?'new-password':'current-password';$('authSubmit').innerHTML=m==='login'?'Entra nella tua cerchia <span>→</span>':'Crea il mio account <span>→</span>';}
-// ZYRO MAP CUSTOM V14: one MapLibre interactive engine, customized vector style.
-// Official published OpenFreeMap styles; no manual tile renderer or competing gestures.
-const STABLE_MAP_STYLES={dark:'https://tiles.openfreemap.org/styles/fiord',light:'https://tiles.openfreemap.org/styles/liberty'};
-
-// Recolor native vector layers while preserving real roads, buildings and labels.
-const ZYRO_CUSTOM_COLORS={
- dark:{bg:'#0b1929',land:'#142438',park:'#173d3b',building:'#24384b',water:'#0c344b',major:'#7f9ead',minor:'#405f70',label:'#bacdd9',halo:'#0b1929'},
- light:{bg:'#e9f3f7',land:'#e0edf2',park:'#d4e8df',building:'#cadde7',water:'#abd8e6',major:'#799baa',minor:'#b1c8d0',label:'#355267',halo:'#f1f9fb'}
-};
-function styleZyroLayers(map,theme){
- const color=ZYRO_CUSTOM_COLORS[theme]||ZYRO_CUSTOM_COLORS.dark;
- for(const layer of (map.getStyle()?.layers||[])){
-  const id=layer.id;const key=id.toLowerCase();
-  try{
-   if(layer.type==='background')map.setPaintProperty(id,'background-color',color.bg);
-   else if(layer.type==='fill'){
-    if(/water|sea|ocean|river|lake/.test(key))map.setPaintProperty(id,'fill-color',color.water);
-    else if(/park|wood|forest|grass|green/.test(key))map.setPaintProperty(id,'fill-color',color.park);
-    else if(/building/.test(key))map.setPaintProperty(id,'fill-color',color.building);
-    else if(/land|residential|industrial|commercial/.test(key))map.setPaintProperty(id,'fill-color',color.land);
-   }else if(layer.type==='line'){
-    if(/road|street|motorway|highway|primary|secondary|tertiary|minor|path/.test(key))
-      map.setPaintProperty(id,'line-color',/motorway|highway|primary/.test(key)?color.major:color.minor);
-    else if(/waterway|river|stream/.test(key))map.setPaintProperty(id,'line-color',color.water);
-   }else if(layer.type==='symbol'&&layer.layout?.['text-field']!==undefined){
-    map.setPaintProperty(id,'text-color',color.label);
-    map.setPaintProperty(id,'text-halo-color',color.halo);
-    map.setPaintProperty(id,'text-halo-width',0.7);
-   }
-  }catch(err){/* Some provider layers use paint expressions or unsupported properties. */}
- }
-}
-
-const STABLE_MAP_RETRY_DELAYS=[2000,5000,12000];
-const STABLE_MAP_DEFAULT={lat:41.9,lon:12.5,zoom:5};
+// ZYRO 360 V14.2 — simple 2D cartography for browsers without WebGL or external JS libraries.
+// Real raster tiles, requested via the existing authenticated /api/map-tile route.
+// Map location is read from GPS; it is only sent to the server when the user opts into sharing.
+const TILE_SIZE=256, DEFAULT_CENTER={lat:41.9,lon:12.5};
+const ZYRO_MAP_MAX_ZOOM=18;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const mapValidPoint=p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon))&&Math.abs(Number(p.lat))<=85&&Math.abs(Number(p.lon))<=180;
 const mapSafePoint=p=>[Number(p.lon),Number(p.lat)];
+const worldWidth=z=>TILE_SIZE*2**z;
+function toWorld(lat,lon,z){
+  const safeLat=clamp(Number(lat),-85.051128,85.051128),f=Math.PI/180,s=Math.sin(safeLat*f);
+  return {x:(Number(lon)+180)/360*worldWidth(z),y:(.5-Math.log((1+s)/(1-s))/(4*Math.PI))*worldWidth(z)};
+}
+function fromWorld(x,y,z){const w=worldWidth(z);return {lat:Math.atan(Math.sinh(Math.PI*(1-2*clamp(y,0,w)/w)))*180/Math.PI,lon:((x/w*360+180)%360+360)%360-180};}
 function mapStatus(message){const el=$('mapStatus');if(el)el.textContent=message;}
-function mapLink(){
-  const link=$('mapOpenGoogle');
-  if(!link)return;
-  link.href=mapValidPoint(lastCoords)?`https://www.openstreetmap.org/?mlat=${encodeURIComponent(lastCoords.lat)}&mlon=${encodeURIComponent(lastCoords.lon)}#map=16/${encodeURIComponent(lastCoords.lat)}/${encodeURIComponent(lastCoords.lon)}`:'https://www.openstreetmap.org/';
-}
-function mapShowFailure(message){
-  const el=$('mapUnavailable');
-  if(!el)return;
-  el.classList.remove('hidden');
-  const hint=$('mapFailureText');if(hint)hint.textContent=message;
-  mapStatus('Mappa non disponibile. La posizione GPS resta separata dalla cartografia.');
-  mapLink();
-}
+function mapLink(){const link=$('mapOpenGoogle');if(!link)return;link.href=mapValidPoint(lastCoords)?`https://www.openstreetmap.org/?mlat=${encodeURIComponent(lastCoords.lat)}&mlon=${encodeURIComponent(lastCoords.lon)}#map=16/${encodeURIComponent(lastCoords.lat)}/${encodeURIComponent(lastCoords.lon)}`:'https://www.openstreetmap.org/';}
+function mapShowFailure(message){$('mapUnavailable')?.classList.remove('hidden');if($('mapFailureText'))$('mapFailureText').textContent=message;mapStatus('Cartografia non raggiungibile. Il GPS continua a funzionare.');mapLink();}
 function mapHideFailure(){$('mapUnavailable')?.classList.add('hidden');}
 function clearMapTimers(){clearTimeout(stableLoadTimer);clearTimeout(stableRetryTimer);stableLoadTimer=null;stableRetryTimer=null;}
-function removeStableMap(){
-  stableBootId++;
-  clearMapTimers();
-  for(const marker of stableMarkers.values())try{marker.remove();}catch{}
-  stableMarkers.clear();
-  try{stableMap?.remove();}catch{}
-  stableMap=null;stableMapState='idle';
-  const el=$('zyroVectorMap');if(el){el.replaceChildren();}
-}
-function scheduleMapRetry(reason){
-  clearMapTimers();
-  for(const marker of stableMarkers.values())try{marker.remove();}catch{}
-  stableMarkers.clear();
-  try{stableMap?.remove();}catch{}
-  stableMap=null;
-  const el=$('zyroVectorMap');if(el)el.replaceChildren();
-  stableMapState='error';
-  mapShowFailure(reason || 'Impossibile caricare le strade. Controlla Internet e riprova.');
-  if(!current || stableAttempts>STABLE_MAP_RETRY_DELAYS.length)return;
-  const delay=STABLE_MAP_RETRY_DELAYS[Math.min(stableAttempts-1,STABLE_MAP_RETRY_DELAYS.length-1)];
-  stableRetryTimer=setTimeout(()=>{stableRetryTimer=null;ensureStableMap();},delay);
-}
+function removeStableMap(){stableBootId++;clearMapTimers();try{stableMap?.remove();}catch{}stableMap=null;stableMapState='idle';stableMarkers.clear();$('zyroVectorMap')?.replaceChildren();}
 function stableMarker(isSelf,heading,name,alert=false){
-  const el=document.createElement('div');
-  el.className=isSelf?'zyro-gl-location':'zyro-gl-contact';
-  if(alert)el.classList.add('zyro-contact-alert');
-  if(isSelf){
-    const ring=document.createElement('span'),arrow=document.createElement('span'),core=document.createElement('span');
-    ring.className='zyro-gl-ring';arrow.className='zyro-gl-arrow';core.className='zyro-gl-core';
-    arrow.style.transform=`rotate(${Number.isFinite(heading)?heading:0}deg)`;
-    el.append(ring,arrow,core);
-  }else{
-    const badge=document.createElement('span'),letter=document.createElement('b'),tag=document.createElement('span');
-    badge.className='zyro-atlas-initial';letter.textContent=String(name||'?').trim()[0]?.toUpperCase()||'?';
-    badge.append(letter);tag.className='zyro-atlas-contact-name';tag.textContent=String(name||'Contatto').slice(0,22);
-    el.append(badge,tag);
-  }
-  el.title=isSelf?'Tu — posizione GPS':String(name||'Contatto');
-  el.setAttribute('aria-label',el.title);
-  return el;
+ const el=document.createElement('div');el.className=isSelf?'zyro-gl-location':'zyro-gl-contact';
+ if(alert)el.classList.add('zyro-contact-alert');
+ if(isSelf){const ring=document.createElement('span'),arrow=document.createElement('span'),core=document.createElement('span');ring.className='zyro-gl-ring';arrow.className='zyro-gl-arrow';core.className='zyro-gl-core';arrow.style.transform=`rotate(${Number.isFinite(heading)?heading:0}deg)`;el.append(ring,arrow,core);}
+ else{const badge=document.createElement('span'),letter=document.createElement('b'),tag=document.createElement('span');badge.className='zyro-atlas-initial';letter.textContent=String(name||'?').trim()[0]?.toUpperCase()||'?';badge.append(letter);tag.className='zyro-atlas-contact-name';tag.textContent=String(name||'Contatto').slice(0,22);el.append(badge,tag);}
+ el.title=isSelf?'Tu — posizione GPS':String(name||'Contatto');el.setAttribute('aria-label',el.title);return el;
 }
-function syncStableMarkers(){
-  if(!stableMap||stableMapState!=='ready'||!current)return;
-  const points=[];
-  for(const u of uniqueContacts())if(mapValidPoint(u.location))points.push({id:'contact:'+u.id,p:u.location,name:u.name,alert:!!u.sos,own:false});
-  if(mapValidPoint(lastCoords))points.push({id:'me',p:lastCoords,name:'Tu',own:true});
+class ZyroRasterMap{
+ constructor(container,center,zoom,onTile,onError){
+  this.el=container;this.zoom=zoom;this.center={...center};this.tiles=new Map();this.onTile=onTile;this.onError=onError;
+  this.failed=0;this.loaded=0;this.removed=false;this.pending=null;this.pointers=new Map();this.pinNodes=new Map();
+  this.layer=document.createElement('div');this.layer.className='zyro-raster-tiles';
+  this.pinLayer=document.createElement('div');this.pinLayer.className='zyro-raster-markers';
+  this.el.replaceChildren(this.layer,this.pinLayer);
+  this.onDown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
+  this.onMove=e=>{
+   if(!this.pointers.has(e.pointerId))return;
+   const prev=this.pointers.get(e.pointerId),next={x:e.clientX,y:e.clientY};this.pointers.set(e.pointerId,next);
+   if(this.pointers.size===1){this.shift(next.x-prev.x,next.y-prev.y);}
+   else if(this.pointers.size===2){
+    const arr=[...this.pointers.values()],dist=Math.hypot(arr[0].x-arr[1].x,arr[0].y-arr[1].y);
+    if(!this.pinchStart){this.pinchStart=dist;return;}
+    if(dist>this.pinchStart*1.4){this.zoomTo(this.zoom+1);this.pinchStart=dist;}
+    else if(dist<this.pinchStart/1.4){this.zoomTo(this.zoom-1);this.pinchStart=dist;}
+   }
+   e.preventDefault();
+  };
+  this.onUp=e=>{this.pointers.delete(e.pointerId);if(this.pointers.size<2)this.pinchStart=0;};
+  this.onWheel=e=>{e.preventDefault();this.zoomTo(this.zoom+(e.deltaY<0?1:-1));};
+  this.el.addEventListener('pointerdown',this.onDown);
+  this.el.addEventListener('pointermove',this.onMove);
+  this.el.addEventListener('pointerup',this.onUp);this.el.addEventListener('pointercancel',this.onUp);
+  this.el.addEventListener('wheel',this.onWheel,{passive:false});
+  this.resize();
+ }
+ getZoom(){return this.zoom;}
+ zoomTo(newZoom){const z=clamp(Math.round(newZoom),2,ZYRO_MAP_MAX_ZOOM);if(z===this.zoom)return;this.zoom=z;this.clearTiles();this.schedule();}
+ easeTo(opts){if(opts.center&&opts.center.length===2)this.center={lon:Number(opts.center[0]),lat:Number(opts.center[1])};if(Number.isFinite(opts.zoom))this.zoom=clamp(Math.round(opts.zoom),2,ZYRO_MAP_MAX_ZOOM);this.clearTiles();this.schedule();}
+ setStyle(){this.schedule();}
+ shift(dx,dy){const p=toWorld(this.center.lat,this.center.lon,this.zoom),n=fromWorld(p.x-dx,p.y-dy,this.zoom);this.center=n;this.schedule();}
+ resize(){this.schedule();}
+ schedule(){if(this.removed||this.pending!==null)return;this.pending=requestAnimationFrame(()=>{this.pending=null;this.draw();});}
+ clearTiles(){for(const img of this.tiles.values())img.remove();this.tiles.clear();}
+ draw(){
+  if(this.removed)return;
+  const w=this.el.clientWidth,h=this.el.clientHeight;if(w<20||h<20)return;
+  const center=toWorld(this.center.lat,this.center.lon,this.zoom),count=2**this.zoom;
+  const left=center.x-w/2,top=center.y-h/2;
+  const startX=Math.floor(left/TILE_SIZE)-1,endX=Math.floor((left+w)/TILE_SIZE)+1;
+  const startY=Math.max(0,Math.floor(top/TILE_SIZE)-1),endY=Math.min(count-1,Math.floor((top+h)/TILE_SIZE)+1);
+  const visible=new Set();
+  for(let yy=startY;yy<=endY;yy++)for(let xx=startX;xx<=endX;xx++){
+   const key=`${this.zoom}/${xx}/${yy}`;visible.add(key);let img=this.tiles.get(key);
+   if(!img){
+    img=document.createElement('img');img.className='zyro-raster-tile';img.alt='';img.draggable=false;img.decoding='async';
+    img.onload=()=>{if(this.removed)return;this.loaded++;this.onTile?.();};
+    img.onerror=()=>{if(this.removed)return;this.failed++;if(this.loaded===0&&this.failed>=3)this.onError?.('Le immagini della mappa non arrivano dal server. Riprova o verifica Render.');};
+    img.src=`/api/map-tile/${this.zoom}/${((xx%count)+count)%count}/${yy}.png`;
+    this.tiles.set(key,img);this.layer.appendChild(img);
+   }
+   img.style.transform=`translate3d(${Math.round(xx*TILE_SIZE-left)}px,${Math.round(yy*TILE_SIZE-top)}px,0)`;
+  }
+  for(const [key,img]of this.tiles){if(!visible.has(key)){img.remove();this.tiles.delete(key);}}
+  this.drawPins(w,h,center);
+ }
+ drawPins(w,h,center){
+  if(!current)return;
+  const places=[];for(const c of uniqueContacts())if(mapValidPoint(c.location))places.push({id:'contact:'+c.id,p:c.location,name:c.name,alert:!!c.sos,own:false});
+  if(mapValidPoint(lastCoords))places.push({id:'me',p:lastCoords,name:'Tu',own:true});
   const present=new Set();
-  for(const p of points){
-    present.add(p.id);
-    let marker=stableMarkers.get(p.id);
-    if(!marker){
-      marker=new window.maplibregl.Marker({element:stableMarker(p.own,p.p.heading,p.name,p.alert),anchor:p.own?'center':'bottom'})
-        .setLngLat(mapSafePoint(p.p)).addTo(stableMap);
-      stableMarkers.set(p.id,marker);
-    }else marker.setLngLat(mapSafePoint(p.p));
-    const el=marker.getElement();
-    el.classList.toggle('zyro-contact-alert',p.alert);
-    const arrow=el.querySelector('.zyro-gl-arrow');
-    if(arrow&&Number.isFinite(Number(p.p.heading)))arrow.style.transform=`rotate(${Number(p.p.heading)}deg)`;
+  for(const p of places){
+   const pos=toWorld(p.p.lat,p.p.lon,this.zoom);let dx=pos.x-center.x;const world=worldWidth(this.zoom);
+   if(dx>world/2)dx-=world;if(dx< -world/2)dx+=world;
+   const x=w/2+dx,y=h/2+pos.y-center.y;present.add(p.id);
+   let pin=this.pinNodes.get(p.id);if(!pin){pin=stableMarker(p.own,p.p.heading,p.name,p.alert);pin.classList.add('zyro-raster-pin');this.pinNodes.set(p.id,pin);this.pinLayer.appendChild(pin);}
+   pin.style.transform=`translate3d(${Math.round(x)}px,${Math.round(y)}px,0) translate(-50%,-50%)`;
+   pin.style.display=(x< -70||x>w+70||y< -70||y>h+70)?'none':'';
+   pin.classList.toggle('zyro-contact-alert',!!p.alert);
+   const arrow=pin.querySelector('.zyro-gl-arrow');if(arrow&&Number.isFinite(Number(p.p.heading)))arrow.style.transform=`rotate(${Number(p.p.heading)}deg)`;
   }
-  for(const [id,marker]of stableMarkers)if(!present.has(id)){marker.remove();stableMarkers.delete(id);}
+  for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
+ }
+ remove(){this.removed=true;if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
 }
-function focusStableMap(lat,lon,zoom=16){
-  if(!stableMap||stableMapState!=='ready'||!mapValidPoint({lat,lon}))return;
-  stableMap.easeTo({center:[Number(lon),Number(lat)],zoom:Math.min(18,Math.max(2,zoom)),pitch:0,bearing:0,duration:500,essential:true});
-}
+function syncStableMarkers(){stableMap?.schedule();}
+function focusStableMap(lat,lon,zoom=16){if(!stableMap||!mapValidPoint({lat,lon}))return;stableMap.easeTo({center:[Number(lon),Number(lat)],zoom});}
 function applyZyroTheme(next,persist=true){
-  zyroTheme=next==='light'?'light':'dark';
-  document.documentElement.dataset.theme=zyroTheme;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',zyroTheme==='dark'?'#071626':'#e8f5f7');
-  for(const btn of document.querySelectorAll('[data-theme-choice]')){
-    const selected=btn.dataset.themeChoice===zyroTheme;
-    btn.classList.toggle('is-selected',selected);btn.setAttribute('aria-pressed',String(selected));
-  }
-  if(persist)try{localStorage.setItem(ZYRO_THEME_KEY,zyroTheme);}catch{}
-  if(stableMap&&stableMapState==='ready'){
-    stableMap.setStyle(STABLE_MAP_STYLES[zyroTheme]);
-    // Markers are DOM elements; style reload does not remove them.
-  }
+ zyroTheme=next==='light'?'light':'dark';document.documentElement.dataset.theme=zyroTheme;
+ document.querySelector('meta[name="theme-color"]')?.setAttribute('content',zyroTheme==='dark'?'#071626':'#e8f5f7');
+ for(const btn of document.querySelectorAll('[data-theme-choice]')){const selected=btn.dataset.themeChoice===zyroTheme;btn.classList.toggle('is-selected',selected);btn.setAttribute('aria-pressed',String(selected));}
+ if(persist)try{localStorage.setItem(ZYRO_THEME_KEY,zyroTheme);}catch{}
+ stableMap?.setStyle(zyroTheme);
 }
 function ensureStableMap(){
-  if(!current||$('homeView').classList.contains('hidden'))return;
-  if(stableMapState==='ready'){stableMap?.resize();syncStableMarkers();return;}
-  if(stableMapState==='loading'||stableRetryTimer)return;
-  const el=$('zyroVectorMap');
-  if(!el||el.clientWidth<25||el.clientHeight<25){
-    // Hidden tab / layout not yet measured: retry when it becomes visible.
-    return;
-  }
-  if(!window.maplibregl?.Map||!window.maplibregl?.supported?.()){
-    stableAttempts++;
-    scheduleMapRetry('Il motore grafico della mappa non è disponibile. Controlla la rete o WebGL.');
-    return;
-  }
-  stableMapState='loading';
-  stableAttempts++;
-  mapHideFailure();mapStatus('Caricamento mappa mondiale...');
-  const boot=++stableBootId;
-  let instance;
-  try{
-    const pos=mapValidPoint(lastCoords)?{lat:lastCoords.lat,lon:lastCoords.lon,zoom:15}:STABLE_MAP_DEFAULT;
-    instance=new window.maplibregl.Map({
-      container:el,style:STABLE_MAP_STYLES[zyroTheme],center:[pos.lon,pos.lat],zoom:pos.zoom,
-      minZoom:2,maxZoom:18,pitch:0,bearing:0,dragRotate:false,touchPitch:false,
-      touchZoomRotate:true,dragPan:true,scrollZoom:false,cooperativeGestures:false,
-      attributionControl:false,renderWorldCopies:true,trackResize:true,fadeDuration:100,antialias:false
-    });
-    stableMap=instance;
-    const failure=()=>{
-      if(boot!==stableBootId||stableMapState!=='loading')return;
-      scheduleMapRetry('Le mappe non si caricano. Verifica la connessione oppure premi Riprova.');
-    };
-    stableLoadTimer=setTimeout(failure,16000);
-    instance.on('style.load',()=>{if(boot===stableBootId)styleZyroLayers(instance,zyroTheme);});
-    instance.once('load',()=>{
-      if(boot!==stableBootId)return;
-      clearTimeout(stableLoadTimer);stableLoadTimer=null;
-      stableMapState='ready';stableAttempts=0;mapHideFailure();
-      stableMap.resize();syncStableMarkers();renderMap();
-      mapStatus(mapValidPoint(lastCoords)?`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`:'Mappa pronta · attiva la posizione per localizzarti');
-    });
-    instance.on('error',event=>{
-      // Non tutte le risorse secondarie sono necessarie per vedere la mappa.
-      console.warn('ZYRO MAP',event?.error?.message||'Risorsa cartografica non disponibile');
-    });
-  }catch(e){
-    console.warn('ZYRO MAP: inizializzazione non riuscita',e);
-    scheduleMapRetry('Impossibile inizializzare la mappa su questo telefono.');
-  }
+ if(!current||$('homeView').classList.contains('hidden'))return;
+ if(stableMap){stableMap.resize();return;}
+ const el=$('zyroVectorMap');if(!el||el.clientWidth<20||el.clientHeight<20)return;
+ stableMapState='loading';mapHideFailure();mapStatus('Caricamento strade...');
+ const initial=mapValidPoint(lastCoords)?{lat:lastCoords.lat,lon:lastCoords.lon}:DEFAULT_CENTER;
+ const boot=++stableBootId;
+ stableMap=new ZyroRasterMap(el,initial,mapValidPoint(lastCoords)?15:5,()=>{
+  if(boot!==stableBootId)return;
+  if(stableMapState!=='ready'){stableMapState='ready';mapHideFailure();mapStatus('Cartografia caricata. Attiva il GPS per localizzarti.');renderMap();}
+ },message=>{if(boot===stableBootId)mapShowFailure(message);});
+ stableLoadTimer=setTimeout(()=>{if(stableMapState!=='ready'&&boot===stableBootId)mapShowFailure('Non arrivano le strade. Controlla la rete e il servizio su Render.');},14000);
 }
 function renderMap(){
-  if(!current||$('homeView').classList.contains('hidden'))return;
-  mapLink();
-  ensureStableMap();
-  if(stableMapState!=='ready')return;
-  syncStableMarkers();
-  if(mapValidPoint(lastCoords)){
-    if(!ownCentered){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
-    mapStatus(`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`);
-  }else if(!ownCentered){
-    const first=uniqueContacts().find(u=>mapValidPoint(u.location));
-    if(first){focusStableMap(first.location.lat,first.location.lon,14);ownCentered=true;}
-    mapStatus(geolocationError||'Attiva il GPS per vedere la tua posizione');
-  }else mapStatus(geolocationError||'Posizione non attiva');
+ if(!current||$('homeView').classList.contains('hidden'))return;
+ mapLink();ensureStableMap();if(!stableMap)return;
+ syncStableMarkers();
+ if(mapValidPoint(lastCoords)){
+  if(!ownCentered){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
+  if(stableMapState==='ready')mapStatus(`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`);
+ }else if(!ownCentered){const c=uniqueContacts().find(u=>mapValidPoint(u.location));if(c){focusStableMap(c.location.lat,c.location.lon,14);ownCentered=true;}if(stableMapState==='ready')mapStatus(geolocationError||'Attiva il GPS per localizzarti');}
+ else if(stableMapState==='ready')mapStatus(geolocationError||'Posizione non attiva');
 }
 function onOrientation(e){
   let direction=Number.isFinite(e.webkitCompassHeading)?e.webkitCompassHeading:Number.isFinite(e.alpha)?(360-e.alpha)%360:null;
@@ -600,8 +538,8 @@ async function init(){
     $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
-  $('mapZoomIn').addEventListener('click',()=>{if(stableMapState==='ready')stableMap.zoomTo(Math.min(18,stableMap.getZoom()+1),{duration:250});});
-  $('mapZoomOut').addEventListener('click',()=>{if(stableMapState==='ready')stableMap.zoomTo(Math.max(2,stableMap.getZoom()-1),{duration:250});});
+  $('mapZoomIn').addEventListener('click',()=>{if(stableMap)stableMap.zoomTo(Math.min(18,stableMap.getZoom()+1),{duration:250});});
+  $('mapZoomOut').addEventListener('click',()=>{if(stableMap)stableMap.zoomTo(Math.max(2,stableMap.getZoom()-1),{duration:250});});
   $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;ownCentered=false;void orientationPermission();updateGeo(null,true);if(lastCoords){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
   $('pickNotify').addEventListener('change',renderPickControls);
   $('pickRecipientsList').addEventListener('change',e=>{if(!e.target.matches('[data-pickcontact]'))return;const id=e.target.dataset.pickcontact;if(e.target.checked)pickSelected.add(id);else pickSelected.delete(id);});
@@ -627,7 +565,7 @@ async function init(){
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=12.0-map-stable').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=14.2-map-2d').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});

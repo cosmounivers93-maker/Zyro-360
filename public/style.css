@@ -594,3 +594,29 @@ html[data-theme="dark"] .geo-immersive .live-map::after{opacity:0!important;poin
 .zyro-gl-location .zyro-gl-core{background:#45b7ec!important;box-shadow:0 0 0 3px #45b7ec35,0 2px 8px #06172799!important}
 .zyro-contact-alert .zyro-atlas-initial{background:#e9617d!important}
 html[data-theme="light"] #zyroVectorMap .maplibregl-ctrl-attrib{background:rgba(247,253,255,.9);color:#365468}
+
+/* ZYRO 360 V14.2 — 2D map: no external WebGL dependency, no large banner. */
+.geo-immersive .live-map{background:#12243c!important;overflow:hidden!important;touch-action:none!important}
+#zyroVectorMap{position:absolute!important;inset:0!important;z-index:4!important;overflow:hidden!important;touch-action:none!important;cursor:grab;user-select:none!important}
+#zyroVectorMap:active{cursor:grabbing}
+.zyro-raster-tiles,.zyro-raster-markers{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+.zyro-raster-tiles{z-index:1;transform:translateZ(0);background:#112940}
+.zyro-raster-markers{z-index:2;overflow:visible}
+.zyro-raster-tile{position:absolute;left:0;top:0;width:256px;height:256px;max-width:none!important;max-height:none!important;pointer-events:none;user-select:none;will-change:transform;filter:grayscale(.94) invert(.90) sepia(.17) saturate(1.6) hue-rotate(156deg) brightness(.85) contrast(1.22)}
+html[data-theme="light"] .zyro-raster-tiles{background:#e6f3f7}
+html[data-theme="light"] .zyro-raster-tile{filter:grayscale(.72) sepia(.12) hue-rotate(140deg) saturate(.7) brightness(1.07) contrast(1.02)}
+.zyro-raster-tiles:after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 40px #07162a20}
+.zyro-raster-pin{position:absolute!important;left:0;top:0;pointer-events:none;will-change:transform;z-index:3}
+.map-top-label,.zyro-map-brand{display:none!important}
+.zyro-atlas-legend{position:absolute!important;z-index:16!important;top:15px!important;left:14px!important;right:auto!important;max-width:calc(100% - 95px)!important;border-radius:12px!important}
+#mapZoomControls{top:15px!important;right:14px!important;z-index:18!important}
+#mapUnavailable{left:12px!important;right:12px!important;top:auto!important;bottom:68px!important;inset:auto 12px 68px 12px!important;max-width:none!important;min-width:0!important;box-sizing:border-box!important;white-space:normal!important;overflow-wrap:anywhere!important;padding:12px 14px!important;border-radius:15px!important;box-shadow:0 7px 20px #08192b55!important}
+#mapUnavailable strong{font-size:12px!important}
+#mapUnavailable #mapFailureText{font-size:11px!important;line-height:1.4!important}
+#mapUnavailable .map-recovery-actions{gap:8px;margin-top:2px}
+#mapUnavailable .map-recovery-actions a,#mapRetry{font-size:10px!important;padding:8px 10px!important}
+#mapStatus{z-index:10!important;max-width:calc(100% - 26px)!important;white-space:normal!important}
+html[data-theme="light"] .geo-immersive .live-map{background:#e9f2f6!important}
+@media(max-width:380px){.zyro-atlas-legend{max-width:calc(100% - 82px)!important;gap:5px!important;font-size:9px!important}#mapUnavailable{bottom:55px!important}}
+
+#mapUnavailable{transform:none!important;width:auto!important;text-align:left!important;}
