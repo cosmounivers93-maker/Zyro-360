@@ -304,3 +304,99 @@
 @media(max-width:350px){.zyro-command-row{padding:7px 6px;gap:5px}.zyro-command-btn{height:72px}.zyro-cmd-title{font-size:9px}}
 @media(max-height:690px){.zyro-command-row{padding-top:6px;padding-bottom:6px}.zyro-command-btn{height:67px}.zyro-cmd-icon,.zyro-cmd-icon svg{width:20px;height:20px}.zyro-map-brand{bottom:37px}}
 @media(prefers-reduced-motion:reduce){.zyro-command-btn{transition:none}.zyro-gl-location .zyro-gl-ring{animation:none}}
+
+
+/* ═════════════════════════════════════════════════════════════
+   ZYRO 360 V8 — aspetto chiaro/scuro e mappa 3D in stile ZYRO
+   ═════════════════════════════════════════════════════════════ */
+.zyro-appearance-panel{margin:18px 0;padding:19px;border:1px solid #d7e5e9;border-radius:24px;background:linear-gradient(125deg,#fff,#f0fbf9);box-shadow:0 12px 34px #173b4b0b}
+.zyro-appearance-header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.appearance-emblem{display:grid;place-items:center;width:47px;height:47px;border-radius:15px;background:#d9f7f0;color:#0c9b92;font-size:29px;flex:none}
+.zyro-appearance-header h2{margin:0;font-size:17px;letter-spacing:-.3px;color:#142c43}
+.zyro-appearance-header p{font-size:11px;color:#778b98;margin:5px 0 0;line-height:1.4}
+.zyro-theme-choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.zyro-theme-option{display:flex;flex-direction:column;align-items:flex-start;gap:7px;text-align:left;padding:10px;background:#fff;border:2px solid #e3ebee;color:#1a3449;border-radius:17px;min-width:0;transition:transform .2s,border-color .2s}
+.zyro-theme-option.is-selected{border-color:#1fc1ac;box-shadow:0 0 0 3px #3ac7ae1c}
+.zyro-theme-option>span:not(.theme-preview){font-size:13px;font-weight:850}
+.zyro-theme-option small{font-size:10px;color:#718698}
+.zyro-theme-option:focus-visible{outline:3px solid #11bda7;outline-offset:2px}
+.theme-preview{display:block;position:relative;overflow:hidden;width:100%;height:61px;border-radius:10px;background:#eaf3f8;border:1px solid #d0e6e6}
+.theme-preview span{position:absolute;top:25px;left:-13%;width:130%;height:13px;transform:rotate(-13deg);background:#fff;border-radius:9px;box-shadow:0 -13px #bce8cd,0 13px #c9dff2}
+.theme-preview i{position:absolute;z-index:1;top:18px;left:52%;width:17px;height:17px;border:4px solid #fff;border-radius:50%;background:#1589f6;box-shadow:0 0 0 5px #168cf63c}
+.theme-preview-dark{background:#071b2e;border-color:#1a4054}
+.theme-preview-dark span{background:#21abb7;box-shadow:0 -12px #144e66,0 12px #189890;filter:drop-shadow(0 0 4px #20ead28f)}
+.theme-preview-dark i{background:#18a6ff;box-shadow:0 0 0 6px #18b6ff44,0 0 16px #0b9ffb}
+.appearance-note{font-size:10px;color:#758994;line-height:1.6;margin:12px 0 0}
+/* The vector map is the gesture owner. The raster fallback never captures its touches. */
+.zyro-vector-map{touch-action:none}
+.zyro-gl-core{box-shadow:0 0 0 5px #16d5f93b,0 0 22px #00c9ff,0 0 5px white}
+.map-zoom-controls button#mapTilt{font-size:11px;font-weight:900;letter-spacing:.6px;border-top:1px solid #ffffff38}
+.map-top-label{background:#091e33eb;box-shadow:0 8px 30px #050e24a1;border-color:#30e2c056}
+.zyro-map-brand{font-size:9px;letter-spacing:1px;background:#08182ddb}
+html[data-theme="dark"]{color-scheme:dark;--navy:#061326;--bg:#091527;--text:#e8f2fc;--muted:#a2b8c8;--border:#23445a;--shadow:0 16px 44px #030c1990}
+html[data-theme="dark"] body{background:#091527;color:#e7f4ff}
+html[data-theme="dark"] .topbar{background:#061326;border-bottom:1px solid #16405e}
+html[data-theme="dark"] .container{background:#091527}
+html[data-theme="dark"] .bottom-nav{background:#08182d;border-top:1px solid #254459}
+html[data-theme="dark"] .bottom-nav .nav-item{color:#91a8ba}
+html[data-theme="dark"] .bottom-nav .nav-item.active{color:#42e4ce}
+html[data-theme="dark"] .geo-immersive .live-map{background:#091d31}
+html[data-theme="dark"] .map-tiles{filter:brightness(.46) saturate(1.8) hue-rotate(135deg) contrast(1.45)}
+html[data-theme="dark"] .map-attribution{background:#0b2439dc;color:#aec7d8}
+html[data-theme="dark"] .map-attribution a{color:#c6e7ee}
+html[data-theme="dark"] .zyro-command-row{background:linear-gradient(180deg,#0a2338,#081a31);border-color:#1c4358}
+html[data-theme="dark"] .zyro-command-btn{box-shadow:0 0 0 1px #1b647054,0 8px 17px #010f2377}
+html[data-theme="dark"] .zyro-command-share{background:linear-gradient(145deg,#063a45,#092d3a);border-color:#20d7c2;color:#adfff3}
+html[data-theme="dark"] .zyro-command-locate{background:linear-gradient(145deg,#063a57,#092744);border-color:#23d4ed;color:#e3f9ff}
+html[data-theme="dark"] .zyro-command-sos{background:linear-gradient(145deg,#8a1737,#4c122a);border-color:#fb607e;color:#fff}
+html[data-theme="dark"] .zyro-command-btn .zyro-cmd-state{color:#90d9d7}
+html[data-theme="dark"] .zyro-sos-status{background:#11273e;border-color:#2a556d;color:#d6f5f3}
+html[data-theme="dark"] .panel,html[data-theme="dark"] .circle-card,html[data-theme="dark"] .stat-card,html[data-theme="dark"] .pick-panel,
+html[data-theme="dark"] .zyro-appearance-panel,html[data-theme="dark"] .profile-photo-editor,html[data-theme="dark"] .how-it-works,
+html[data-theme="dark"] .chat-hub{background:linear-gradient(145deg,#10263c,#0d2033);border-color:#244b61;color:#e8f4fa;box-shadow:0 14px 34px #0004}
+html[data-theme="dark"] .page-heading h1,html[data-theme="dark"] .section-head h2,html[data-theme="dark"] .panel-title h2,
+html[data-theme="dark"] .profile-heading h1,html[data-theme="dark"] .how-heading h2,
+html[data-theme="dark"] .chat-heading-row h2,html[data-theme="dark"] .chat-empty-view h3,
+html[data-theme="dark"] .zyro-appearance-header h2{color:#efffff}
+html[data-theme="dark"] .page-heading>p,html[data-theme="dark"] .panel-title p,html[data-theme="dark"] .profile-heading>p,
+html[data-theme="dark"] .setting-description,html[data-theme="dark"] .profile-photo-heading p,
+html[data-theme="dark"] .chat-room-text small,html[data-theme="dark"] .zyro-appearance-header p{color:#adbecc}
+html[data-theme="dark"] input:not([type=checkbox]):not([type=radio]):not([type=file]),html[data-theme="dark"] select,html[data-theme="dark"] textarea{background:#142e44;color:#e6f8ff;border:1px solid #2b5368}
+html[data-theme="dark"] input::placeholder{color:#95aeba}
+html[data-theme="dark"] .inline-form input,html[data-theme="dark"] .chat-search{background:#152d44;border-color:#2b5065;color:#ebf8ff}
+html[data-theme="dark"] .chat-search input{background:transparent;border:none}
+html[data-theme="dark"] .zyro-theme-option{background:#132b42;color:#e2f6ff;border-color:#2c5163}
+html[data-theme="dark"] .zyro-theme-option small,html[data-theme="dark"] .appearance-note{color:#a5bbc8}
+html[data-theme="dark"] .zyro-theme-option.is-selected{border-color:#35e4cd}
+html[data-theme="dark"] .appearance-emblem,html[data-theme="dark"] .chat-heading-emblem{background:#133d49;color:#4df0d7}
+html[data-theme="dark"] .zyro-chat-page .chat-room,html[data-theme="dark"] .chat-empty-view,
+html[data-theme="dark"] .chat-filter,html[data-theme="dark"] .quick-messages,
+html[data-theme="dark"] .chat-compose{background:#102b40;color:#ecf9ff;border-color:#2a5368}
+html[data-theme="dark"] .zyro-chat-page .chat-room-text b{color:#ecf8ff}
+html[data-theme="dark"] .chat-filter.active{background:#166b6e;border-color:#24c9b2}
+html[data-theme="dark"] .chat-empty-view p{color:#a2bdc8}
+html[data-theme="dark"] .chat-messages{background:#0a2135}
+html[data-theme="dark"] .chat-bubble{background:#1a3b54;color:#e8f9ff}
+html[data-theme="dark"] .chat-bubble.mine{background:#145d5d}
+html[data-theme="dark"] .chat-compose .chat-photo-label{background:#194c57}
+html[data-theme="dark"] .circle-top strong,html[data-theme="dark"] .profile-photo-heading h2,
+html[data-theme="dark"] .mode-heading h1{color:#e6f9ff}
+html[data-theme="dark"] .circle-members .member-pill{color:#d7fff3}
+html[data-theme="dark"] .how-it-works details,html[data-theme="dark"] .law-links a{background:#132e44;border-color:#28586a;color:#dcf4f5}
+html[data-theme="dark"] .how-content,html[data-theme="dark"] .how-content p{color:#c1d8e2}
+html[data-theme="dark"] .chat-security-note,html[data-theme="dark"] .small-disclaimer{color:#a4b9c6}
+html[data-theme="dark"] .auth-card{background:#10273d;color:#e9faff}
+html[data-theme="dark"] .auth-tabs{background:#091d32}
+html[data-theme="dark"] .auth-tab{color:#a7c7cf}
+html[data-theme="dark"] .auth-tab.active{background:#125366;color:#fff}
+html[data-theme="dark"] .auth-copy,html[data-theme="dark"] .auth-card .field span{color:#b9d4e0}
+@media(max-width:385px){.zyro-appearance-panel{padding:14px}.zyro-theme-choices{gap:8px}.zyro-theme-option{padding:7px}}
+
+html[data-theme="dark"] .map-tiles{background:radial-gradient(circle at 35% 38%,#0e2c46,#081629 76%);filter:brightness(.52) saturate(1.7) hue-rotate(138deg) contrast(1.45)}
+html[data-theme="dark"] .map-pins{background:transparent}
+html[data-theme="dark"] .profile-action.gallery-action,html[data-theme="dark"] .profile-action.camera-action,html[data-theme="dark"] .photo-privacy-note{background:#183c4e;color:#e6fff7;border-color:#2f6d78}
+html[data-theme="dark"] .profile-action b,html[data-theme="dark"] .profile-action small{color:#e1f6fa}
+html[data-theme="dark"] .profile-chevron{color:#56dccd}
+html[data-theme="dark"] .mode-heading{background:linear-gradient(115deg,#0b263d,#14546b)}
+html[data-theme="dark"] .profile-photo-editor .photo-privacy-note span{color:#bfd8df}
+#mapTilt:disabled{opacity:.45;cursor:not-allowed}

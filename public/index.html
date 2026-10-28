@@ -4,14 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v7.0-zyromap-compact">
+  <meta name="zyro-ui-build" content="v8.0-zyromap-3d-temi">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.15.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="/style.css?v=7.0-zyromap-compact">
+  <link rel="stylesheet" href="/style.css?v=8.0-zyromap-3d-temi">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -47,9 +47,9 @@
           <div id="googleMap" class="google-map hidden" aria-label="Google Maps con i membri della tua cerchia"></div>
           <div id="mapTiles" class="map-tiles" aria-hidden="true"></div>
           <div id="mapPins" class="map-pins" aria-hidden="true"></div>
-          <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button></div>
-          <div class="map-top-label"><span class="map-live-dot"></span><span>ZYRO MAP</span><span class="zyro-map-pill">LIVE</span></div>
-          <div class="zyro-map-brand" aria-hidden="true"><span class="zyro-map-orb">✦</span><span>360°</span></div>
+          <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button><button type="button" id="mapTilt" title="Attiva o disattiva la visuale 3D" aria-label="Passa da vista 3D a 2D" aria-pressed="true">3D</button></div>
+          <div class="map-top-label"><span class="map-live-dot"></span><span>ZYRO MAP</span><span class="zyro-map-pill">LIVE · 3D</span></div>
+          <div class="zyro-map-brand" aria-hidden="true"><span class="zyro-map-orb">✦</span><span>MAPPA ZYRO · 360°</span></div>
           <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
           <div id="mapUnavailable" class="map-unavailable hidden" role="alert">La mappa incorporata non è disponibile. <a id="mapOpenGoogle" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer">Apri Google Maps</a></div>
           <div id="mapAttribution" class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a id="mapSourceCredit" href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">© OpenFreeMap</a></div>
@@ -149,6 +149,14 @@
         <button type="button" id="avatarRemove" class="avatar-remove-action">Rimuovi la foto attuale</button>
         <div class="photo-privacy-note"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1"/></svg><span>Solo le persone delle tue cerchie vedranno questa foto.</span></div>
       </section>
+      <section class="zyro-appearance-panel" aria-labelledby="appearanceTitle">
+        <div class="zyro-appearance-header"><span class="appearance-emblem" aria-hidden="true">◐</span><div><h2 id="appearanceTitle">Aspetto dell'app</h2><p>Scegli il tema di ZYRO 360 e della mappa.</p></div></div>
+        <div class="zyro-theme-choices" role="group" aria-label="Tema dell'app">
+          <button id="themeLight" class="zyro-theme-option" data-theme-choice="light" type="button" aria-pressed="false"><span class="theme-preview theme-preview-light" aria-hidden="true"><span></span><i></i></span><span>☀️ Chiara</span><small>Colori luminosi</small></button>
+          <button id="themeDark" class="zyro-theme-option" data-theme-choice="dark" type="button" aria-pressed="true"><span class="theme-preview theme-preview-dark" aria-hidden="true"><span></span><i></i></span><span>🌙 Scura</span><small>Notte e neon</small></button>
+        </div>
+        <p class="appearance-note">Il tema rimane selezionato su questo dispositivo, anche dopo aver chiuso l'app. La mappa usa dati geografici reali.</p>
+      </section>
       <div class="panel"><div class="panel-title"><span class="panel-icon">♧</span><div><h2>Avvisi SOS</h2><p>Ricevi notifiche se una persona della tua cerchia chiede aiuto</p></div></div><button id="pushButton" class="btn btn-dark btn-wide" type="button">Attiva notifiche</button><p id="pushStatus" class="setting-description">Le notifiche dipendono dal supporto del browser e dalle impostazioni del dispositivo.</p></div>
       <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento.</p></div>
       <div class="panel"><div class="panel-title"><span class="panel-icon warm">☏</span><div><h2>Numeri di emergenza</h2><p>In Italia e nell'UE il numero unico è 112</p></div></div><a href="tel:112" class="btn btn-outline btn-wide">Chiama il 112</a></div>
@@ -179,6 +187,6 @@
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
 <script src="https://unpkg.com/maplibre-gl@5.15.0/dist/maplibre-gl.js" defer></script>
-<script src="/app.js?v=7.0-zyromap-compact" defer></script>
+<script src="/app.js?v=8.0-zyromap-3d-temi" defer></script>
 </body>
 </html>
