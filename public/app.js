@@ -152,13 +152,24 @@ async function imageData(file,maxPx=520,maxBytes=105000){
   }finally{URL.revokeObjectURL(url);}
 }
 async function saveAvatar(file){const avatar=await imageData(file,400,100000);await post('/api/profile/avatar',{avatar});await refresh();toast('Foto profilo aggiornata.');}
+let chatCategory='all';
+let chatSearch='';
+const roomArrow=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>`;
+const roomGroupIcon=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19v-2.1A4.9 4.9 0 0 1 8.4 12h1.2a4.9 4.9 0 0 1 4.9 4.9V19H3.5Z"/><path d="M16 5a3 3 0 0 1 0 6M18 13c2.1.5 3 1.9 3 4v2h-4"/></svg>`;
+const roomChatIcon=`<svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg>`;
 function renderChatRooms(){
   if(!current)return;
-  const circles=current.circles, contacts=uniqueContacts();
-  $('chatRooms').innerHTML=`<p class="chat-section-label">👨‍👩‍👧‍👦 Gruppi famiglia</p>`+(circles.length?circles.map(c=>`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon">◎</span><span><b>${escapeHtml(c.name)}</b><small>${c.members.length} membri · chat di gruppo</small></span><span>›</span></button>`).join(''):'<p class="setting-description">Crea una cerchia per avere la sua chat.</p>')+`<p class="chat-section-label">💬 Chat amici</p>`+(contacts.length?contacts.map(u=>`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon">${avatarHTML(u)}</span><span><b>${escapeHtml(u.name)}</b><small>Conversazione privata</small></span><span>›</span></button>`).join(''):'<p class="setting-description">Invita gli amici per messaggiare.</p>');
+  const circles=current.circles||[], contacts=uniqueContacts();
+  const matching=(name)=>String(name).toLocaleLowerCase('it').includes(chatSearch.toLocaleLowerCase('it'));
+  const rooms=[];
+  if(chatCategory!=='direct')for(const c of circles.filter(c=>matching(c.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(c.name)}</b><small>Gruppo famiglia · ${c.members.length} ${c.members.length===1?'persona':'persone'}</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  if(chatCategory!=='circle')for(const u of contacts.filter(u=>matching(u.name)))rooms.push(`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon person-room-icon">${avatarHTML(u)}</span><span class="chat-room-text"><b>${escapeHtml(u.name)}</b><small>Messaggio privato · cerchia condivisa</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  const hasAny = circles.length||contacts.length;
+  $('chatRooms').innerHTML=rooms.length?rooms.join(''):chatSearch?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Nessun risultato</h3><p>Prova a cercare un altro nome.</p></div>`:hasAny?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Non ci sono chat qui</h3><p>Seleziona un'altra categoria.</p></div>`:`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Ogni legame inizia da qui</h3><p>Crea una cerchia o invita una persona fidata per iniziare una conversazione.</p><button type="button" class="btn btn-primary" id="chatInviteNow">Vai alle Cerchie <span aria-hidden="true">→</span></button></div>`;
   $('chatRooms').querySelectorAll('.chat-room').forEach(b=>b.addEventListener('click',()=>openChat(b.dataset.typ,b.dataset.id)));
+  $('chatInviteNow')?.addEventListener('click',()=>showView('circles'));
 }
-function openChat(type,id){chatRoom={type,id};showView('chats');$('chatConversation').classList.remove('hidden');const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);$('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';$('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · membri della cerchia':'Chat privata · solo voi due';loadChat().catch(e=>toast(e.message,true));}
+function openChat(type,id){chatRoom={type,id};showView('chats');$('chatsView').classList.add('is-conversation');$('chatConversation').classList.remove('hidden');const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);$('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';$('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · membri della cerchia':'Chat privata · solo voi due';loadChat().catch(e=>toast(e.message,true));}
 async function loadChat(){
   const r=chatRoom;if(!r||!current)return;
   const response=await api(`/api/chat/${encodeURIComponent(r.type)}/${encodeURIComponent(r.id)}`);
@@ -168,7 +179,7 @@ async function loadChat(){
 }
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
-function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
+function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
 function showView(view){activeView=view;for(const v of ['home','circles','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();zyroMap?.invalidateSize();});}}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;geolocationError='';renderMap();return;}
@@ -251,6 +262,60 @@ async function enablePush(){
 }
 function base64ToBytes(base64){const padding='='.repeat((4-base64.length%4)%4);const binary=atob((base64+padding).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(binary,x=>x.charCodeAt(0));}
 function setMode(m){authMode=m;document.querySelectorAll('.auth-tab').forEach(b=>{const yes=b.dataset.mode===m;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));});$('nameField').classList.toggle('hidden',m==='login');$('name').required=m==='register';$('password').autocomplete=m==='register'?'new-password':'current-password';$('authSubmit').innerHTML=m==='login'?'Entra nella tua cerchia <span>→</span>':'Crea il mio account <span>→</span>';}
+// Google Maps is optional and requires a Google Cloud API key restricted to the site.
+// Without a key, the on-screen free map remains functional using independent providers.
+let googleMap=null,googleMarkers=[],googleInitAttempted=false,googleMapLoading=false;
+async function maybeInitGoogleMap(){
+  if(googleInitAttempted||googleMapLoading||!current)return;
+  googleInitAttempted=true;googleMapLoading=true;
+  try{
+    const config=await api('/api/map-config');
+    if(!config.googleMapsKey){googleMapLoading=false;return;}
+    await new Promise((resolve,reject)=>{
+      if(window.google?.maps?.Map){resolve();return;}
+      const tag=document.createElement('script');tag.async=true;
+      tag.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(config.googleMapsKey)}&v=weekly&language=it`;
+      tag.onload=()=>window.google?.maps?.Map?resolve():reject(Error('Google Maps non è stato caricato'));
+      tag.onerror=()=>reject(Error('Rete o chiave Google Maps non disponibile'));
+      document.head.append(tag);
+    });
+    const native=zyroMap;
+    googleMap=new window.google.maps.Map($('googleMap'),{
+      center:{lat:native?.center.lat??41.65,lng:native?.center.lon??12.48},zoom:native?.zoom??6,
+      disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy',clickableIcons:false,
+      fullscreenControl:false,streetViewControl:false,mapTypeControl:false,
+      styles:[{featureType:'poi',stylers:[{visibility:'off'}]},{featureType:'transit',stylers:[{visibility:'off'}]}]
+    });
+    $('googleMap').classList.remove('hidden');
+    $('mapTiles').classList.add('hidden');$('mapPins').classList.add('hidden');
+    $('mapAttribution').classList.add('hidden');$('mapUnavailable').classList.add('hidden');
+    document.querySelector('.map-top-label').lastChild.textContent=' GOOGLE MAPS · LIVE';
+    syncGoogleMap();
+  }catch(error){console.warn('Google Maps non disponibile. Cartografia alternativa attiva.',error);}
+  finally{googleMapLoading=false;}
+}
+function googlePinIcon(isMe,heading){
+  const arrow=Number.isFinite(heading)?`<path d="M26 10L35 30L26 26L17 30Z" fill="#1b72dd" transform="rotate(${Number(heading)} 26 28)"/>`:'';
+  const svg=isMe?`<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="23" fill="#148ee9" fill-opacity=".14"/>${arrow}<circle cx="26" cy="26" r="11" fill="white"/><circle cx="26" cy="26" r="7" fill="#1688ef"/></svg>`:`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="54" viewBox="0 0 48 54"><path d="M24 3c-10 0-18 8-18 18c0 14 18 29 18 29s18-15 18-29C42 11 34 3 24 3Z" fill="#13bfa4" stroke="white" stroke-width="3"/><circle cx="24" cy="21" r="7" fill="white" opacity=".9"/></svg>`;
+  return {url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg),scaledSize:new google.maps.Size(isMe?52:48,isMe?52:54),anchor:new google.maps.Point(isMe?26:24,isMe?26:50)};
+}
+function syncGoogleMap(){
+  if(!googleMap||!current)return;
+  for(const marker of googleMarkers)marker.setMap(null);
+  googleMarkers=[];
+  const make=(lat,lon,title,isMe,heading)=>{
+    const marker=new google.maps.Marker({map:googleMap,position:{lat:Number(lat),lng:Number(lon)},title,icon:googlePinIcon(isMe,heading),zIndex:isMe?10:2});
+    googleMarkers.push(marker);
+  };
+  for(const user of uniqueContacts().filter(u=>u.location&&Number.isFinite(Number(u.location.lat))&&Number.isFinite(Number(u.location.lon))))make(user.location.lat,user.location.lon,user.name,false);
+  if(lastCoords)make(lastCoords.lat,lastCoords.lon,'La tua posizione GPS',true,lastCoords.heading);
+  const native=zyroMap;
+  if(native && !googleMap.centerInitialized){
+    googleMap.setCenter({lat:native.center.lat,lng:native.center.lon});googleMap.setZoom(native.zoom);googleMap.centerInitialized=true;
+  }
+}
+function focusGoogleMap(lat,lon,zoom=16){if(googleMap){googleMap.panTo({lat:Number(lat),lng:Number(lon)});googleMap.setZoom(zoom);googleMap.centerInitialized=true;}}
+
 // Map tiles are loaded only for the visible viewport. No third-party JS dependency.
 // OpenStreetMap standard tiles: © OpenStreetMap contributors. Internet required.
 const MAP_TILE_SIZE=256, MIN_MAP_ZOOM=3, MAX_MAP_ZOOM=18;
@@ -353,10 +418,10 @@ class ZyroNativeMap {
         img.addEventListener('error',()=>{
           source++;
           if(source===1){img.src=`https://tile.openstreetmap.org/${route}`;return;}
-          if(source===2){img.src=`https://tile.openstreetmap.fr/hot/${route}`;return;}
+          if(source===2){img.src=`/api/map-tile/${route}`;return;}
           this.failed++;this.updateTileStatus();
         });
-        img.src=`/api/map-tile/${route}`;
+        img.src=`https://a.basemaps.cartocdn.com/light_all/${route}`;
         this.tilesByKey.set(key,img);this.tiles.append(img);
       }
       img.style.transform=`translate3d(${Math.round(col*MAP_TILE_SIZE-left)}px,${Math.round(row*MAP_TILE_SIZE-top)}px,0)`;
@@ -390,6 +455,7 @@ class ZyroNativeMap {
   }
   updateTileStatus(){
     const fail=$('mapUnavailable');
+    if(googleMap){fail.classList.add('hidden');return;}
     if(this.loaded>0){fail.classList.add('hidden');return;}
     if(this.failed>=3)fail.classList.remove('hidden');
   }
@@ -400,13 +466,16 @@ function renderMap(){
   const contacts=uniqueContacts().filter(m=>m.location && Number.isFinite(Number(m.location.lat)) && Number.isFinite(Number(m.location.lon)));
   zyroMap.own=lastCoords;zyroMap.contacts=contacts;
   if(lastCoords){
-    if(!ownCentered){zyroMap.focusOn(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
+    if(!ownCentered){zyroMap.focusOn(lastCoords.lat,lastCoords.lon,16);focusGoogleMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
     $('mapStatus').textContent=`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`;
   }else if(contacts.length && !ownCentered){
-    zyroMap.focusOn(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);ownCentered=true;
+    zyroMap.focusOn(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);focusGoogleMap(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);ownCentered=true;
     $('mapStatus').textContent='Mappa della tua cerchia · attiva il GPS per localizzarti';
   }else $('mapStatus').textContent=geolocationError||'Tocca «Trova la mia posizione» per localizzarti';
-  zyroMap.queueDraw();
+  const googLink=$('mapOpenGoogle');
+  if(googLink && lastCoords)googLink.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(lastCoords.lat+','+lastCoords.lon);
+  if(googleMap)syncGoogleMap();
+  else {zyroMap.queueDraw();void maybeInitGoogleMap();}
 }
 function onOrientation(e){
   let direction=Number.isFinite(e.webkitCompassHeading)?e.webkitCompassHeading:Number.isFinite(e.alpha)?(360-e.alpha)%360:null;
@@ -536,7 +605,7 @@ async function init(){
     $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
-  $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){zyroMap?.focusOn(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
+  $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){zyroMap?.focusOn(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));focusGoogleMap(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
   $('pickNotify').addEventListener('change',renderPickControls);
   $('pickRecipientsList').addEventListener('change',e=>{if(!e.target.matches('[data-pickcontact]'))return;const id=e.target.dataset.pickcontact;if(e.target.checked)pickSelected.add(id);else pickSelected.delete(id);});
   $('pickArm').addEventListener('click',()=>action(armPick));
@@ -552,14 +621,16 @@ async function init(){
   $('saveSOSRecipients').addEventListener('click',()=>action(async()=>{const recipients=[...$('sosRecipientList').querySelectorAll('[data-sos-to]:checked')].map(x=>x.dataset.sosTo);await post('/api/settings/sos-recipients',{recipients});sosPending=null;await refresh();toast('Destinatari SOS salvati.');}));
   for(const id of ['avatarCamera','avatarGallery'])$(id).addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(()=>saveAvatar(file));e.target.value='';});
   $('avatarRemove').addEventListener('click',()=>action(async()=>{await post('/api/profile/avatar',{avatar:null});await refresh();toast('Foto profilo rimossa.');}));
-  $('chatClose').addEventListener('click',()=>{chatRoom=null;$('chatConversation').classList.add('hidden');});
+  document.querySelectorAll('[data-chat-filter]').forEach(b=>b.addEventListener('click',()=>{chatCategory=b.dataset.chatFilter;document.querySelectorAll('[data-chat-filter]').forEach(t=>{const on=t===b;t.classList.toggle('active',on);t.setAttribute('aria-pressed',String(on));});renderChatRooms();}));
+  $('chatSearch').addEventListener('input',e=>{chatSearch=e.target.value.trim();renderChatRooms();});
+  $('chatClose').addEventListener('click',()=>{chatRoom=null;$('chatConversation').classList.add('hidden');$('chatsView').classList.remove('is-conversation');});
   $('chatForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const text=$('chatText').value.trim();if(!text&&!chatPhotoData)return;await sendChat(text,chatPhotoData);});});
   $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js').catch(()=>{});
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();googleMarkers.forEach(m=>m.setMap(null));googleMarkers=[];googleMap=null;$('googleMap').classList.add('hidden');$('mapTiles').classList.remove('hidden');$('mapPins').classList.remove('hidden');$('mapAttribution').classList.remove('hidden');googleInitAttempted=false;current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=5.1-layout-fix').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
