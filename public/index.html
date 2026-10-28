@@ -4,13 +4,14 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v6.0-modes-smoothmap-help">
+  <meta name="zyro-ui-build" content="v7.0-zyromap-compact">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="/style.css?v=6.0-modes-smoothmap">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.15.0/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="/style.css?v=7.0-zyromap-compact">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -42,27 +43,41 @@
     <section id="homeView" class="view home-map-view">
       <section class="geo-panel geo-immersive" aria-label="Mappa reale della tua posizione">
         <div id="liveMap" class="live-map" aria-label="Mappa interattiva. Trascina per spostarti, usa due dita per ingrandire.">
+          <div id="zyroVectorMap" class="zyro-vector-map hidden" aria-label="Mappa vettoriale ZYRO 360 con GPS e posizioni condivise"></div>
           <div id="googleMap" class="google-map hidden" aria-label="Google Maps con i membri della tua cerchia"></div>
           <div id="mapTiles" class="map-tiles" aria-hidden="true"></div>
           <div id="mapPins" class="map-pins" aria-hidden="true"></div>
           <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button></div>
-          <div class="map-top-label"><span class="map-live-dot"></span> MAPPA IN TEMPO REALE</div>
+          <div class="map-top-label"><span class="map-live-dot"></span><span>ZYRO MAP</span><span class="zyro-map-pill">LIVE</span></div>
+          <div class="zyro-map-brand" aria-hidden="true"><span class="zyro-map-orb">✦</span><span>360°</span></div>
           <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
           <div id="mapUnavailable" class="map-unavailable hidden" role="alert">La mappa incorporata non è disponibile. <a id="mapOpenGoogle" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer">Apri Google Maps</a></div>
-          <div id="mapAttribution" class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">© CARTO</a></div>
+          <div id="mapAttribution" class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a id="mapSourceCredit" href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">© OpenFreeMap</a></div>
         </div>
-        <div class="home-map-actions">
-          <label class="home-share-action" for="shareToggle"><span class="home-action-symbol">◎</span><span class="home-action-text">Attiva posizione</span><span class="switch"><input id="shareToggle" type="checkbox" aria-label="Attiva o disattiva la condivisione posizione con la cerchia"><span class="switch-slider"></span></span></label>
-          <button id="locateMe" class="home-locate-action" type="button"><span class="home-action-symbol">⌖</span><span>Trova la mia posizione</span></button>
+        <div class="zyro-command-row" role="group" aria-label="Azioni rapide di ZYRO 360">
+          <label class="zyro-command-btn zyro-command-share" for="shareToggle" title="Attiva o disattiva la condivisione GPS con le tue cerchie">
+            <input id="shareToggle" type="checkbox" aria-label="Condividi la posizione in tempo reale con le mie cerchie">
+            <span class="zyro-cmd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-12A7 7 0 0 0 5 9c0 5.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.2"/></svg></span>
+            <span class="zyro-cmd-title">Attiva<br>posizione</span>
+            <span id="shareState" class="zyro-cmd-state">OFF</span>
+          </label>
+          <button id="locateMe" class="zyro-command-btn zyro-command-locate" type="button" title="Centra la mappa sul mio GPS">
+            <span class="zyro-cmd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg></span>
+            <span class="zyro-cmd-title">Trova la mia<br>posizione</span>
+            <span class="zyro-cmd-state">GPS</span>
+          </button>
+          <button id="sosButton" class="zyro-command-btn zyro-command-sos" type="button" aria-label="Invia una richiesta SOS ai contatti selezionati" title="Avvisa i contatti SOS che hai selezionato">
+            <span class="zyro-cmd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg></span>
+            <span class="zyro-cmd-title">Invia<br>SOS</span>
+            <span class="zyro-cmd-state">AIUTO</span>
+          </button>
         </div>
-      <div class="sos-card" id="sosCard">
-        <div class="sos-card-top"><span class="white-dot"></span><span>ALLERTA AI CONTATTI CHE HAI SCELTO</span><span class="sos-sparkle">✧</span></div>
-        <h2 id="sosTitle">Hai bisogno di aiuto?</h2>
-        <p id="sosDescription">Invia una richiesta di aiuto ai contatti SOS scelti. La posizione si condivide separatamente.</p>
-        <button id="sosButton" class="sos-button" type="button" aria-label="Attiva SOS"><span class="sos-button-inner"><span class="sos-icon">✳</span><b>SOS</b><small>PREMI QUI</small></span></button>
-        <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> ALLARME ATTIVO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">🎙 Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div></div>
-        <div id="sosInactiveNote" class="sos-card-bottom"><span>♧</span><span>Avvisa soltanto i destinatari SOS selezionati</span></div>
-      </div>
+        <div class="zyro-sos-status" id="sosCard" role="status" aria-live="polite">
+          <div class="zyro-sos-status-header"><span class="pulse-dot"></span><strong id="sosTitle">SOS attivo</strong></div>
+          <p id="sosDescription">Avviso inviato ai contatti selezionati</p>
+          <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> ALLARME ATTIVO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div></div>
+          <div id="sosInactiveNote" class="hidden">La condivisione GPS è indipendente dall'SOS.</div>
+        </div>
       </section>
     </section>
 
@@ -140,7 +155,7 @@
       <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
       <section class="how-it-works" id="zyroHelp" aria-labelledby="howTitle">
         <div class="how-heading"><span class="how-icon">?</span><div><p class="eyebrow muted">GUIDA E TRASPARENZA</p><h2 id="howTitle">Come funziona ZYRO 360?</h2><p>Tutto quello che devi sapere su protezione, privacy e uso corretto.</p></div></div>
-        <details><summary>La mappa e la posizione condivisa <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Usa «Trova la mia posizione» per visualizzarti sulla mappa. Solo con «Attiva posizione» autorizzi la condivisione GPS con i membri delle tue cerchie. Puoi disattivarla in ogni momento. La precisione dipende dal GPS, dalla connessione e dai permessi del telefono. Sul web, il tracciamento può interrompersi a schermo spento.</p></div></details>
+        <details><summary>La mappa e la posizione condivisa <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Usa «Trova la mia posizione» per visualizzarti sulla mappa. Solo con «Attiva posizione» autorizzi la condivisione GPS con i membri delle tue cerchie. Puoi disattivarla in ogni momento. La precisione dipende dal GPS, dalla connessione e dai permessi del telefono. Sul web, il tracciamento può interrompersi a schermo spento. Il fornitore della cartografia riceve richieste tecniche come indirizzo IP e area consultata: consulta anche la sua informativa privacy.</p></div></details>
         <details><summary>Cerchie, inviti e chat <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea una cerchia, genera un codice o link temporaneo e invialo alle persone fidate. Chi riceve l'invito deve accedere all'app e confermare l'ingresso. Le chat private e quelle di gruppo sono destinate ai membri autorizzati. In questo prototipo i messaggi non hanno crittografia end-to-end: non inviare dati particolarmente sensibili.</p></div></details>
         <details><summary>SOS, notifiche e microfono <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Il tasto SOS invia una richiesta d'aiuto ai contatti selezionati, senza attivare automaticamente la condivisione GPS. Se scegli «Attiva microfono» durante l'SOS, il browser ti richiede l'autorizzazione per trasmettere audio in diretta; puoi fermarlo in ogni momento. Il flusso audio non viene registrato sul server da questo prototipo. Le notifiche push funzionano solo se il server è configurato e il destinatario ha autorizzato le notifiche.</p><p>Se sei in pericolo reale chiama immediatamente il <a href="tel:112">112</a>: ZYRO 360 non sostituisce i soccorsi.</p></div></details>
         <details><summary>Modalità Pick Pocket <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Rileva alcuni movimenti bruschi tramite i sensori del browser e prova ad attivare una sirena. Può generare falsi allarmi; non garantisce il rilevamento dei furti, non impedisce di spegnere il telefono e potrebbe smettere di funzionare con schermo bloccato o app in background. Puoi scegliere se avvisare i contatti autorizzati.</p></div></details>
@@ -163,6 +178,7 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=6.0-modes-smoothmap" defer></script>
+<script src="https://unpkg.com/maplibre-gl@5.15.0/dist/maplibre-gl.js" defer></script>
+<script src="/app.js?v=7.0-zyromap-compact" defer></script>
 </body>
 </html>

@@ -250,3 +250,57 @@
 @media(max-width:400px){.bottom-nav .nav-item{font-size:9px}.bottom-nav .nav-icon{font-size:22px}.bottom-nav{padding-left:1px!important;padding-right:1px!important}.mode-heading{padding:24px 18px}.how-it-works{padding:19px 14px}}
 /* Permit overscanned tiles to slide under the viewport's parent clipping during a pan. */
 .map-tiles,.map-pins{overflow:visible!important}
+
+
+/* ZYRO 360 V7 — Cartografia vettoriale personalizzata e tre comandi compatti. */
+.geo-immersive .live-map{background:linear-gradient(145deg,#E6F5F6,#CBDDE3 80%);touch-action:none}
+.zyro-vector-map{position:absolute!important;inset:0;z-index:4;overflow:hidden}
+#zyroVectorMap.hidden{display:block!important;visibility:hidden;pointer-events:none}
+.zyro-vector-map .maplibregl-control-container{display:none}
+.zyro-vector-map .maplibregl-canvas{outline:0}
+.map-tiles{filter:saturate(.72) sepia(.12) hue-rotate(143deg) brightness(1.035) contrast(.94)}
+.zyro-map-brand{position:absolute;right:16px;bottom:47px;z-index:10;display:flex;align-items:center;gap:5px;padding:7px 10px;border:1px solid #ffffffaa;border-radius:13px;background:#102c44d9;color:#baf9e9;box-shadow:0 7px 22px #092e4140;pointer-events:none;font-size:12px;font-weight:900;letter-spacing:.8px;backdrop-filter:blur(14px)}
+.zyro-map-orb{font-size:16px;color:#3dd6ba;line-height:1}
+.map-top-label{z-index:12;top:17px;left:16px;border-radius:14px;background:#0c243de9;border:1px solid #77c9bb66;padding:10px 12px;color:#fff;font-size:11px;letter-spacing:1.3px;box-shadow:0 9px 23px #0c315039}
+.zyro-map-pill{color:#72e8c9;font-size:8px;letter-spacing:.9px;border:1px solid #46ceb061;border-radius:18px;padding:4px 6px;background:#27b7a221}
+.geo-immersive .map-status{z-index:12;bottom:24px;left:12px;max-width:calc(100% - 116px);border:1px solid #8ed9d24d;background:#102c43d9;border-radius:12px;color:#e7fff8;font-size:10px;box-shadow:0 8px 30px #082c4533}
+.map-zoom-controls{z-index:14;top:75px;right:13px;border:1px solid #eafbf4b2;border-radius:16px;background:#112c44df;box-shadow:0 12px 24px #1034443f;backdrop-filter:blur(12px)}
+.map-zoom-controls button{background:transparent;color:#d4fff5;width:39px;height:42px;font-weight:450}
+.map-zoom-controls button+button{border-top:1px solid #ffffff38}
+.map-zoom-controls button:active{background:#27cbb840}
+.zyro-command-row{position:relative;z-index:18;flex-shrink:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px max(12px,env(safe-area-inset-right)) 11px max(12px,env(safe-area-inset-left));background:linear-gradient(180deg,#f7fcfb,#fff);border-top:1px solid #d7eae9;box-shadow:0 -9px 20px #073a4a0e}
+.zyro-command-btn{appearance:none;position:relative;min-width:0;height:78px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:1px solid #d7e5e8;border-radius:17px;background:#f0f8f8;color:#17445a;box-shadow:0 3px 8px #123b4c08;text-align:center;font-weight:800;padding:8px 5px;line-height:1.05;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .18s,transform .18s,border-color .18s}
+.zyro-command-btn:active{transform:scale(.96)}
+.zyro-command-btn:focus-visible,.zyro-command-btn:focus-within{outline:3px solid #5ce0ce;outline-offset:2px}
+.zyro-cmd-icon{display:flex;align-items:center;justify-content:center;width:23px;height:23px;flex-shrink:0;color:#0ba995}
+.zyro-cmd-icon svg{width:23px;height:23px}
+.zyro-cmd-title{font-size:10.5px;letter-spacing:-.15px;line-height:1.1;white-space:normal;color:inherit}
+.zyro-cmd-state{font-size:7px;letter-spacing:1px;font-weight:900;color:#4d8993;margin-top:2px}
+.zyro-command-share{background:#f2faf8}
+.zyro-command-share input{position:absolute;opacity:0;inset:0;width:100%;height:100%;cursor:pointer;margin:0;z-index:2}
+.zyro-command-share.is-sharing{background:#D7F7EC;border-color:#48c5ac;color:#0f746a}
+.zyro-command-share.is-sharing .zyro-cmd-state{color:#047867}
+.zyro-command-locate{background:linear-gradient(145deg,#113955,#0a2543);color:#fff;border-color:#163d51}
+.zyro-command-locate .zyro-cmd-icon{color:#70edcf}
+.zyro-command-locate .zyro-cmd-state{color:#9bd8cf}
+.zyro-command-sos{color:#fff;border-color:#e74267;background:linear-gradient(135deg,#ff6c82,#df3159);box-shadow:0 4px 12px #cf315229}
+.zyro-command-sos .zyro-cmd-icon,.zyro-command-sos .zyro-cmd-state{color:#fff}
+.zyro-command-sos:disabled{opacity:.75;cursor:not-allowed}
+.zyro-sos-status{display:none;z-index:16;flex-shrink:0;background:#442238;color:#fff;padding:10px 14px;border-top:1px solid #f8a1b9}
+.zyro-sos-status.is-active{display:block}
+.zyro-sos-status-header{display:flex;gap:8px;align-items:center;font-size:12px}
+.zyro-sos-status p{font-size:10px;line-height:1.35;color:#ffe1e8;margin:4px 0 7px}
+.zyro-sos-status #sosActiveActions:not(.hidden){display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.zyro-sos-status .sos-live{font-size:9px}
+.zyro-sos-status .sos-actions{display:flex;gap:8px}
+.zyro-sos-status .light-button{font-size:10px;border-radius:9px;padding:7px 9px}
+.zyro-gl-location{height:54px;width:54px;display:grid;place-items:center;position:relative;pointer-events:none}
+.zyro-gl-location .zyro-gl-ring{position:absolute;inset:5px;border-radius:50%;background:#1b9db81a;border:2px solid #108ed045;animation:zyroGpsRipple 2.8s ease-in-out infinite}
+.zyro-gl-location .zyro-gl-arrow{position:absolute;top:0;left:12px;width:30px;height:31px;clip-path:polygon(50% 0%,94% 100%,50% 77%,6% 100%);background:#098bdb;filter:drop-shadow(0 2px 3px #06406c66);transform-origin:50% 26px}
+.zyro-gl-location .zyro-gl-core{position:absolute;top:19px;left:19px;width:16px;height:16px;border:4px solid #fff;border-radius:50%;background:#168eee;box-shadow:0 1px 12px #044b7c5c}
+.zyro-gl-contact{width:38px;height:38px;display:grid;place-items:center;background:linear-gradient(135deg,#25d7b8,#0a8c9a);border-radius:14px;border:3px solid #fff;color:#fff;box-shadow:0 4px 15px #0c596b33;font-weight:900;font-size:15px}
+@keyframes zyroGpsRipple{50%{transform:scale(1.20);opacity:.4}}
+@media(max-width:490px){.zyro-command-row{padding:8px 9px 9px;gap:7px}.zyro-command-btn{height:75px;border-radius:14px;padding:7px 3px}.zyro-cmd-title{font-size:10px}.zyro-map-brand{right:9px;bottom:40px}.geo-immersive .map-status{bottom:19px;left:10px}}
+@media(max-width:350px){.zyro-command-row{padding:7px 6px;gap:5px}.zyro-command-btn{height:72px}.zyro-cmd-title{font-size:9px}}
+@media(max-height:690px){.zyro-command-row{padding-top:6px;padding-bottom:6px}.zyro-command-btn{height:67px}.zyro-cmd-icon,.zyro-cmd-icon svg{width:20px;height:20px}.zyro-map-brand{bottom:37px}}
+@media(prefers-reduced-motion:reduce){.zyro-command-btn{transition:none}.zyro-gl-location .zyro-gl-ring{animation:none}}

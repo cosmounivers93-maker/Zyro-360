@@ -24,6 +24,8 @@ let inviteFromLink=null;
 // Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
 let mapTracking=false, ownCentered=false;
 let zyroMap=null;
+let zyroVectorMap=null, zyroVectorAttempted=false, zyroVectorLoading=false;
+const zyroVectorMarkers=new Map();
 let compassHeading = null;
 // Pick Pocket is a foreground browser experiment, not an Android system lock.
 let pickArmed=false, theftTriggered=false, lastMotionAt=0, motionPeaks=0, motionSamples=0, armTime=0;
@@ -86,6 +88,8 @@ function renderHome(){
   $('greetingName').textContent=me.name.split(' ')[0];setAvatar($('myAvatar'),me); 
   $('totalMembers').textContent=contacts.length;$('totalCircles').textContent=current.circles.length;
   $('shareToggle').checked=!!me.sharing; $('shareToggle').disabled=!!me.sos;
+  $('shareToggle').closest('.zyro-command-share')?.classList.toggle('is-sharing',!!me.sharing);
+  $('shareState').textContent=me.sharing?'LIVE':'OFF';
   const liveGPS=me.sharing||(pick&&me.theftShare);
   $('myLocationText').textContent= sos?'SOS attivo. Posizione condivisa solo se già autorizzata.':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
   $('sosCard').classList.toggle('is-active',!!me.sos);
@@ -180,7 +184,7 @@ async function loadChat(){
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
 function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
-function showView(view){activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();zyroMap?.invalidateSize();});}}
+function showView(view){activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();zyroMap?.invalidateSize();zyroVectorMap?.resize();});}}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;geolocationError='';renderMap();return;}
   if(watchId!==null)return;
@@ -454,11 +458,10 @@ class ZyroNativeMap {
         img.addEventListener('load',()=>{this.loaded++;this.updateTileStatus();});
         img.addEventListener('error',()=>{
           source++;
-          if(source===1){img.src=`https://tile.openstreetmap.org/${route}`;return;}
-          if(source===2){img.src=`/api/map-tile/${route}`;return;}
+          if(source===1){img.src=`/api/map-tile/${route}`;return;}
           this.failed++;this.updateTileStatus();
         });
-        img.src=`https://a.basemaps.cartocdn.com/light_all/${route}`;
+        img.src=`https://tile.openstreetmap.org/${route}`;
         this.tilesByKey.set(key,img);this.tiles.append(img);
       }
       img.style.transform=`translate3d(${Math.round(col*MAP_TILE_SIZE-left)}px,${Math.round(row*MAP_TILE_SIZE-top)}px,0)`;
@@ -497,22 +500,136 @@ class ZyroNativeMap {
     if(this.failed>=3)fail.classList.remove('hidden');
   }
 }
+
+// ZYRO MAP v7. Styled vector map with GPU panning. OpenFreeMap/Osm map data, no fake streets.
+// If MapLibre, WebGL, CDN or the vector tile provider is unavailable, the older raster map remains usable.
+function zyroStylePaint(map){
+  const layers=map.getStyle()?.layers||[];
+  for(const layer of layers){
+    const name=(layer.id||'').toLowerCase(),paint=layer.paint||{};
+    let color;
+    try{
+      if(layer.type==='background')map.setPaintProperty(layer.id,'background-color','#eef5f8');
+      if(layer.type==='fill' && !paint['fill-pattern']){
+        color=/water|lake|ocean|sea|riverbank/.test(name)?'#bcdfe5':
+          /park|wood|forest|grass|green|garden|landcover|nature|pitch/.test(name)?'#d6efe5':
+          /building/.test(name)?'#d8e3e9':
+          /residential|suburb|urban/.test(name)?'#e9f2f5':'#edf4f7';
+        map.setPaintProperty(layer.id,'fill-color',color);
+      }
+      if(layer.type==='line' && !paint['line-pattern']){
+        color=/water|stream|river|canal/.test(name)?'#87c7d5':
+          /motorway|trunk|highway/.test(name)?'#bad4d8':
+          /primary|secondary|tertiary|road|street|residential/.test(name)?'#ffffff':
+          /boundary|border|admin/.test(name)?'#b6cbd1':
+          /path|track|pedestrian|footway/.test(name)?'#b5d4c9':'#c9d8dc';
+        map.setPaintProperty(layer.id,'line-color',color);
+      }
+      if(layer.type==='symbol' && layer.layout?.['text-field']!==undefined){
+        map.setPaintProperty(layer.id,'text-color',/water/.test(name)?'#3d879a':'#36576b');
+        map.setPaintProperty(layer.id,'text-halo-color','#f5fafc');
+        map.setPaintProperty(layer.id,'text-halo-width',1.25);
+      }
+    }catch(e){ /* Preserve provider defaults for layers with special expression types. */ }
+  }
+}
+function zyroVectorMarker(isMe,heading,person){
+  const el=document.createElement('div');
+  el.className=isMe?'zyro-gl-location':'zyro-gl-contact';
+  if(isMe){
+    const ring=document.createElement('span'),arrow=document.createElement('span'),core=document.createElement('span');
+    ring.className='zyro-gl-ring';arrow.className='zyro-gl-arrow';core.className='zyro-gl-core';
+    arrow.style.transform=`rotate(${Number.isFinite(heading)?heading:0}deg)`;
+    el.append(ring,arrow,core);
+  }else el.textContent=String(person||'?').trim().charAt(0).toUpperCase()||'?';
+  el.title=isMe?'La tua posizione GPS':String(person||'Contatto');
+  el.setAttribute('aria-label',el.title);
+  return el;
+}
+function syncZyroVector(){
+  if(!zyroVectorMap||!current)return;
+  const people=uniqueContacts().filter(u=>u.location&&Number.isFinite(Number(u.location.lat))&&Number.isFinite(Number(u.location.lon)));
+  const wanted=new Set();
+  const points=people.map(u=>({id:'contact:'+u.id,lon:Number(u.location.lon),lat:Number(u.location.lat),heading:null,name:u.name}));
+  if(lastCoords)points.push({id:'me',lon:Number(lastCoords.lon),lat:Number(lastCoords.lat),heading:lastCoords.heading,name:'Tu'});
+  for(const p of points){
+    if(Math.abs(p.lat)>85||Math.abs(p.lon)>180)continue;
+    wanted.add(p.id);let mark=zyroVectorMarkers.get(p.id);
+    if(!mark){
+      const elem=zyroVectorMarker(p.id==='me',p.heading,p.name);
+      mark=new window.maplibregl.Marker({element:elem,anchor:'center'}).setLngLat([p.lon,p.lat]).addTo(zyroVectorMap);
+      zyroVectorMarkers.set(p.id,mark);
+    }else mark.setLngLat([p.lon,p.lat]);
+    const arrow=mark.getElement().querySelector('.zyro-gl-arrow');
+    if(arrow&&Number.isFinite(p.heading))arrow.style.transform=`rotate(${p.heading}deg)`;
+  }
+  for(const [id,mark]of zyroVectorMarkers){if(!wanted.has(id)){mark.remove();zyroVectorMarkers.delete(id);}}
+}
+function focusZyroVector(lat,lon,zoom=16){
+  if(!zyroVectorMap||!Number.isFinite(Number(lat))||!Number.isFinite(Number(lon)))return;
+  zyroVectorMap.easeTo({center:[Number(lon),Number(lat)],zoom:Math.min(19,Math.max(3,zoom)),duration:580,essential:true});
+}
+function resetZyroVector(){
+  for(const mark of zyroVectorMarkers.values())mark.remove();zyroVectorMarkers.clear();
+  if(zyroVectorMap){zyroVectorMap.remove();zyroVectorMap=null;}
+  zyroVectorAttempted=false;zyroVectorLoading=false;
+  $('zyroVectorMap').classList.add('hidden');
+  $('mapTiles').classList.remove('hidden');$('mapPins').classList.remove('hidden');
+  $('mapZoomControls').classList.remove('hidden');
+}
+function maybeInitZyroVector(){
+  if(zyroVectorMap||zyroVectorAttempted||zyroVectorLoading||!current||!window.maplibregl?.Map)return;
+  if(!window.maplibregl.supported?.())return;
+  const el=$('zyroVectorMap');if(!el||!el.clientWidth||!el.clientHeight)return;
+  zyroVectorAttempted=true;zyroVectorLoading=true;
+  let candidate=null,ready=false;
+  const fallback=()=>{
+    if(ready)return;
+    zyroVectorLoading=false;
+    try{candidate?.remove();}catch{}
+    el.classList.add('hidden');
+  };
+  // A failed remote provider never removes the existing raster map.
+  const timeout=setTimeout(fallback,11000);
+  try{
+    const pos=lastCoords?{lat:lastCoords.lat,lon:lastCoords.lon,zoom:16}:
+      zyroMap?{lat:zyroMap.center.lat,lon:zyroMap.center.lon,zoom:zyroMap.zoom}:{lat:41.9,lon:12.5,zoom:6};
+    candidate=new window.maplibregl.Map({container:el,style:'https://tiles.openfreemap.org/styles/positron',center:[pos.lon,pos.lat],zoom:pos.zoom,minZoom:3,maxZoom:19,
+      attributionControl:false,dragRotate:false,touchPitch:false,pitchWithRotate:false,scrollZoom:false,
+      fadeDuration:170,antialias:false,renderWorldCopies:true,cooperativeGestures:false});
+    candidate.on('load',()=>{
+      if(!current){clearTimeout(timeout);fallback();return;}
+      ready=true;zyroVectorLoading=false;clearTimeout(timeout);zyroVectorMap=candidate;
+      zyroStylePaint(candidate);
+      el.classList.remove('hidden');
+      $('mapTiles').classList.add('hidden');$('mapPins').classList.add('hidden');
+      $('mapUnavailable').classList.add('hidden');
+      $('mapSourceCredit').textContent='© OpenFreeMap';
+      $('mapSourceCredit').href='https://openfreemap.org/';
+      syncZyroVector();candidate.resize();
+    });
+    candidate.on('error',error=>{console.warn('ZYRO MAP: stile o tile vettoriali non disponibili.',error?.error?.message||'errore');});
+  }catch(error){console.warn('ZYRO MAP: mappa di riserva attiva',error);clearTimeout(timeout);fallback();}
+}
+
 function renderMap(){
   if(!current || $('homeView').classList.contains('hidden'))return;
   if(!zyroMap)zyroMap=new ZyroNativeMap($('liveMap'));
   const contacts=uniqueContacts().filter(m=>m.location && Number.isFinite(Number(m.location.lat)) && Number.isFinite(Number(m.location.lon)));
   zyroMap.own=lastCoords;zyroMap.contacts=contacts;
   if(lastCoords){
-    if(!ownCentered){zyroMap.focusOn(lastCoords.lat,lastCoords.lon,16);focusGoogleMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
+    if(!ownCentered){zyroMap.focusOn(lastCoords.lat,lastCoords.lon,16);focusZyroVector(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
     $('mapStatus').textContent=`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`;
   }else if(contacts.length && !ownCentered){
-    zyroMap.focusOn(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);focusGoogleMap(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);ownCentered=true;
+    zyroMap.focusOn(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);focusZyroVector(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);ownCentered=true;
     $('mapStatus').textContent='Mappa della tua cerchia · attiva il GPS per localizzarti';
   }else $('mapStatus').textContent=geolocationError||'Tocca «Trova la mia posizione» per localizzarti';
   const googLink=$('mapOpenGoogle');
   if(googLink && lastCoords)googLink.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(lastCoords.lat+','+lastCoords.lon);
-  if(googleMap)syncGoogleMap();
-  else {zyroMap.queueDraw();void maybeInitGoogleMap();}
+  if(zyroVectorMap){syncZyroVector();return;}
+  $('mapSourceCredit').textContent='Dati OSM';
+  $('mapSourceCredit').href='https://www.openstreetmap.org/copyright';
+  zyroMap.queueDraw();maybeInitZyroVector();
 }
 function onOrientation(e){
   let direction=Number.isFinite(e.webkitCompassHeading)?e.webkitCompassHeading:Number.isFinite(e.alpha)?(360-e.alpha)%360:null;
@@ -642,9 +759,9 @@ async function init(){
     $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
-  $('mapZoomIn').addEventListener('click',()=>{if(googleMap){googleMap.setZoom(Math.min(20,googleMap.getZoom()+1));}else zyroMap?.setZoom(zyroMap.zoom+1);});
-  $('mapZoomOut').addEventListener('click',()=>{if(googleMap){googleMap.setZoom(Math.max(3,googleMap.getZoom()-1));}else zyroMap?.setZoom(zyroMap.zoom-1);});
-  $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){zyroMap?.focusOn(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));focusGoogleMap(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
+  $('mapZoomIn').addEventListener('click',()=>{if(zyroVectorMap){zyroVectorMap.zoomTo(Math.min(19,zyroVectorMap.getZoom()+1),{duration:230});}else zyroMap?.setZoom(zyroMap.zoom+1);});
+  $('mapZoomOut').addEventListener('click',()=>{if(zyroVectorMap){zyroVectorMap.zoomTo(Math.max(3,zyroVectorMap.getZoom()-1),{duration:230});}else zyroMap?.setZoom(zyroMap.zoom-1);});
+  $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){zyroMap?.focusOn(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));focusZyroVector(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
   $('pickNotify').addEventListener('change',renderPickControls);
   $('pickRecipientsList').addEventListener('change',e=>{if(!e.target.matches('[data-pickcontact]'))return;const id=e.target.dataset.pickcontact;if(e.target.checked)pickSelected.add(id);else pickSelected.delete(id);});
   $('pickArm').addEventListener('click',()=>action(armPick));
@@ -668,8 +785,8 @@ async function init(){
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();googleMarkers.forEach(m=>m.setMap(null));googleMarkers=[];googleMap=null;$('googleMap').classList.add('hidden');$('mapTiles').classList.remove('hidden');$('mapPins').classList.remove('hidden');$('mapAttribution').classList.remove('hidden');googleInitAttempted=false;current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=6.0-modes-smoothmap').catch(()=>{});
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();resetZyroVector();googleMarkers.forEach(m=>m.setMap(null));googleMarkers=[];googleMap=null;$('googleMap').classList.add('hidden');$('mapTiles').classList.remove('hidden');$('mapPins').classList.remove('hidden');$('mapAttribution').classList.remove('hidden');googleInitAttempted=false;current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=7.0-zyromap-compact').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
