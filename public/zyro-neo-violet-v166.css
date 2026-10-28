@@ -1,0 +1,120 @@
+/* ZYRO 360 V16.6 – NEO MAP VIOLET
+   Purple/magenta neon over existing genuine raster street tiles. Visual-only.
+   No position collection, tile URL, GPS, pan, zoom, SOS, touch handler or network change.
+   Keep the map purple even when the application's general theme is light. */
+
+/* Deep plum rather than the old midnight blue: unambiguously purple in both modes. */
+html #homeView #liveMap,
+html #homeView #liveMap #zyroVectorMap,
+html #homeView #liveMap #zyroVectorMap .zyro-raster-tiles {
+  background-color:#100720!important;
+  background-image:none!important;
+}
+
+/* The existing real streets and labels become violet, not cyan. The same tile
+   nodes/URLs and positioning are preserved; no duplicate layers or repaint loop. */
+html #homeView #liveMap #zyroVectorMap .zyro-raster-tile,
+html[data-theme="light"] #homeView #liveMap #zyroVectorMap .zyro-raster-tile,
+html[data-theme="dark"] #homeView #liveMap #zyroVectorMap .zyro-raster-tile {
+  filter:grayscale(1) invert(.91) sepia(1) saturate(6.4)
+         hue-rotate(226deg) brightness(.86) contrast(1.58)!important;
+  opacity:1!important;
+}
+
+/* Subtle luminous atmosphere above the city, below the HUD buttons. No
+   animated transforms on the map, and nothing intercepts gestures. */
+#homeView #liveMap .zyro-neo-night-overlay {
+  z-index:5;
+  pointer-events:none!important;
+  background:
+    linear-gradient(180deg,rgba(18,4,32,.10) 0%,transparent 20%,transparent 79%,rgba(18,4,32,.14) 100%),
+    radial-gradient(ellipse at 86% 12%,rgba(194,35,255,.25) 0%,rgba(116,17,208,.10) 22%,transparent 55%),
+    radial-gradient(ellipse at 8% 74%,rgba(234,37,205,.19) 0%,rgba(119,13,172,.09) 27%,transparent 59%),
+    radial-gradient(ellipse at 51% 51%,rgba(128,49,248,.07),transparent 63%);
+  box-shadow:inset 0 0 40px rgba(29,4,54,.37);
+}
+#homeView #liveMap .zyro-neo-night-overlay::before {
+  content:"";
+  position:absolute;inset:0;
+  pointer-events:none!important;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 81px,rgba(231,96,255,.045) 82px,transparent 83px),
+    repeating-linear-gradient(90deg,transparent 0 81px,rgba(231,96,255,.045) 82px,transparent 83px);
+  -webkit-mask-image:linear-gradient(180deg,black,transparent 26%,transparent 75%,black);
+  mask-image:linear-gradient(180deg,black,transparent 26%,transparent 75%,black);
+  opacity:.8;
+}
+#homeView #liveMap .zyro-neo-night-overlay::after {
+  content:"";
+  position:absolute;inset:0;
+  pointer-events:none!important;
+  border-top:2px solid rgba(215,93,255,.42);
+  border-bottom:1px solid rgba(235,65,223,.38);
+  box-shadow:
+    inset 0 14px 26px -21px rgba(212,84,255,.85),
+    inset 0 -14px 25px -20px rgba(253,66,232,.65),
+    inset 18px 0 28px -29px rgba(181,64,255,.55);
+}
+
+/* Distinctly violet glass HUD, preserving legibility and touch targets. */
+html #homeView #liveMap .zyro-atlas-legend,
+html[data-theme="light"] #homeView #liveMap .zyro-atlas-legend,
+html #homeView #liveMap #mapZoomControls,
+html[data-theme="light"] #homeView #liveMap #mapZoomControls,
+html #homeView #liveMap #mapStatus,
+html[data-theme="light"] #homeView #liveMap #mapStatus {
+  background:rgba(27,10,53,.89)!important;
+  color:#faf0ff!important;
+  border-color:rgba(194,89,250,.58)!important;
+  box-shadow:0 6px 22px rgba(19,4,38,.38),
+             0 0 14px rgba(183,67,247,.16),
+             inset 0 1px 0 rgba(238,180,255,.13)!important;
+}
+html #homeView #liveMap #mapZoomControls button,
+html[data-theme="light"] #homeView #liveMap #mapZoomControls button{
+  color:#f6eaff!important;
+  background:transparent!important;
+}
+html #homeView #liveMap #mapZoomControls button + button {
+  border-top:1px solid rgba(197,98,250,.34)!important;
+}
+html #homeView #liveMap #mapZoomControls button:active {
+  background:rgba(161,58,230,.24)!important;
+}
+#homeView #liveMap .zyro-neo-night-mark {
+  color:#f4ccff!important;
+  background:rgba(39,11,69,.89)!important;
+  border:1px solid rgba(215,89,255,.64)!important;
+  text-shadow:0 0 9px rgba(228,112,255,.72)!important;
+  box-shadow:0 4px 17px rgba(15,4,32,.44),0 0 15px rgba(198,72,246,.20),
+             inset 0 1px 0 rgba(255,193,253,.16)!important;
+}
+#homeView #liveMap .zyro-neo-night-mark small {
+  color:#eea8ff!important;
+}
+html #homeView #liveMap .map-attribution{
+  color:#e0cdeb!important;
+  background:rgba(35,14,58,.89)!important;
+  border-color:rgba(186,112,231,.24)!important;
+}
+html #homeView #liveMap .map-attribution a{color:#ead1fb!important}
+
+/* GPS remains blue/teal to contrast with violet streets; emphasize halo only.
+   SOS must remain red and friends' markers remain recognizable. */
+#homeView #liveMap .zyro-gl-location .zyro-gl-ring {
+  border-color:rgba(196,117,255,.91)!important;
+  box-shadow:0 0 0 5px rgba(155,62,247,.15),
+             0 0 26px rgba(203,64,255,.43)!important;
+}
+#homeView #liveMap .zyro-raster-markers .zyro-gl-contact:not(.zyro-contact-alert) .zyro-atlas-initial {
+  box-shadow:0 0 0 5px rgba(113,244,212,.15),0 0 15px rgba(91,236,220,.24)!important;
+}
+#homeView #liveMap .zyro-raster-markers .zyro-gl-contact.zyro-contact-alert .zyro-atlas-initial {
+  border-color:#ffe6ed!important;
+  box-shadow:0 0 0 6px rgba(250,76,107,.25),0 0 18px rgba(251,65,104,.38)!important;
+}
+
+@media(prefers-reduced-motion:reduce){
+ #homeView #liveMap .zyro-neo-night-overlay *,
+ #homeView #liveMap .zyro-gl-location .zyro-gl-ring{animation:none!important}
+}
