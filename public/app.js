@@ -155,6 +155,7 @@ function connectSocket(){
     if(m.type==='listen-request') await action(()=>sendOffer(m.from));
     if(m.type==='rtc') await action(()=>handleRTC(m.from,m.signal));
     if(m.type==='account-banned'){alert(m.notice||'Account sospeso.');location.reload();return;}
+    if(m.type==='admin-new-report' && current?.me?.isAdmin){toast('Nuova segnalazione ricevuta nel Centro amministratore.');void action(adminLoad);}
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
   };
@@ -169,7 +170,7 @@ function setState(data){
   current=data;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();
+  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
 
@@ -182,6 +183,8 @@ function renderAdminAccess(){
  const admin=Boolean(current?.me?.isAdmin);
  $('zyroAdminPanel').classList.toggle('hidden',!admin);
  $('myAccountId').textContent=current?.me?.id||'';
+ $('reportMenuItem')?.classList.toggle('hidden',admin);
+ $('premiumPanel')?.classList.toggle('zyro-premium-owner',admin);
  if(!admin){adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
 }
 function renderReportContacts(){
@@ -392,7 +395,7 @@ async function loadChat(older=false){
 }
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
-function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';const status=$('profileStorageStatus');if(status){status.textContent=current.persistentStorage?'✓ Profilo collegato al database persistente. Non serve registrarsi nuovamente a ogni accesso.':'⚠️ Archivio temporaneo: i profili potrebbero sparire dopo il riavvio del server. Configura DATABASE_URL su Render.';status.style.borderColor=current.persistentStorage?'#86cbb8':'#e9b3a4';}renderPushTestContacts();}
+function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;$('profileAccessLabel').textContent=current.me.isAdmin?'Creatore · Premium incluso':'Account personale';setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';const status=$('profileStorageStatus');if(status){status.textContent=current.persistentStorage?'✓ Profilo collegato al database persistente. Non serve registrarsi nuovamente a ogni accesso.':'⚠️ Archivio temporaneo: i profili potrebbero sparire dopo il riavvio del server. Configura DATABASE_URL su Render.';status.style.borderColor=current.persistentStorage?'#86cbb8':'#e9b3a4';}renderPushTestContacts();}
 function renderPushTestContacts(){
   const select=$('pushTestRecipient'), button=$('pushTestButton');
   if(!select||!button)return;
@@ -418,7 +421,7 @@ async function sendPushTest(){
     toast(result.notice||'Test inviato.',result.accepted===0);
   }finally{button.disabled=false;}
 }
-function showView(view){if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
+function showView(view){if(view!=='settings')closeProfileSettings();if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='settings' && current?.me?.isAdmin && !adminLoaded)void action(adminLoad);if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();geolocationError='';renderMap();return;}
   if(watchId!==null)return;
@@ -443,7 +446,7 @@ function updateGeo(oldOn,newOn){
 }
 async function refresh(){if(!current)return;const data=await api('/api/state');setState(data);}
 async function startSOS(){
- if(!current?.me?.premiumActive){showView('modes');$('premiumPanel').scrollIntoView({behavior:'smooth',block:'center'});toast('SOS Premium non attivo: nessun allarme è stato inviato. In emergenza chiama il 112.',true);return;}
+ if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS Premium non attivo: nessun allarme è stato inviato. In emergenza chiama il 112.',true);return;}
  // Try to include a fresh GPS fix, without indefinitely delaying a request for help.
  if(!lastCoords && navigator.geolocation){try{
    const pos=await Promise.race([new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,maximumAge:10000,timeout:2400})),new Promise((_,reject)=>setTimeout(()=>reject(Error('GPS non disponibile')),2600))]);
@@ -892,7 +895,7 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`Premium attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Abbonamento Premium non attivo. Acquisti Play Store non ancora configurati: non è possibile inviare SOS Premium.';
+ $('premiumStatus').textContent=me.creatorPremium?'Account creatore verificato: tutte le funzioni Premium sono incluse gratuitamente. Nessun abbonamento richiesto.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`Premium attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Abbonamento Premium non attivo. Acquisti Play Store non ancora configurati: non è possibile inviare SOS Premium.';
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
   const root=$(container);const members=uniqueContacts();const signature=members.map(x=>x.id).join(',');
@@ -920,6 +923,111 @@ async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere ar
 async function v15CheckinStart(){if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
+// ZYRO V16: one right-side settings drawer for every account. Existing controls
+// are MOVED (not cloned), preserving all event handlers and behavior.
+let activeSettingsPane=null;
+let profileMenuLastFocus=null;
+function setupProfileSettings(){
+ const host=$('zyroSettingsPanels');
+ const candidates={
+  appearance:document.querySelector('#settingsView .zyro-appearance-panel'),
+  help:$('zyroHelp'), premium:$('premiumPanel'),
+  emergency:[...document.querySelectorAll('#settingsView .panel')].find(x=>x.querySelector('h2')?.textContent.trim()==='Numeri di emergenza'),
+  notifications:$('pushButton')?.closest('.panel'),
+  privacy:[...document.querySelectorAll('#settingsView .panel')].find(x=>x.querySelector('h2')?.textContent.trim()==='La tua privacy'),
+  reports:document.querySelector('#settingsView .zyro-report-panel'),
+  logout:$('logoutButton')?.closest('.panel')
+ };
+ const titles={appearance:"Aspetto dell'app",help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',logout:'Esci dall’account'};
+ for(const [key,title] of Object.entries(titles)){
+   const pane=document.createElement('section');pane.className='zyro-settings-pane';pane.dataset.pane=key;pane.hidden=true;
+   if(key==='invitees'){
+      const info=document.createElement('p');info.className='setting-description';
+      info.textContent='Queste persone hanno accettato un invito e sono membri delle tue cerchie. I collegamenti restano associati al tuo account nel database, finché qualcuno lascia o elimina la cerchia.';
+      pane.append(info);
+      const list=document.createElement('div');list.id='savedInvitees';list.className='zyro-saved-invitees';pane.append(list);
+   } else if(candidates[key])pane.append(candidates[key]);
+   host.append(pane);
+ }
+ // The personal ID is a central part of the profile, not buried in settings.
+ const idCard=$('copyMyId')?.closest('.panel');
+ const photoEditor=document.querySelector('#settingsView .profile-photo-editor');
+ if(idCard && photoEditor)photoEditor.after(idCard);
+ $('profileMore').addEventListener('click',()=>openProfileSettings());
+ $('profileSettingsClose').addEventListener('click',closeProfileSettings);
+ $('profileSettingsBackdrop').addEventListener('click',closeProfileSettings);
+ $('settingsDrawerBack').addEventListener('click',()=>showProfileSettingsMenu());
+ document.querySelectorAll('[data-settings-target]').forEach(button=>button.addEventListener('click',()=>showProfileSettingsPane(button.dataset.settingsTarget)));
+ document.addEventListener('keydown',e=>{
+   if(e.key==='Escape' && $('profileSettingsDrawer').classList.contains('is-open')){e.preventDefault();closeProfileSettings();}
+   if(e.key==='Tab' && $('profileSettingsDrawer').classList.contains('is-open')){
+      const focusables=[...$('profileSettingsDrawer').querySelectorAll('button:not([disabled]):not(.hidden),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled])')].filter(x=>x.getClientRects().length);
+      if(!focusables.length)return;
+      const first=focusables[0],last=focusables[focusables.length-1];
+      if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+   }
+ });
+}
+function openProfileSettings(pane){
+ if(!current)return;
+ if(activeView!=='settings')showView('settings');
+ profileMenuLastFocus=document.activeElement;
+ const d=$('profileSettingsDrawer');d.inert=false;d.classList.add('is-open');d.setAttribute('aria-hidden','false');
+ $('profileSettingsBackdrop').classList.add('is-open');$('profileMore').setAttribute('aria-expanded','true');
+ document.body.classList.add('zyro-settings-open');
+ if(pane)showProfileSettingsPane(pane);else showProfileSettingsMenu();
+ $('profileSettingsClose').focus();
+}
+function showProfileSettingsMenu(){
+ activeSettingsPane=null;$('zyroSettingsMenu').hidden=false;$('zyroSettingsDetail').hidden=true;
+ document.querySelectorAll('.zyro-settings-pane').forEach(x=>x.hidden=true);
+}
+function showProfileSettingsPane(name){
+ if(name==='reports' && current?.me?.isAdmin)return;
+ const pane=document.querySelector('.zyro-settings-pane[data-pane="'+name+'"]');if(!pane)return;
+ activeSettingsPane=name;$('zyroSettingsMenu').hidden=true;$('zyroSettingsDetail').hidden=false;
+ document.querySelectorAll('.zyro-settings-pane').forEach(x=>x.hidden=x!==pane);
+ const selected=document.querySelector('[data-settings-target="'+name+'"]');
+ $('settingsDrawerHeading').textContent=selected?.querySelector('span:nth-child(2)')?.firstChild?.textContent?.trim()||'Impostazioni';
+ $('profileSettingsDrawer').scrollTop=0;
+}
+function closeProfileSettings(){
+ const d=$('profileSettingsDrawer');if(!d?.classList.contains('is-open'))return;
+ d.classList.remove('is-open');d.setAttribute('aria-hidden','true');d.inert=true;
+ $('profileSettingsBackdrop').classList.remove('is-open');$('profileMore').setAttribute('aria-expanded','false');
+ document.body.classList.remove('zyro-settings-open');
+ if(profileMenuLastFocus?.isConnected)profileMenuLastFocus.focus();
+}
+function renderInvitedPeople(){
+ const root=$('savedInvitees');if(!root || !current)return;
+ const byId=new Map();
+ for(const circle of current.circles||[]){
+   for(const member of circle.members||[]){
+     if(member.id===current.me.id)continue;
+     if(!byId.has(member.id))byId.set(member.id,{member,circles:new Set()});
+     byId.get(member.id).circles.add(circle.name);
+   }
+ }
+ root.replaceChildren();
+ if(!byId.size){const p=document.createElement('p');p.className='zyro-invitees-empty';p.textContent='Nessuna persona collegata. Genera un invito in Cerchie e condividilo con chi vuoi aggiungere.';root.append(p);return;}
+ for(const {member,circles} of byId.values()){
+   const card=document.createElement('div');card.className='zyro-invitee-row';
+   const avatar=document.createElement('span');avatar.className='zyro-invitee-avatar';avatar.textContent=initials(member.name);
+   const content=document.createElement('div');
+   const title=document.createElement('strong');title.textContent=member.name;
+   const meta=document.createElement('small');meta.textContent='Cerchie: '+[...circles].join(', ');
+   content.append(title,meta);
+   const flag=document.createElement('span');flag.className='zyro-invitee-flag';flag.textContent=member.invitedByMe?'Invitato da te':'Collegato';
+   card.append(avatar,content,flag);root.append(card);
+ }
+}
+async function copyAccountId(id){
+ if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(id);return;}catch{}}
+ const control=document.createElement('textarea');control.value=id;control.readOnly=true;control.style.position='fixed';control.style.top='-9999px';document.body.append(control);
+ try{control.select();if(!document.execCommand('copy'))throw Error('Copy blocked');}finally{control.remove();}
+}
+
 async function init(){
   let storedTheme=null;try{storedTheme=localStorage.getItem(ZYRO_THEME_KEY);}catch{}
   applyZyroTheme(storedTheme||'dark',false);
@@ -934,6 +1042,7 @@ async function init(){
     $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
+  setupProfileSettings();
   $('mapZoomIn').addEventListener('click',()=>{if(stableMap)stableMap.zoomTo(Math.min(18,stableMap.getZoom()+1),{duration:250});});
   $('mapZoomOut').addEventListener('click',()=>{if(stableMap)stableMap.zoomTo(Math.max(2,stableMap.getZoom()-1),{duration:250});});
   $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;ownCentered=false;void orientationPermission();updateGeo(null,true);if(lastCoords){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
@@ -971,12 +1080,12 @@ async function init(){
   $('reportSubmit').addEventListener('click',()=>action(submitReport));
   $('adminLoad').addEventListener('click',()=>action(adminLoad));
   $('adminFilter').addEventListener('input',renderAdminUsers);
-  $('copyMyId').addEventListener('click',async()=>{if(!current)return;try{await navigator.clipboard.writeText(current.me.id);toast('ID account copiato.');}catch{toast('Seleziona e copia il tuo ID visualizzato sopra.',true);}});
+  $('copyMyId').addEventListener('click',async()=>{if(!current)return;try{await copyAccountId(current.me.id);toast('ID account copiato.');}catch{toast('Copia non disponibile. Seleziona il codice e copialo manualmente.',true);}});
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=15.5-profili').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=16-profilo').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);

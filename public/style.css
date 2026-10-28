@@ -1034,3 +1034,55 @@ html[data-theme="dark"] body.zyro-chat-full .chat-older{background:#113d50;color
 
 .zyro-report-panel select,.zyro-report-panel textarea{width:100%;padding:12px;border-radius:12px;background:#fff;border:1px solid #cfe0e3;font:inherit;color:#183b4e;box-sizing:border-box}
 .zyro-report-panel textarea{resize:vertical;min-height:74px}
+
+
+/* ZYRO 360 V16 — profile-only settings drawer; common to all accounts */
+.profile-heading{position:relative;padding-right:65px}
+.zyro-profile-more{position:absolute;right:0;top:16px;z-index:2;width:48px;height:48px;border-radius:16px;border:1px solid rgba(70,195,177,.35);background:rgba(50,183,164,.10);color:var(--z-text,#174252);font-size:24px;font-weight:900;letter-spacing:2px;line-height:1;display:grid;place-items:center;box-shadow:0 4px 16px rgba(11,48,65,.09);cursor:pointer}
+.zyro-profile-more:active{transform:scale(.96)}
+.zyro-profile-more:focus-visible,.zyro-settings-drawer button:focus-visible{outline:3px solid #39cfb5;outline-offset:2px}
+.zyro-settings-backdrop{position:fixed;inset:0;background:rgba(2,17,32,.64);z-index:7000;opacity:0;pointer-events:none;transition:opacity .24s ease}
+.zyro-settings-backdrop.is-open{opacity:1;pointer-events:auto}
+.zyro-settings-drawer{box-sizing:border-box;position:fixed;z-index:7001;top:0;right:0;bottom:0;width:min(420px,92vw);padding:max(23px,env(safe-area-inset-top)) 18px max(28px,env(safe-area-inset-bottom));overflow-y:auto;overscroll-behavior:contain;background:rgba(248,253,255,.98);color:#12344b;border-left:1px solid rgba(77,182,174,.23);box-shadow:-18px 0 55px rgba(0,15,30,.32);transform:translateX(102%);visibility:hidden;pointer-events:none;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s linear .3s}
+.zyro-settings-drawer.is-open{transform:translateX(0);visibility:visible;pointer-events:auto;transition:transform .3s cubic-bezier(.2,.8,.2,1),visibility 0s}
+.zyro-settings-open{overflow:hidden}
+.zyro-drawer-top{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:0 3px 21px;border-bottom:1px solid #dbe9ee}
+.zyro-drawer-top h2{margin:5px 0 0;font-size:25px;line-height:1.1;color:inherit}
+.zyro-drawer-icon-button{border:1px solid #d0e5e8;border-radius:13px;background:#ebf5f8;color:#163f51;width:42px;height:42px;font-size:21px;cursor:pointer}
+.zyro-drawer-menu{display:grid;gap:10px;margin-top:20px}
+.zyro-drawer-menu>button{min-height:69px;width:100%;display:flex;align-items:center;gap:12px;text-align:left;padding:11px 12px;border-radius:16px;border:1px solid #dcebee;background:#fff;color:#16394c;font:inherit;font-weight:800;cursor:pointer;box-shadow:0 6px 15px rgba(13,53,67,.04)}
+.zyro-drawer-menu>button.hidden{display:none!important}
+.zyro-drawer-menu>button>span:nth-child(2){flex:1;min-width:0;font-size:14px}
+.zyro-drawer-menu>button small{display:block;font-size:11px;color:#69818c;font-weight:500;line-height:1.5;margin-top:2px}
+.zyro-drawer-menu>button>b{font-size:24px;font-weight:400;color:#299a8e}
+.zyro-settings-glyph{height:39px;width:39px;flex:none;display:grid;place-items:center;background:linear-gradient(140deg,#e3f9f6,#dbf3fa);border-radius:12px;color:#169b8b;font-size:21px}
+.zyro-settings-detail{padding:18px 2px 8px}
+.zyro-settings-detail[hidden],.zyro-drawer-menu[hidden],.zyro-settings-pane[hidden]{display:none!important}
+.zyro-settings-back{background:none;border:0;color:#008f81;font-weight:800;padding:10px 2px;font-size:13px}
+#settingsDrawerHeading{font-size:21px;margin:10px 0 16px;color:inherit}
+.zyro-settings-pane>*{max-width:100%;box-sizing:border-box}
+.zyro-settings-pane .panel,.zyro-settings-pane .zyro-appearance-panel,.zyro-settings-pane .how-it-works,.zyro-settings-pane .zyro-v15-panel{margin:10px 0 18px}
+.zyro-settings-pane .zyro-theme-choices{grid-template-columns:repeat(2,minmax(0,1fr))}
+.zyro-settings-pane :is(input,select,textarea){max-width:100%}
+.zyro-saved-invitees{display:grid;gap:10px;margin:15px 0}
+.zyro-invitee-row{display:flex;align-items:center;gap:10px;border:1px solid #d5e8ea;border-radius:16px;background:#fff;padding:12px}
+.zyro-invitee-avatar{flex:none;display:grid;place-items:center;width:43px;height:43px;border-radius:14px;background:#d9f7f0;color:#047b71;font-weight:850;font-size:19px}
+.zyro-invitee-row>div{flex:1;min-width:0}.zyro-invitee-row strong{font-size:14px;display:block;overflow-wrap:anywhere}.zyro-invitee-row small{font-size:11px;display:block;line-height:1.4;color:#667f90;overflow-wrap:anywhere;margin-top:4px}
+.zyro-invitee-flag{flex:none;color:#087c6c;border-radius:999px;padding:5px 7px;background:#e6f8f0;font-size:10px;font-weight:800}
+.zyro-invitees-empty{font-size:13px;line-height:1.6;padding:20px;background:#e9f8f5;border:1px dashed #a9d7ce;border-radius:15px;color:#285569}
+.zyro-premium-owner .zyro-v15-plans{display:none!important}
+.zyro-premium-owner #premiumStatus{border:1px solid #45d1ad;background:#ddf8ec;color:#136b55;padding:12px;border-radius:12px}
+html[data-theme="dark"] .zyro-profile-more{color:#b8f9ea;background:rgba(39,201,178,.13)}
+html[data-theme="dark"] .zyro-settings-drawer{background:rgba(8,26,42,.98);color:#ecfafd;border-left-color:#2b636d}
+html[data-theme="dark"] .zyro-drawer-top{border-bottom-color:#315363}
+html[data-theme="dark"] .zyro-drawer-icon-button{background:#143449;color:#eafffa;border-color:#315363}
+html[data-theme="dark"] .zyro-drawer-menu>button{background:#123247;border-color:#315163;color:#ecf9fc}
+html[data-theme="dark"] .zyro-drawer-menu>button small{color:#a3c4d0}
+html[data-theme="dark"] .zyro-settings-glyph{background:#1c4b59;color:#7bf4d9}
+html[data-theme="dark"] .zyro-invitee-row{background:#143649;border-color:#2a5460;color:#f2fffc}
+html[data-theme="dark"] .zyro-invitee-row small{color:#b0ced9}
+html[data-theme="dark"] .zyro-invitee-flag{background:#20534e;color:#a5f7db}
+html[data-theme="dark"] .zyro-invitees-empty{background:#143549;color:#d7f2f2;border-color:#427273}
+@media(prefers-reduced-motion:reduce){.zyro-settings-backdrop,.zyro-settings-drawer,.zyro-profile-more{transition:none!important}}
+
+.zyro-profile-access-label{display:inline-block;margin-top:7px;border-radius:999px;padding:5px 10px;color:#c8fff1;background:rgba(39,194,164,.15);border:1px solid rgba(92,220,191,.32);font-size:11px;font-weight:800}

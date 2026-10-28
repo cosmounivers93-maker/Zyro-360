@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v15.4-admin-privato">
+  <meta name="zyro-ui-build" content="v16.0-profilo-riordinato">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="/style.css?v=15.5-profili">
+  <link rel="stylesheet" href="/style.css?v=16.0">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -142,7 +142,7 @@
         <div class="zyro-v15-plans"><div><b>ZYRO Premium</b><strong>3,99 € <small>/mese</small></strong></div><div><b>ZYRO Family</b><strong>6,99 € <small>/mese</small></strong></div></div>
         <p id="premiumStatus" class="zyro-v15-status" role="status">Verifica abbonamento…</p>
         <label class="zyro-v15-mic"><input id="sosAudioConsent" type="checkbox"> <span><b>Chiedi di attivare il microfono quando premi SOS</b><small>Il browser chiederà l'autorizzazione. Audio in diretta, non registrato dal server; serve l'app aperta e il consenso.</small></span></label>
-        <p class="zyro-v15-note">Solo un acquisto verificato dal server potrà attivare SOS Premium. La fatturazione Play Store non è ancora collegata: nessun pagamento viene richiesto né elaborato in questa versione. Non viene inviato alcun SOS Premium con abbonamento inattivo.</p>
+        <p class="zyro-v15-note">Per gli utenti, le funzioni Premium richiedono un diritto di accesso verificato dal server. Il creatore autorizzato ha accesso incluso gratuitamente. Gli acquisti Play Store non sono ancora attivi e non vengono elaborati pagamenti in questa versione.</p>
         <button id="premiumDetails" type="button" class="zyro-v15-secondary">Informazioni su Premium</button>
         <a class="zyro-v15-emergency" href="tel:112">Emergenza reale? Chiama il 112 — sempre disponibile</a>
       </section>
@@ -176,11 +176,13 @@
     </section>
 
     <section id="settingsView" class="view hidden zyro-profile-page">
-      <div class="profile-heading"><span class="mini-overline">IL TUO ACCOUNT</span><h1>Il tuo profilo<span>.</span></h1><p>La tua identità, protetta e riconoscibile da chi ami.</p></div>
+      <div class="profile-heading"><span class="mini-overline">IL TUO ACCOUNT</span><h1>Il tuo profilo<span>.</span></h1><p>La tua identità, protetta e riconoscibile da chi ami.</p>
+        <button type="button" id="profileMore" class="zyro-profile-more" aria-label="Apri impostazioni profilo" aria-controls="profileSettingsDrawer" aria-expanded="false" title="Impostazioni"><span aria-hidden="true">•••</span></button>
+      </div>
       <section class="profile-identity-card">
         <div class="profile-orbit" aria-hidden="true"></div>
         <div class="profile-avatar-wrap"><div class="profile-avatar" id="profileAvatar">S</div><label class="profile-avatar-camera" title="Cambia foto dalla galleria" for="avatarGallery" aria-label="Cambia la tua foto profilo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h2.5l1.6-2h5.8l1.6 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.3"/></svg></label></div>
-        <div class="profile-id-copy"><span class="profile-id-caption">ACCOUNT PERSONALE <span class="verified-dot">✓</span></span><strong id="profileName">Utente</strong><p id="profileEmail">email</p></div>
+        <div class="profile-id-copy"><span class="profile-id-caption">ACCOUNT PERSONALE <span class="verified-dot">✓</span></span><strong id="profileName">Utente</strong><p id="profileEmail">email</p><span id="profileAccessLabel" class="zyro-profile-access-label">Account personale</span></div>
       </section>
       <p id="profileStorageStatus" class="setting-description" role="status" aria-live="polite" style="margin:10px 0 14px;padding:11px 14px;border:1px solid #acd9d2;border-radius:14px">Verifica salvataggio del profilo…</p>
       <section class="profile-photo-editor">
@@ -242,6 +244,30 @@
       <p class="small-disclaimer">Questa è una versione iniziale da testare. Connessione Internet, autorizzazioni e app aperta possono essere necessari. Non usarla come unico strumento di emergenza.</p>
     </section>
   </main>
+
+  <div id="profileSettingsBackdrop" class="zyro-settings-backdrop" aria-hidden="true"></div>
+  <aside id="profileSettingsDrawer" class="zyro-settings-drawer" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="zyroSettingsTitle" tabindex="-1" inert>
+    <div class="zyro-drawer-top">
+      <div><span class="mini-overline">ZYRO 360</span><h2 id="zyroSettingsTitle">Impostazioni</h2></div>
+      <button id="profileSettingsClose" class="zyro-drawer-icon-button" type="button" aria-label="Chiudi impostazioni">✕</button>
+    </div>
+    <nav id="zyroSettingsMenu" class="zyro-drawer-menu" aria-label="Sezioni impostazioni">
+      <button type="button" data-settings-target="appearance"><span class="zyro-settings-glyph">◐</span><span>Aspetto dell'app<small>Tema chiaro o scuro</small></span><b>›</b></button>
+      <button type="button" data-settings-target="help"><span class="zyro-settings-glyph">?</span><span>Come funziona l'app<small>Guida, privacy e funzionamento</small></span><b>›</b></button>
+      <button type="button" data-settings-target="premium"><span class="zyro-settings-glyph">✦</span><span>Abbonamenti<small>Funzioni e accesso Premium</small></span><b>›</b></button>
+      <button type="button" data-settings-target="emergency"><span class="zyro-settings-glyph">✚</span><span>Numeri di emergenza<small>Chiama il 112</small></span><b>›</b></button>
+      <button type="button" data-settings-target="invitees"><span class="zyro-settings-glyph">♧</span><span>Persone invitate<small>Contatti delle cerchie salvati nell’account</small></span><b>›</b></button>
+      <button type="button" data-settings-target="notifications"><span class="zyro-settings-glyph">♢</span><span>Notifiche e avvisi SOS<small>Preferenze e test</small></span><b>›</b></button>
+      <button type="button" data-settings-target="privacy"><span class="zyro-settings-glyph">◇</span><span>Privacy<small>Posizione, audio e consenso</small></span><b>›</b></button>
+      <button type="button" id="reportMenuItem" data-settings-target="reports"><span class="zyro-settings-glyph">⚑</span><span>Segnala un utente<small>Invia una segnalazione privata</small></span><b>›</b></button>
+      <button type="button" data-settings-target="logout"><span class="zyro-settings-glyph">↪</span><span>Esci dall'account<small>Disconnetti il dispositivo</small></span><b>›</b></button>
+    </nav>
+    <div id="zyroSettingsDetail" class="zyro-settings-detail" hidden>
+      <button id="settingsDrawerBack" type="button" class="zyro-settings-back">‹ Tutte le impostazioni</button>
+      <h3 id="settingsDrawerHeading"></h3>
+      <div id="zyroSettingsPanels"></div>
+    </div>
+  </aside>
   <nav class="bottom-nav" aria-label="Navigazione principale">
     <button class="nav-item active" data-view="home" type="button"><span class="nav-icon">⌂</span><span>Home</span></button>
     <button class="nav-item" data-view="circles" type="button"><span class="nav-icon">◎</span><span>Cerchie</span></button>
@@ -255,6 +281,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=15.5-profili" defer></script>
+<script src="/app.js?v=16.0" defer></script>
 </body>
 </html>
