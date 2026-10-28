@@ -1,0 +1,65 @@
+/* ZYRO 360 V16.3 — Balanced floating settings, after V16.2 Glass Edition.
+   Visual-only: keeps services, map, GPS, SOS, Premium and menus intact.
+   Wider for legibility, horizontally centered, and lower than V16.2.
+   Panel stays below system bars and scrolls when screen height is limited. */
+:root{
+  --zyro-floating-top:calc(max(10px, env(safe-area-inset-top)) + clamp(24px, 4.5dvh, 43px));
+}
+.zyro-settings-drawer,
+html[data-theme="dark"] .zyro-settings-drawer{
+  position:fixed;
+  left:50%;
+  right:auto;
+  top:var(--zyro-floating-top);
+  bottom:auto;
+  width:min(440px,92vw);
+  max-width:calc(100vw - 20px);
+  height:auto;
+  max-height:calc(100dvh - var(--zyro-floating-top) - max(15px, env(safe-area-inset-bottom)));
+  padding:18px 16px 21px;
+  border-radius:26px;
+  overflow-x:hidden;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+  transform:translate3d(-50%,12px,0) scale(.99);
+  opacity:0;
+  transition:transform .25s cubic-bezier(.2,.7,.2,1), opacity .22s ease, visibility 0s linear .25s;
+}
+.zyro-settings-drawer.is-open,
+html[data-theme="dark"] .zyro-settings-drawer.is-open{
+  transform:translate3d(-50%,0,0) scale(1);
+  opacity:1;
+  transition:transform .25s cubic-bezier(.2,.7,.2,1), opacity .22s ease, visibility 0s;
+}
+.zyro-settings-drawer .zyro-drawer-top{padding-bottom:15px}
+.zyro-settings-drawer .zyro-drawer-menu{gap:9px;margin-top:16px}
+.zyro-settings-drawer .zyro-drawer-menu>button{
+  min-height:60px;
+  padding:9px 12px;
+  border-radius:15px;
+}
+.zyro-settings-drawer .zyro-settings-detail{padding:14px 1px 10px}
+.zyro-settings-drawer :is(.panel,.zyro-v15-panel,.zyro-appearance-panel,.how-it-works){
+  border-radius:17px;
+}
+@media(max-width:370px){
+  .zyro-settings-drawer,
+  html[data-theme="dark"] .zyro-settings-drawer{
+    width:94vw;
+    max-width:calc(100vw - 16px);
+    padding-left:12px;
+    padding-right:12px;
+  }
+}
+@media(max-height:630px){
+  :root{--zyro-floating-top:max(8px, env(safe-area-inset-top))}
+  .zyro-settings-drawer,
+  html[data-theme="dark"] .zyro-settings-drawer{padding-top:12px;padding-bottom:12px}
+}
+@media(prefers-reduced-motion:reduce){
+  .zyro-settings-drawer,html[data-theme="dark"] .zyro-settings-drawer,
+  .zyro-settings-drawer.is-open,html[data-theme="dark"] .zyro-settings-drawer.is-open{
+    transition:none!important;
+  }
+}
