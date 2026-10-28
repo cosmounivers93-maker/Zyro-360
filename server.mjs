@@ -11,10 +11,11 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const dbPath = path.join(dataDir, 'zyro360.json');
-const initial = { users: {}, circles: {}, memberships: [], invites: {}, sessions: {}, alerts: {}, messages: {} };
+const initial = { users: {}, circles: {}, memberships: [], invites: {}, sessions: {}, alerts: {}, messages: {}, journeys: {}, checkins: {} };
 let db;
 try { db = { ...initial, ...JSON.parse(fs.readFileSync(dbPath, 'utf8')) }; }
 catch (err) { if (err.code !== 'ENOENT') throw err; db = structuredClone(initial); }
+db.journeys ||= {}; db.checkins ||= {};
 // Browser microphone tracks cannot survive a backend restart; do not claim audio is live.
 for (const alert of Object.values(db.alerts)) alert.hasAudio = false;
 let locations = new Map();
@@ -27,6 +28,15 @@ const MAX_USER_CIRCLES = 12;
 const hash = v => crypto.createHash('sha256').update(v).digest('hex');
 const token = (n = 24) => crypto.randomBytes(n).toString('base64url');
 const now = () => Date.now();
+// Only a verified, server-side purchase may set premiumUntil. Never trust premium=true from a browser.
+// Actual Play Billing purchase verification is NOT configured in this web prototype.
+const premiumActive = user => Number(user?.premiumUntil || 0) > now();
+const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
+function validCoords(point){const lat=Number(point?.lat),lon=Number(point?.lon),accuracy=Number(point?.accuracy||0);return Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180&&Number.isFinite(accuracy)&&accuracy>=0&&accuracy<=100000?{lat,lon,accuracy,updatedAt:now()}:null;}
+function metersBetween(a,b){const r=Math.PI/180,phi=(b.lat-a.lat)*r,l=(b.lon-a.lon)*r;const q=Math.sin(phi/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(l/2)**2;return 12742000*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
+const publicJourney = (j,viewer) => j && (j.userId===viewer || (j.recipients||[]).includes(viewer)) ? {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',destination:j.destination,dueAt:j.dueAt,startedAt:j.startedAt,status:j.status,arrivedAt:j.arrivedAt||null,autoArrival:!!j.destinationPoint} : null;
+const publicCheckin = (c,viewer) => c && (c.userId===viewer || (c.recipients||[]).includes(viewer)) ? {id:c.id,userId:c.userId,name:db.users[c.userId]?.name||'Contatto',dueAt:c.dueAt,status:c.status,completedAt:c.completedAt||null} : null;
+
 const cleanText = (s, max = 60) => String(s || '').trim().replace(/[\u0000-\u001F\u007F<>]/g, '').slice(0, max);
 const publicUser = u => ({ id: u.id, name: u.name, avatar: u.avatar || null });
 function save() { const tmp = `${dbPath}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(db), { mode: 0o600 }); fs.renameSync(tmp, dbPath); }
@@ -61,15 +71,15 @@ function stateFor(id) {
       const u = db.users[x]; const alert = currentAlert(x);
       const visibleAlert = alert && canSeeAlert(id,alert) ? alert : null;
       const shared = Boolean(u.sharing || (visibleAlert?.kind === 'pickpocket' && visibleAlert.recipients?.includes(id)));
-      const location = shared && locations.has(x) ? locations.get(x) : null;
+      const location = (shared || (visibleAlert?.kind==='sos' && visibleAlert.recipients?.includes(id))) && locations.has(x) ? locations.get(x) : null;
       return { ...publicUser(u), online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio, kind: alert.kind || 'sos' } : null };
     })
   }));
   const alerts = Object.values(db.alerts).filter(a => a.active && canSeeAlert(id, a)).map(a => ({
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
-    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), location: (db.users[a.userId]?.sharing || (a.kind==='pickpocket' && a.recipients?.includes(id))) ? (locations.get(a.userId)||null) : null
+    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (db.users[a.userId]?.sharing || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)) }, circles, alerts, pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), premiumUntil: premiumActive(me)?me.premiumUntil:null, journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -214,11 +224,17 @@ app.post('/api/sharing', requireAuth, (req,res) => {
 const lastPos = new Map();
 app.post('/api/position', requireAuth, (req,res) => {
   const alert=currentAlert(req.user.id);
-  if (!req.user.sharing && !(alert?.kind==='pickpocket' && alert.recipients?.length)) return res.status(403).json({error:'Condivisione non attiva.'});
+  if (!req.user.sharing && !(alert?.recipients?.length)) return res.status(403).json({error:'Condivisione non attiva.'});
   const lat = Number(req.body.lat), lon = Number(req.body.lon), accuracy = Number(req.body.accuracy);
   if (![lat,lon,accuracy].every(Number.isFinite) || Math.abs(lat)>90 || Math.abs(lon)>180 || accuracy < 0 || accuracy>100000) return res.status(400).json({error:'Coordinate non valide.'});
   const t=now(); if (t-(lastPos.get(req.user.id)||0)<2400) return res.json({ok:true}); lastPos.set(req.user.id,t);
-  locations.set(req.user.id,{lat,lon,accuracy,updatedAt:t}); refreshRelated(req.user.id); res.json({ok:true});
+  locations.set(req.user.id,{lat,lon,accuracy,updatedAt:t});
+  const j=db.journeys[req.user.id];
+  if(j?.status==='active' && j.destinationPoint && accuracy<=100){
+    j.nearCount = metersBetween({lat,lon},j.destinationPoint) <= 120 ? (j.nearCount||0)+1 : 0;
+    if(j.nearCount>=2){j.status='arrived';j.arrivedAt=t;save();void sendEventPush(j.recipients,'✅ Arrivo confermato',`${req.user.name} è arrivato/a a ${j.destination}.`);}
+  }
+  refreshRelated(req.user.id); res.json({ok:true});
 });
 const configuredPush = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 if (configuredPush) webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.org', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
@@ -232,6 +248,71 @@ async function notifyContacts(id, name, recipients = null, isTheft = false) {
   }
   await Promise.allSettled(tasks); save();
 }
+
+// Notifications: "accepted by a push provider" is not proof that the person read the message.
+async function sendEventPush(recipients,title,body){
+ if(!configuredPush)return {configured:false,accepted:0,attempted:0};
+ let attempted=0,accepted=0;
+ const calls=[];
+ for(const id of recipients){for(const sub of db.users[id]?.pushSubs||[]){
+  attempted++;
+  calls.push(webpush.sendNotification(sub,JSON.stringify({title,body,url:'/'}),{TTL:300,urgency:'high'}).then(()=>{accepted++}).catch(err=>{if([404,410].includes(err.statusCode))db.users[id].pushSubs=db.users[id].pushSubs.filter(s=>s.endpoint!==sub.endpoint);}));
+ }}
+ await Promise.allSettled(calls);if(attempted)save();return {configured:true,accepted,attempted};
+}
+async function sosAddressFor(pos){
+ // Opt-in: forwarding GPS coordinates to a geocoder must be disclosed in privacy information.
+ if(!pos || process.env.ZYRO_SOS_GEOCODER_ENABLED!=='true')return null;
+ try{
+  const base=(process.env.ZYRO_SOS_GEOCODER_URL||'https://nominatim.openstreetmap.org/reverse');
+  const url=new URL(base);url.searchParams.set('format','jsonv2');url.searchParams.set('addressdetails','1');url.searchParams.set('lat',String(pos.lat));url.searchParams.set('lon',String(pos.lon));url.searchParams.set('zoom','18');
+  const response=await fetch(url,{headers:{'User-Agent':'ZYRO360-SOS-Prototype/1.0 (contact: support@invalid.example)','Accept-Language':'it'},signal:AbortSignal.timeout(2200)});
+  if(!response.ok)return null;const data=await response.json(),a=data.address||{};
+  const street=[a.road||a.pedestrian||a.footway||a.residential,a.house_number].filter(Boolean).join(' '),town=a.city||a.town||a.village||a.municipality;
+  return cleanText([street,town].filter(Boolean).join(', '),160)||null;
+ }catch{return null;}
+}
+function journeyAudience(userId, ids){const chosen=allowedRecipients(userId,ids);return chosen&&chosen.length===new Set(ids).size&&chosen.length?chosen:null;}
+// Trip / check-in events are server-backed but cannot run during Render Free spin-down.
+function overdueCheck(){
+ const t=now();let changed=false;
+ for(const j of Object.values(db.journeys))if(j.status==='active'&&j.dueAt<=t){j.status='late';j.lateAt=t;changed=true;void sendEventPush(j.recipients,'⌛ Percorso in ritardo',`${db.users[j.userId]?.name||'Un contatto'} non ha ancora confermato l'arrivo a ${j.destination}. Verifica direttamente.`);for(const x of j.recipients)pushState(x);}
+ for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){c.status='late';c.lateAt=t;changed=true;void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);for(const x of c.recipients)pushState(x);}
+ if(changed)save();
+}
+app.get('/api/premium/status',requireAuth,(req,res)=>res.json({active:premiumActive(req.user),billingReady:false,priceHint:'3,99 €/mese (indicativo)',message:'Gli acquisti Google Play non sono ancora collegati. Non effettuare pagamenti.'}));
+app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
+ const recipients=journeyAudience(req.user.id,req.body.recipients);
+ const destination=cleanText(req.body.destination,70);const mins=Number(req.body.minutes);
+ if(!recipients||!destination||!Number.isInteger(mins)||mins<5||mins>720)return res.status(400).json({error:'Indica meta, minuti (5-720) e destinatari della cerchia.'});
+ if(!req.user.sharing)return res.status(409).json({error:'Attiva la condivisione della posizione prima di iniziare Accompagnami.'});
+ if(['active','late'].includes(db.journeys[req.user.id]?.status))return res.status(409).json({error:'Termina prima il percorso esistente.'});
+ const point=req.body.destinationPoint?validCoords(req.body.destinationPoint):null;
+ if(req.body.destinationPoint && !point)return res.status(400).json({error:'Coordinate della destinazione non valide.'});
+ const j={id:token(10),userId:req.user.id,destination,recipients,startedAt:now(),dueAt:now()+mins*60000,status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,nearCount:0};
+ db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
+ void sendEventPush(recipients,'🚶 Percorso iniziato',`${req.user.name} è in viaggio verso ${destination}. Orario di arrivo previsto: ${new Date(j.dueAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'})}.`);
+ res.json({ok:true,journey:publicJourney(j,req.user.id)});
+});
+app.post('/api/journey/end',requireAuth,(req,res)=>{
+ const j=db.journeys[req.user.id];if(!j||!['active','late'].includes(j.status))return res.status(404).json({error:'Nessun percorso attivo.'});
+ const arrived=req.body.arrived===true;j.status=arrived?'arrived':'cancelled';j.endedAt=now();if(arrived)j.arrivedAt=j.endedAt;
+ save();refreshRelated(req.user.id);void sendEventPush(j.recipients,arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`);res.json({ok:true});
+});
+app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
+ const recipients=journeyAudience(req.user.id,req.body.recipients),minutes=Number(req.body.minutes);
+ if(!recipients||!Number.isInteger(minutes)||minutes<5||minutes>1440)return res.status(400).json({error:'Scegli i contatti e un controllo tra 5 e 1440 minuti.'});
+ if(['pending','late'].includes(db.checkins[req.user.id]?.status))return res.status(409).json({error:'Hai già un check-in attivo.'});
+ const c={id:token(10),userId:req.user.id,recipients,dueAt:now()+minutes*60000,status:'pending',startedAt:now()};db.checkins[req.user.id]=c;save();refreshRelated(req.user.id);res.json({ok:true,checkin:publicCheckin(c,req.user.id)});
+});
+app.post('/api/checkin/end',requireAuth,(req,res)=>{
+ const c=db.checkins[req.user.id];if(!c||!['pending','late'].includes(c.status))return res.status(404).json({error:'Nessun check-in attivo.'});
+ const confirmed=req.body.confirmed===true;c.status=confirmed?'confirmed':'cancelled';c.completedAt=now();save();refreshRelated(req.user.id);
+ if(confirmed)void sendEventPush(c.recipients,'✅ Check-in confermato',`${req.user.name} ha confermato di stare bene.`);
+ res.json({ok:true});
+});
+setInterval(overdueCheck,20000).unref();
+
 app.post('/api/push/subscribe', requireAuth, (req,res) => {
   if (!configuredPush) return res.status(503).json({error:'Notifiche push non configurate.'});
   const s=req.body.subscription;
@@ -283,11 +364,21 @@ app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
   res.json({ok:true,message});
 });
 app.post('/api/sos/start', requireAuth, async (req,res) => {
-  let alert = currentAlert(req.user.id);
-  const recipients=[...new Set((req.user.sosRecipients||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)))];
-  if(!recipients.length && !alert)return res.status(400).json({error:'Seleziona prima i destinatari SOS nella sezione Cerchie.'});
-  if (!alert) { alert={id:token(12),userId:req.user.id,recipients,startedAt:now(),active:true,hasAudio:false,kind:'sos'}; db.alerts[alert.id]=alert; save(); for(const id of alertAudience(alert))pushState(id); void notifyContacts(req.user.id, req.user.name, recipients).catch(()=>{}); }
-  res.json({ok:true,id:alert.id});
+ // Premium is enforced server-side. A UI claim or client flag never grants access.
+ if (!premiumActive(req.user)) return res.status(402).json({error:'SOS Premium non attivo. Nessun avviso è stato inviato. Per un pericolo reale chiama il 112.'});
+ let alert=currentAlert(req.user.id);
+ const recipients=[...new Set((req.user.sosRecipients||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)))];
+ if(!recipients.length&&!alert)return res.status(400).json({error:'Seleziona prima almeno un destinatario SOS nella sezione Modalità.'});
+ if(alert?.kind==='pickpocket')return res.status(409).json({error:'Termina prima l’allarme Pick Pocket.'});
+ if(alert)return res.json({ok:true,id:alert.id,alreadyActive:true,pushConfigured:configuredPush,serverRecorded:true});
+ const pos=validCoords(req.body.location);
+ if(pos)locations.set(req.user.id,pos);
+ alert={id:token(12),userId:req.user.id,recipients,startedAt:now(),active:true,hasAudio:false,kind:'sos',address:null};db.alerts[alert.id]=alert;save();refreshRelated(req.user.id);
+ // An address is attempted only with explicit geocoder configuration; GPS works without it.
+ const street=await sosAddressFor(pos);if(street){alert.address=street;save();refreshRelated(req.user.id);}
+ const where=street || (pos?`GPS ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`:'Posizione GPS in attesa');
+ const push=await sendEventPush(recipients,'🆘 SOS Premium: aiuto richiesto',`${req.user.name} chiede aiuto. ${where}. Apri ZYRO 360 per mappa e audio (se attivo).`);
+ res.json({ok:true,id:alert.id,serverRecorded:true,pushConfigured:push.configured,pushAccepted:push.accepted,pushAttempted:push.attempted,recipientCount:recipients.length,address:street});
 });
 app.post('/api/sos/stop', requireAuth, (req,res) => {
   const a=currentAlert(req.user.id);
