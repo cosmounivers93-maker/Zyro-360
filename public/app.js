@@ -226,28 +226,76 @@ async function adminLoad(){
  $('adminAudit').innerHTML=(data.audit||[]).map(a=>`<p><b>${escapeHtml(a.kind)}</b> · ${escapeHtml(a.for||'')} · ${escapeHtml(fmtAdminDate(a.at))}</p>`).join('')||'<p>Nessuna azione registrata.</p>';
  $('adminStatus').textContent=`${adminUsersCache.length} account registrati. Dati visibili esclusivamente al proprietario.`;
 }
+/* V17.1: native browser confirm()/prompt() may be cancelled by Android WebView.
+   Use accessible DOM dialogs; all privileged actions still require server-side
+   account ownership AND owner password verification. */
+function zyroOwnerDialog({title,description='',kind='confirm',submitLabel='Conferma',defaultValue=''}) {
+ return new Promise(resolve=>{
+  const veil=document.createElement('div');veil.className='zyro-owner-dialog-backdrop';
+  const form=document.createElement('form');form.className='zyro-owner-dialog';
+  form.setAttribute('role','dialog');form.setAttribute('aria-modal','true');
+  const heading=document.createElement('h3');heading.textContent=title;
+  const explanation=document.createElement('p');explanation.className='zyro-owner-dialog-description';explanation.textContent=description;
+  form.setAttribute('aria-label',title);
+  form.append(heading,explanation);
+  let field=null;
+  if(kind==='reason'||kind==='password'){
+   const label=document.createElement('label');label.textContent=kind==='password'?'Password del proprietario':'Motivazione della sospensione';
+   field=document.createElement(kind==='reason'?'textarea':'input');
+   field.className='zyro-owner-dialog-input';field.required=true;
+   if(kind==='password'){
+    field.type='password';field.autocomplete='current-password';field.maxLength=200;
+   }else{
+    field.rows=3;field.minLength=8;field.maxLength=300;
+   }
+   field.value=defaultValue;
+   label.append(field);form.append(label);
+  }
+  const actions=document.createElement('div');actions.className='zyro-owner-dialog-actions';
+  const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Annulla';
+  const submit=document.createElement('button');submit.type='submit';submit.className='zyro-owner-dialog-ok';submit.textContent=submitLabel;
+  actions.append(cancel,submit);form.append(actions);veil.append(form);
+  const previousFocus=document.activeElement;
+  let done=false;
+  const onKey=(event)=>{if(event.key==='Escape'){event.preventDefault();finish(null);}else if(event.key==='Tab'){
+    const allowed=[...(field?[field]:[]),cancel,submit];
+    if(event.shiftKey&&document.activeElement===allowed[0]){event.preventDefault();allowed[allowed.length-1].focus();}
+    else if(!event.shiftKey&&document.activeElement===allowed[allowed.length-1]){event.preventDefault();allowed[0].focus();}
+  }};
+  const finish=(value)=>{if(done)return;done=true;document.removeEventListener('keydown',onKey,true);veil.remove();try{previousFocus?.focus?.();}catch{}resolve(value);};
+  cancel.addEventListener('click',()=>finish(null));
+  veil.addEventListener('click',e=>{if(e.target===veil)finish(null);});
+  form.addEventListener('submit',e=>{e.preventDefault();if(field){const value=field.value.trim();if(!value||kind==='reason'&&value.length<8){field.focus();field.setCustomValidity(kind==='reason'?'Scrivi almeno 8 caratteri.':'Inserisci la password.');field.reportValidity();return;}finish(value);}else finish(true);});
+  field?.addEventListener('input',()=>field.setCustomValidity(''));
+  document.body.append(veil);document.addEventListener('keydown',onKey,true);
+  (field||submit).focus();
+ });
+}
 async function adminChangeBan(id){
  const u=adminUsersCache.find(x=>x.id===id);if(!u)return;
  const ban=!u.bannedAt;
- const reason=ban?prompt(`Motivo della sospensione di ${u.name}:`):'Rimozione della sospensione';
- if(reason===null||ban&&reason.trim().length<8){if(reason!==null)toast('Inserisci una motivazione di almeno 8 caratteri.',true);return;}
- if(!confirm(`${ban?'Sospendere':'Riattivare'} l’account ${u.name}?`))return;
- const password=prompt('Conferma l’operazione con la password del tuo account amministratore:');
- if(password===null||!password)return;
+ const reason=ban?await zyroOwnerDialog({title:`Sospendi ${u.name}`,description:'Scrivi la motivazione che giustifica la sospensione di questo account.',kind:'reason',submitLabel:'Continua'}):'Rimozione della sospensione';
+ if(reason===null)return;
+ const confirmed=await zyroOwnerDialog({title:ban?'Sospensione account':'Riattivazione account',description:`Vuoi davvero ${ban?'sospendere':'riattivare'} ${u.name}?`,submitLabel:ban?'Sospendi account':'Riattiva account'});
+ if(!confirmed)return;
+ const password=await zyroOwnerDialog({title:'Conferma amministratore',description:'Per sicurezza, inserisci la password del tuo account creatore.',kind:'password',submitLabel:'Conferma'});
+ if(!password)return;
  await post('/api/admin/ban',{userId:id,banned:ban,reason,password});
  await adminLoad();toast(ban?'Account sospeso. Accesso revocato.':'Account riattivato.');
 }
 async function adminChangeGift(id){
  const u=adminUsersCache.find(x=>x.id===id);if(!u)return;
  const enabled=!u.premiumGiftLifetime;
- if(!confirm(`${enabled?'Regalare Premium per sempre':'Revocare il regalo Premium'} a ${u.name}?`))return;
- const password=prompt('Conferma con la password del tuo account amministratore:');
- if(password===null||!password)return;
+ const confirmed=await zyroOwnerDialog({title:enabled?'Regala Premium a vita':'Revoca Premium a vita',description:`${enabled?'Assegnare Premium gratuito a vita a':'Revocare il regalo Premium a'} ${u.name}?`,submitLabel:enabled?'Regala Premium':'Revoca Premium'});
+ if(!confirmed)return;
+ const password=await zyroOwnerDialog({title:'Conferma amministratore',description:'Inserisci la password del tuo account creatore per autorizzare il cambiamento.',kind:'password',submitLabel:'Conferma'});
+ if(!password)return;
  await post('/api/admin/premium-gift',{userId:id,enabled,password});
  await adminLoad();toast(enabled?'Premium a vita concesso.':'Regalo Premium revocato.');
 }
 async function adminReview(reportId){
- const password=prompt('Conferma con la password del tuo account amministratore:');if(!password)return;
+ const password=await zyroOwnerDialog({title:'Conferma amministratore',description:'Autorizza la revisione della segnalazione con la tua password.',kind:'password',submitLabel:'Segna come esaminata'});
+ if(!password)return;
  await post('/api/admin/report-resolve',{reportId,password,status:'reviewed'});
  await adminLoad();toast('Segnalazione esaminata.');
 }
@@ -507,8 +555,11 @@ async function handleRTC(remoteId,signal){
 async function flushIce(remoteId){const p=peers.get(remoteId);for(const item of pendingIce.get(remoteId)||[])await p?.addIceCandidate(new RTCIceCandidate(item)).catch(()=>{});pendingIce.delete(remoteId);}
 function stopListening(){if(listeningTo){const p=peers.get(listeningTo);if(p){p.close();peers.delete(listeningTo);}pendingIce.delete(listeningTo);}listeningTo=null;const a=$('remoteAudio');a.pause();a.srcObject=null;$('audioDock').classList.add('hidden');}
 async function enablePush(){
-  if(!current?.pushEnabled)return;
-  if(!('serviceWorker'in navigator) || !('PushManager'in window))throw Error('Notifiche push non supportate da questo browser.');
+  if(!current?.pushEnabled)throw Error('Le notifiche Web Push non sono ancora configurate sul server.');
+  if(!('serviceWorker'in navigator) || !('PushManager'in window)) {
+    const nativeAndroid=/\bwv\b|; wv\)/i.test(navigator.userAgent);
+    throw Error(nativeAndroid?'Questa versione Android usa una WebView, che non supporta Web Push. Le notifiche Android native richiedono Firebase Cloud Messaging (FCM), non ancora configurato.':'Il browser non supporta Web Push. Verifica i requisiti del browser e della connessione sicura.');
+  }
   if(Notification.permission==='denied')throw Error('Notifiche bloccate nelle impostazioni del dispositivo.');
   const permission=await Notification.requestPermission();if(permission!=='granted')throw Error('Consenso alle notifiche non concesso.');
   const reg=await navigator.serviceWorker.ready;
