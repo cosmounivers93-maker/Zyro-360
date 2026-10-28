@@ -1,0 +1,134 @@
+/* ZYRO 360 V17.0 — VETRO VERO: STRADE VISIBILI ATTRAVERSO LE BARRE
+   La V16.9 impostava colori semitrasparenti, ma non c'era la mappa sotto.
+   Qui la mappa reale continua a muoversi e viene disegnata dietro entrambe le
+   barre. Non vengono duplicate le tessere, ne' alterati GPS, SOS o zoom.
+   Tutte le modifiche sono limitate alla Home. */
+
+/* La pagina Home ora riempie lo spazio anche DIETRO il logo e la navigazione.
+   Il contenuto resta su un unico layer cartografico, senza copie o flicker. */
+#appScreen #homeView.home-map-view {
+  top:0!important;
+  bottom:0!important;
+  height:100%!important;
+  max-height:100%!important;
+}
+
+/* Griglia sovrapposta: la mappa e' lo sfondo di tutte le righe;
+   l'area comandi e l'eventuale SOS occupano righe proprie, a misura variabile.
+   L'ultima riga riserva 73px alla barra inferiore (al di sopra della mappa). */
+#appScreen #homeView .geo-immersive {
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr);
+  grid-template-rows:minmax(0,1fr) auto auto 73px;
+  height:100%!important;
+  min-height:0!important;
+  background:transparent!important;
+}
+#appScreen #homeView #liveMap {
+  grid-column:1!important;
+  grid-row:1 / 5!important;
+  align-self:stretch!important;
+  justify-self:stretch!important;
+  height:100%!important;
+  min-height:0!important;
+  width:100%!important;
+  flex:none!important;
+  z-index:1!important;
+}
+#appScreen #homeView .zyro-command-row {
+  grid-column:1!important;
+  grid-row:3!important;
+  z-index:19!important;
+  align-self:end!important;
+}
+#appScreen #homeView .zyro-sos-status {
+  grid-column:1!important;
+  grid-row:2!important;
+  z-index:20!important;
+  align-self:end!important;
+}
+#appScreen #homeView .geo-immersive::after {
+  content:"";
+  grid-column:1;
+  grid-row:4;
+  pointer-events:none;
+  height:73px;
+}
+
+/* Per non far finire legenda e zoom nascosti SOTTO la testata. */
+#appScreen #homeView #mapZoomControls,
+#appScreen #homeView .zyro-atlas-legend {
+  top:82px!important; /* 67px della barra superiore + 15px */
+}
+
+/* I riferimenti restano vicini ai comandi, non nascosti in fondo sotto la nav. */
+#appScreen #homeView #mapStatus {
+  bottom:calc(73px + 101px + 18px)!important;
+}
+#appScreen #homeView #mapAttribution {
+  bottom:calc(73px + 101px + 4px)!important;
+}
+#appScreen #homeView #mapUnavailable {
+  bottom:calc(73px + 101px + 56px)!important;
+}
+@media (max-height:690px){
+  #appScreen #homeView #mapStatus{bottom:calc(73px + 83px + 11px)!important}
+  #appScreen #homeView #mapAttribution{bottom:calc(73px + 83px + 4px)!important}
+  #appScreen #homeView #mapUnavailable{bottom:calc(73px + 83px + 56px)!important}
+}
+@media (max-width:350px){
+  #appScreen #homeView #mapStatus{bottom:calc(73px + 88px + 12px)!important}
+  #appScreen #homeView #mapAttribution{bottom:calc(73px + 88px + 4px)!important}
+}
+
+/* Ora LE BARRE stanno sopra la mappa, che realmente passa dietro di loro. */
+#appScreen:has(#homeView:not(.hidden)) > .topbar {
+  position:relative!important;
+  z-index:60!important;
+  background:rgba(7,39,52,.54)!important;
+  -webkit-backdrop-filter:blur(5px) saturate(1.16)!important;
+  backdrop-filter:blur(5px) saturate(1.16)!important;
+  border-bottom:1px solid rgba(98,207,205,.55)!important;
+  box-shadow:0 7px 22px rgba(9,39,47,.12),inset 0 1px rgba(255,255,255,.12)!important;
+}
+#appScreen:has(#homeView:not(.hidden)) > .topbar .brand,
+#appScreen:has(#homeView:not(.hidden)) > .topbar .connection-pill {
+  color:#f9ffff!important;
+  text-shadow:0 1px 3px rgba(0,23,33,.45);
+}
+#appScreen:has(#homeView:not(.hidden)) > .bottom-nav {
+  position:fixed!important;
+  z-index:50!important;
+  background:rgba(237,250,250,.46)!important;
+  -webkit-backdrop-filter:blur(5px) saturate(1.12)!important;
+  backdrop-filter:blur(5px) saturate(1.12)!important;
+  border-top:1px solid rgba(92,195,192,.59)!important;
+  box-shadow:0 -7px 20px rgba(9,45,58,.10),inset 0 1px rgba(255,255,255,.68)!important;
+}
+#appScreen:has(#homeView:not(.hidden)) > .bottom-nav .nav-item:not(.active){
+  color:#526b7c!important;
+  text-shadow:0 1px 2px rgba(255,255,255,.65);
+}
+#appScreen:has(#homeView:not(.hidden)) > .bottom-nav .nav-item.active{
+  color:#087f73!important;
+  text-shadow:0 1px 2px rgba(255,255,255,.72);
+}
+/* Per chi usa il tema scuro: vetro fumé, mappa visibile e scritte chiare. */
+html[data-theme="dark"] #appScreen:has(#homeView:not(.hidden)) > .topbar {
+  background:rgba(6,25,39,.63)!important;
+}
+html[data-theme="dark"] #appScreen:has(#homeView:not(.hidden)) > .bottom-nav {
+  background:rgba(7,35,47,.58)!important;
+  border-top-color:rgba(88,179,189,.50)!important;
+}
+html[data-theme="dark"] #appScreen:has(#homeView:not(.hidden)) > .bottom-nav .nav-item:not(.active){
+  color:#deecf4!important;text-shadow:0 1px 3px rgba(0,7,19,.65);
+}
+html[data-theme="dark"] #appScreen:has(#homeView:not(.hidden)) > .bottom-nav .nav-item.active{
+  color:#80f0d9!important;text-shadow:0 1px 3px rgba(0,9,20,.65);
+}
+/* Non si applica alcun blur alle immagini della mappa, solo alle barre sopra. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  #appScreen:has(#homeView:not(.hidden)) > .topbar{background:rgba(7,39,52,.68)!important}
+  #appScreen:has(#homeView:not(.hidden)) > .bottom-nav{background:rgba(236,249,250,.66)!important}
+}
