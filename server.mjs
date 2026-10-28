@@ -81,7 +81,9 @@ app.use((req, res, next) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.set('Permissions-Policy', 'geolocation=(self), microphone=(self), camera=(self)');
-  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org https://tiles.openfreemap.org https://unpkg.com; connect-src 'self' https://tiles.openfreemap.org https://unpkg.com ws: wss:; worker-src 'self' blob:; font-src 'self' data: https://tiles.openfreemap.org; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+  // Google Maps loads dependencies from several Google domains; keep the allowlist aligned with official Google Maps CSP guidance.
+  // For a production safety app, migrate to nonce-based strict CSP (see Google's CSP guide).
+  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-eval' https://maps.googleapis.com https://maps.gstatic.com https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com https://*.googleusercontent.com blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://*.googleapis.com; img-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com https://*.googleusercontent.com; connect-src 'self' data: blob: https://*.googleapis.com https://*.gstatic.com https://*.google.com https://*.ggpht.com ws: wss:; frame-src https://*.google.com; worker-src 'self' blob:; font-src 'self' data: https://fonts.gstatic.com https://*.gstatic.com; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
   res.set('Cache-Control', req.path.startsWith('/api/') ? 'no-store' : 'no-cache');
   next();
 });
