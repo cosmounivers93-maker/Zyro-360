@@ -1,0 +1,96 @@
+/* ZYRO 360 V16.5 — NEO NIGHT STREETS / visibilita' verificabile.
+   The road network is the existing REAL raster map. No static imitation,
+   no changed tile URLs, no GPS/zoom/drag modifications. The theme is
+   intentionally night-blue in BOTH system modes, as requested.
+   All map layers and gestures remain untouched. */
+
+/* Base map gets an unmistakable midnight-blue palette even when the
+   rest of the app is set to the light theme. */
+html #homeView #liveMap,
+html #homeView #liveMap #zyroVectorMap,
+html #homeView #liveMap #zyroVectorMap .zyro-raster-tiles {
+  background-color:#061324!important;
+  background-image:none!important;
+}
+html #homeView #liveMap #zyroVectorMap .zyro-raster-tile,
+html[data-theme="light"] #homeView #liveMap #zyroVectorMap .zyro-raster-tile,
+html[data-theme="dark"] #homeView #liveMap #zyroVectorMap .zyro-raster-tile {
+  /* Deliberate high-contrast, cool teal/cyan restyling, distinct from V14/V16.4.
+     Raster source pixels remain actual roads, labels and buildings. */
+  filter:grayscale(1) invert(.91) sepia(.95) saturate(5.3)
+         hue-rotate(160deg) brightness(.73) contrast(1.65)!important;
+  opacity:1!important;
+}
+
+/* Fixed graphic HUD on top of the actual tiles. DOES NOT block pinch or drag.
+   It stays subtle enough not to obscure names and street geometry. */
+#homeView #liveMap .zyro-neo-night-overlay {
+  position:absolute;inset:0;z-index:5;pointer-events:none!important;
+  overflow:hidden;isolation:isolate;
+  background:
+    linear-gradient(180deg,rgba(1,14,30,.24) 0,transparent 17%,transparent 85%,rgba(1,16,33,.24) 100%),
+    radial-gradient(ellipse at 96% 8%,rgba(22,200,229,.17),transparent 42%),
+    radial-gradient(ellipse at 0% 85%,rgba(24,173,233,.11),transparent 48%);
+  box-shadow:inset 0 0 36px rgba(0,14,29,.45);
+}
+#homeView #liveMap .zyro-neo-night-overlay::before {
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    repeating-linear-gradient(0deg,transparent 0 69px,rgba(66,234,248,.035) 70px,transparent 71px),
+    repeating-linear-gradient(90deg,transparent 0 69px,rgba(66,234,248,.035) 70px,transparent 71px);
+  -webkit-mask-image:linear-gradient(180deg,black 0%,transparent 28%,transparent 70%,black 100%);
+  mask-image:linear-gradient(180deg,black 0%,transparent 28%,transparent 70%,black 100%);
+}
+#homeView #liveMap .zyro-neo-night-overlay::after {
+  content:"";position:absolute;inset:0;pointer-events:none;
+  border-top:2px solid rgba(50,217,248,.28);
+  border-bottom:1px solid rgba(42,193,231,.25);
+  box-shadow:inset 0 12px 20px -18px rgba(63,232,255,.7),
+             inset 0 -13px 22px -19px rgba(63,232,255,.52);
+}
+#homeView #liveMap .zyro-neo-night-mark {
+  position:absolute;bottom:90px;right:14px;display:flex;
+  align-items:center;gap:6px;padding:6px 9px;
+  border:1px solid rgba(74,232,246,.4);border-radius:9px;
+  background:rgba(4,25,43,.83);color:#b5faff;
+  font:750 9px/1.2 ui-sans-serif,-apple-system,Arial,sans-serif;
+  letter-spacing:1.15px;text-shadow:0 0 10px rgba(31,217,244,.55);
+  box-shadow:0 3px 14px rgba(0,9,22,.28),inset 0 1px 0 rgba(154,249,255,.12);
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+}
+#homeView #liveMap .zyro-neo-night-mark small {
+  font-size:8px;letter-spacing:.4px;color:#78cbd7;
+}
+/* Keep HUD readable even in the light appearance. */
+html #homeView #liveMap .zyro-atlas-legend,
+html[data-theme="light"] #homeView #liveMap .zyro-atlas-legend,
+html #homeView #liveMap #mapZoomControls,
+html[data-theme="light"] #homeView #liveMap #mapZoomControls,
+html #homeView #liveMap #mapStatus,
+html[data-theme="light"] #homeView #liveMap #mapStatus {
+  background:rgba(5,30,50,.9)!important;
+  color:#e5fcff!important;
+  border-color:rgba(79,214,236,.48)!important;
+  box-shadow:0 5px 20px rgba(0,13,26,.33),
+             inset 0 1px 0 rgba(138,241,255,.13)!important;
+}
+html #homeView #liveMap #mapZoomControls button,
+html[data-theme="light"] #homeView #liveMap #mapZoomControls button {
+  background:transparent!important;color:#ecfcff!important;
+}
+/* Small live-position emphasis without changing real coordinates or orientation. */
+#homeView #liveMap .zyro-gl-location .zyro-gl-ring {
+  border-color:rgba(85,237,250,.88)!important;
+  box-shadow:0 0 0 5px rgba(20,214,242,.13),0 0 23px rgba(45,219,242,.38)!important;
+}
+#homeView #liveMap .zyro-raster-markers .zyro-contact-alert .zyro-atlas-initial {
+  border-color:#ffe6ed!important;
+  box-shadow:0 0 0 5px rgba(246,58,93,.27),0 0 16px rgba(251,59,99,.36)!important;
+}
+@media(max-width:370px){
+  #homeView #liveMap .zyro-neo-night-mark {bottom:80px;right:10px;font-size:8px;padding:5px 7px}
+  #homeView #liveMap .zyro-neo-night-mark small{font-size:7px}
+}
+@media(prefers-reduced-motion:reduce){
+  #homeView #liveMap .zyro-neo-night-overlay *{animation:none!important;transition:none!important}
+}

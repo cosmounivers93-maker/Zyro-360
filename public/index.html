@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v16.4-neo-map-streets">
+  <meta name="zyro-ui-build" content="v16.5-neo-night-streets">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/zyro-glass-v162.css?v=16.2">
   <link rel="stylesheet" href="/zyro-settings-balanced-v163.css?v=16.3">
   <link rel="stylesheet" href="/zyro-neo-map-v164.css?v=16.4">
+  <link rel="stylesheet" href="/zyro-neo-night-v165.css?v=16.5">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -47,6 +48,7 @@
       <section class="geo-panel geo-immersive" aria-label="Mappa reale della tua posizione">
         <div id="liveMap" class="live-map" aria-label="Mappa interattiva. Trascina per spostarti, usa due dita per ingrandire.">
           <div id="zyroVectorMap" class="zyro-vector-map" aria-label="Cartografia mondiale interattiva di ZYRO 360"></div>
+          <div class="zyro-neo-night-overlay" aria-hidden="true"><div class="zyro-neo-night-mark">NEO MAP <small>STREETS 16.5</small></div></div>
           <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button></div>
           <div class="zyro-atlas-legend" aria-label="Legenda GPS, cerchia e SOS"><span><i class="atlas-key-you"></i> Tu</span><span><i class="atlas-key-circle"></i> Cerchia</span><span><i class="atlas-key-sos"></i> SOS</span></div>
           <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
