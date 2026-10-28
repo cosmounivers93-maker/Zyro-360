@@ -7,12 +7,28 @@ import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import webpush from 'web-push';
 import pg from 'pg';
+import firebaseAdmin from 'firebase-admin';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const dbPath = path.join(dataDir, 'zyro360.json');
 const initial = { users: {}, circles: {}, memberships: [], invites: {}, sessions: {}, alerts: {}, messages: {}, journeys: {}, checkins: {} };
+
+// Firebase Admin is server-only. Add FIREBASE_SERVICE_ACCOUNT_JSON as a secret
+// on Render; never upload its JSON key, private_key or access tokens to GitHub.
+let fcmReady = false;
+const fcmSecret = String(process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
+if (fcmSecret) {
+  const serviceAccount = JSON.parse(fcmSecret);
+  if (serviceAccount.project_id !== 'zyro-360') {
+    throw new Error('Firebase service account belongs to the wrong project.');
+  }
+  firebaseAdmin.initializeApp({
+    credential:firebaseAdmin.credential.cert(serviceAccount)
+  });
+  fcmReady = true;
+}
 // V15.5: PostgreSQL is the authoritative store. The previous local JSON file was
 // TEMPORARY on free Render and MUST NOT be mistaken for a durable database.
 // This bridge uses one JSONB snapshot for compatibility with existing features;
@@ -141,7 +157,7 @@ function stateFor(id) {
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
     startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (db.users[a.userId]?.sharing || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -262,7 +278,13 @@ app.post('/api/login', limit, (req, res) => {
   auditLogin(req,u);loginUser(res, u.id); res.json({ok:true});
 });
 app.post('/api/logout', requireAuth, (req,res) => {
-  const sid = getCookie(req, 'cs_session'); if (sid) delete db.sessions[hash(sid)];
+  const sid = getCookie(req, 'cs_session');
+  if (sid) {
+    const sessionKey = hash(sid);
+    delete db.sessions[sessionKey];
+    // Only this login session's Android device tokens are removed.
+    req.user.fcmTokens=(req.user.fcmTokens||[]).filter(x=>x.session!==sessionKey);
+  }
   res.clearCookie('cs_session', {path:'/'}); save();
   for (const ws of connections(req.user.id)) ws.close(1008,'Sessione terminata');
   res.json({ok:true});
@@ -391,29 +413,99 @@ app.post('/api/position', requireAuth, (req,res) => {
   }
   refreshRelated(req.user.id); res.json({ok:true});
 });
+
 const configuredPush = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
 if (configuredPush) webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@example.org', process.env.VAPID_PUBLIC_KEY, process.env.VAPID_PRIVATE_KEY);
-async function notifyContacts(id, name, recipients = null, isTheft = false) {
-  if (!configuredPush) return;
-  const tasks = [];
-  for (const target of (recipients === null ? activeRecipients(id) : recipients)) {
-    if (target === id) continue;
-    const user = db.users[target];
-    for (const sub of user?.pushSubs || []) tasks.push(webpush.sendNotification(sub, JSON.stringify({title:isTheft?'🚨 Possibile furto':'🆘 Richiesta SOS', body:isTheft?`${name}: possibile scippo rilevato. Verifica e contatta la persona.`:`${name} ha attivato un SOS. Apri Zyro 360.`, url:'/'}), {TTL:120, urgency:'high'}).catch(e => { if ([404,410].includes(e.statusCode)) user.pushSubs = user.pushSubs.filter(s => s.endpoint!==sub.endpoint); }));
+
+function hasLiveFcmSession(entry) {
+  return typeof entry?.session==='string' && db.sessions[entry.session]?.expiresAt>now();
+}
+function fcmEntriesFor(id) {
+  return (db.users[id]?.fcmTokens||[]).filter(x=>x && typeof x.token==='string' && hasLiveFcmSession(x));
+}
+async function sendFcm(recipients,title,body) {
+  if (!fcmReady) return {attempted:0,accepted:0};
+  const targets=[...new Set(recipients)].filter(id=>db.users[id]&&!db.users[id].bannedAt);
+  let attempted=0,accepted=0,dirty=false;
+  const jobs=[];
+  for(const userId of targets) {
+    const user=db.users[userId], existing=user.fcmTokens||[];
+    const valid=fcmEntriesFor(userId);
+    if(valid.length!==existing.length) {user.fcmTokens=valid;dirty=true;}
+    for(const entry of valid) {
+      attempted++;
+      jobs.push(firebaseAdmin.messaging().send({
+        token:entry.token,
+        notification:{title:String(title).slice(0,100),body:String(body).slice(0,300)},
+        android:{priority:'high',ttl:120000,notification:{channelId:'zyro_updates',priority:'high',defaultSound:true}},
+        data:{kind:'zyro360',destination:'/'}
+      }).then(()=>{accepted++;}).catch(err=>{
+        const code=String(err?.code||'');
+        if(code==='messaging/registration-token-not-registered' || code==='messaging/invalid-registration-token') {
+          user.fcmTokens=(user.fcmTokens||[]).filter(x=>x.token!==entry.token);
+          dirty=true;
+        } else console.error('[ZYRO FCM] delivery rejected:',code||'unknown');
+      }));
+    }
   }
-  await Promise.allSettled(tasks); save();
+  await Promise.allSettled(jobs);
+  if(dirty)save();
+  return {attempted,accepted};
 }
 
-// Notifications: "accepted by a push provider" is not proof that the person read the message.
-async function sendEventPush(recipients,title,body){
- if(!configuredPush)return {configured:false,accepted:0,attempted:0};
- let attempted=0,accepted=0;
- const calls=[];
- for(const id of recipients){for(const sub of db.users[id]?.pushSubs||[]){
-  attempted++;
-  calls.push(webpush.sendNotification(sub,JSON.stringify({title,body,url:'/'}),{TTL:300,urgency:'high'}).then(()=>{accepted++}).catch(err=>{if([404,410].includes(err.statusCode))db.users[id].pushSubs=db.users[id].pushSubs.filter(s=>s.endpoint!==sub.endpoint);}));
- }}
- await Promise.allSettled(calls);if(attempted)save();return {configured:true,accepted,attempted};
+// The browser and Android must keep separate device registrations.
+app.post('/api/push/android/register',requireAuth,limit,(req,res)=>{
+  if(!fcmReady)return res.status(503).json({error:'Notifiche Firebase non configurate sul server.'});
+  const deviceToken=req.body?.token;
+  if(typeof deviceToken!=='string' || deviceToken.length<60 || deviceToken.length>4096 ||
+      !/^[A-Za-z0-9_:.-]+$/.test(deviceToken))
+    return res.status(400).json({error:'Token notifiche Android non valido.'});
+  const sid=getCookie(req,'cs_session'),session=sid&&hash(sid);
+  if(!session||!db.sessions[session]||db.sessions[session].userId!==req.user.id)
+    return res.status(401).json({error:'Sessione non valida.'});
+  // A phone moving between accounts must not continue receiving old accounts' alerts.
+  for(const user of Object.values(db.users))
+    user.fcmTokens=(user.fcmTokens||[]).filter(x=>x.token!==deviceToken);
+  const registered={token:deviceToken,session,at:now()};
+  req.user.fcmTokens=(req.user.fcmTokens||[]).filter(hasLiveFcmSession).slice(-4);
+  req.user.fcmTokens.push(registered);
+  save();res.json({ok:true,enabled:true});
+});
+app.post('/api/push/android/unregister',requireAuth,limit,(req,res)=>{
+  const t=req.body?.token;
+  if(typeof t!=='string'||t.length>4096)return res.status(400).json({error:'Token non valido.'});
+  req.user.fcmTokens=(req.user.fcmTokens||[]).filter(x=>x.token!==t);
+  save();res.json({ok:true});
+});
+
+async function notifyContacts(id,name,recipients=null,isTheft=false) {
+  const targets=[...(recipients===null?activeRecipients(id):recipients)].filter(x=>x!==id);
+  return sendEventPush(targets,isTheft?'🚨 Possibile furto':'🆘 Richiesta SOS',
+    isTheft?`${name}: possibile furto rilevato. Verifica e contatta la persona.`
+      :`${name} ha attivato un SOS. Apri Zyro 360.`);
+}
+// Accepted by FCM/Web Push does not prove the receiver saw the alert.
+async function sendEventPush(recipients,title,body) {
+  const ids=[...new Set(recipients)].filter(id=>db.users[id]&&!db.users[id].bannedAt);
+  const fcm=await sendFcm(ids,title,body);
+  let attempted=fcm.attempted,accepted=fcm.accepted,dirty=false;
+  if (configuredPush) {
+    const calls=[];
+    for(const id of ids)for(const sub of db.users[id]?.pushSubs||[]){
+      attempted++;
+      calls.push(webpush.sendNotification(sub,JSON.stringify({title,body,url:'/'}),{TTL:300,urgency:'high'})
+        .then(()=>{accepted++;})
+        .catch(err=>{
+          if([404,410].includes(err.statusCode)){
+            db.users[id].pushSubs=db.users[id].pushSubs.filter(s=>s.endpoint!==sub.endpoint);
+            dirty=true;
+          }
+        }));
+    }
+    await Promise.allSettled(calls);
+  }
+  if(dirty)save();
+  return {configured:fcmReady||configuredPush,accepted,attempted};
 }
 async function sosAddressFor(pos){
  // Opt-in: forwarding GPS coordinates to a geocoder must be disclosed in privacy information.
@@ -480,29 +572,23 @@ app.post('/api/push/subscribe', requireAuth, (req,res) => {
 // This test NEVER starts an SOS and NEVER shares location or microphone data.
 const lastPushTestByUser = new Map();
 app.post('/api/push/test', requireAuth, limit, async (req,res) => {
-  if (!configuredPush) return res.status(503).json({error:'Notifiche push non configurate sul server.'});
+  if (!configuredPush && !fcmReady) return res.status(503).json({error:'Notifiche push non configurate sul server.'});
   const targetId = typeof req.body?.recipientId === 'string' ? req.body.recipientId : '';
   if (!targetId || targetId === req.user.id || !db.users[targetId] || !sharedCircle(req.user.id,targetId))
     return res.status(403).json({error:'Scegli un contatto appartenente alla tua cerchia.'});
   const subs = [...(db.users[targetId].pushSubs || [])];
-  if (!subs.length) return res.status(409).json({error:'Questo contatto non risulta iscritto alle notifiche push. Deve aprire Profilo e premere Attiva notifiche.'});
+  if (!subs.length && !fcmEntriesFor(targetId).length) return res.status(409).json({error:'Il contatto non ha ancora attivato le notifiche su un dispositivo.'});
   // One outgoing test per sender per minute. Prevent accidental notification spam.
   const t = now(), previous = lastPushTestByUser.get(req.user.id) || 0;
   if (t - previous < 60000) return res.status(429).json({error:'Attendi almeno un minuto prima di inviare un’altra notifica di prova.'});
   lastPushTestByUser.set(req.user.id,t);
   // This is an ordinary test notification, NOT an SOS/emergency alert.
-  const payload = JSON.stringify({kind:'test',title:'🔔 Test ZYRO 360',body:`${cleanText(req.user.name,36)} ti ha inviato una notifica di prova. Nessuna emergenza.`,url:'/'});
-  let accepted = 0;
-  await Promise.allSettled(subs.map(async sub => {
-    try { await webpush.sendNotification(sub,payload,{TTL:120,urgency:'normal'}); accepted++; }
-    catch (err) {
-      if ([404,410].includes(err.statusCode)) {
-        db.users[targetId].pushSubs = (db.users[targetId].pushSubs||[]).filter(s=>s.endpoint!==sub.endpoint);
-      }
-    }
-  }));
-  if (accepted < subs.length) save();
-  res.json({ok:true,accepted,attempted:subs.length,notice:accepted>0?'Notifica accettata dal servizio push. La ricezione sul telefono non è ancora confermata.':'Nessun servizio push ha accettato la notifica. Controlla l’iscrizione sul telefono destinatario.'});
+  const outcome=await sendEventPush([targetId],'🔔 Test ZYRO 360',
+    `${cleanText(req.user.name,36)} ti ha inviato una notifica di prova. Nessuna emergenza.`);
+  res.json({ok:true,accepted:outcome.accepted,attempted:outcome.attempted,
+    notice:outcome.accepted>0
+      ?'Notifica accettata da Firebase/Web Push. La ricezione non è confermata.'
+      :'Nessun servizio ha accettato la notifica. Controlla le autorizzazioni.'});
 });
 
 app.post('/api/settings/sos-recipients', requireAuth, limit, (req,res)=> {
@@ -558,6 +644,9 @@ app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
   // which MUST be backed by persistent storage for survival across deployments.
   save();
   for(const id of chat.members)for(const sock of connections(id))sendSocket(sock,{type:'chat-new',chatType:req.params.type,target:req.params.target,from:req.user.id});
+  // Keep message contents private on the device lock screen.
+  void sendEventPush(chat.members.filter(id=>id!==req.user.id),'💬 Nuovo messaggio Zyro 360',
+    `${req.user.name} ti ha inviato un messaggio.`).catch(err=>console.error('[ZYRO push] chat:',err.message));
   res.json({ok:true,message});
 });
 app.post('/api/sos/start', requireAuth, async (req,res) => {
@@ -567,7 +656,7 @@ app.post('/api/sos/start', requireAuth, async (req,res) => {
  const recipients=[...new Set((req.user.sosRecipients||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)))];
  if(!recipients.length&&!alert)return res.status(400).json({error:'Seleziona prima almeno un destinatario SOS nella sezione Modalità.'});
  if(alert?.kind==='pickpocket')return res.status(409).json({error:'Termina prima l’allarme Pick Pocket.'});
- if(alert)return res.json({ok:true,id:alert.id,alreadyActive:true,pushConfigured:configuredPush,serverRecorded:true});
+ if(alert)return res.json({ok:true,id:alert.id,alreadyActive:true,pushConfigured:configuredPush||fcmReady,serverRecorded:true});
  const pos=validCoords(req.body.location);
  if(pos)locations.set(req.user.id,pos);
  alert={id:token(12),userId:req.user.id,recipients,startedAt:now(),active:true,hasAudio:false,kind:'sos',address:null};db.alerts[alert.id]=alert;save();refreshRelated(req.user.id);
