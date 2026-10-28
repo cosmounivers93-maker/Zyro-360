@@ -434,3 +434,68 @@ html[data-theme="light"] .geo-immersive .map-status{background:#f8fffff0!importa
 /* Keep the already-approved three equally sized controls, not the old SOS panel. */
 .zyro-command-row{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 @media(max-width:360px){.map-top-label{gap:5px;padding:8px 10px!important}.map-top-label .zyro-map-pill{font-size:7px!important}.zyro-map-brand{font-size:8px!important}}
+
+/* ==============================================================
+   ZYRO ATLAS WORLD V10 · genuine worldwide vector cartography
+   User reference: indigo/violet city map with discrete colored pins.
+   No fictional streets, no sample users: positions are real opt-in GPS.
+   ============================================================= */
+.zyro-vector-map{background:#172447!important}
+html[data-theme="light"] .zyro-vector-map{background:#e7f0f8!important}
+/* Cinematic tint over real roads; no user interaction is intercepted. */
+.geo-immersive .live-map::before{
+  background:
+    radial-gradient(ellipse at 5% 89%, rgba(79,47,173,.30) 0%,transparent 62%),
+    radial-gradient(ellipse at 90% 10%,rgba(28,99,194,.19) 0%,transparent 66%),
+    linear-gradient(180deg,rgba(5,21,59,.08),transparent 36%,rgba(47,29,96,.22) 100%)!important;
+  box-shadow:inset 0 20px 45px rgba(5,17,51,.22),inset 0 -30px 55px rgba(37,22,76,.26)!important;
+  z-index:7;pointer-events:none;
+}
+html[data-theme="light"] .geo-immersive .live-map::before{
+  background:linear-gradient(180deg,#dbf0fa2b,transparent 60%,#d4e7f45c)!important;
+  box-shadow:inset 0 0 36px #7cb5cb23!important;
+}
+.map-top-label{background:linear-gradient(110deg,#111d46f2,#122d58e8)!important;border-color:#62d9d8a0!important;border-radius:17px!important;letter-spacing:1.7px!important}
+.map-top-label .zyro-map-pill{background:#34eed125!important;border-color:#69f3d059!important;color:#b3fff5!important}
+.map-zoom-controls{background:#121c42ee!important;border:1px solid #679cce80!important;backdrop-filter:blur(18px)}
+.map-zoom-controls button{color:#e7f9ff!important}
+.map-zoom-controls button#mapTilt{color:#6cf0d9!important}
+.map-zoom-controls button+button{border-color:#7192c742!important}
+.zyro-map-brand{background:#111d42c9!important;color:#a5e9e5!important;border:1px solid #51bac27c!important;backdrop-filter:blur(12px)}
+.geo-immersive .map-status{background:#172047eb!important;border-color:#6998c05a!important;color:#d9f7ff!important}
+.zyro-atlas-legend{position:absolute;z-index:12;top:73px;left:14px;display:flex;gap:10px;align-items:center;
+  border:1px solid #678bb94a;border-radius:13px;padding:7px 10px;background:#10244fc9;color:#e5f1ff;
+  box-shadow:0 6px 19px #060f3188;backdrop-filter:blur(12px);pointer-events:none;font-weight:700;font-size:10px;letter-spacing:.05px}
+.zyro-atlas-legend span{display:flex;gap:5px;align-items:center;white-space:nowrap}
+.zyro-atlas-legend i{height:8px;width:8px;border-radius:100%;border:1px solid #fff9;display:inline-block}
+.atlas-key-you{background:#28b8fc}.atlas-key-circle{background:#49e1c7}.atlas-key-sos{background:#fe5778}
+html[data-theme="light"] .zyro-atlas-legend{background:#fffffff0;color:#234963;border-color:#b3cddd}
+html[data-theme="light"] .map-top-label{background:linear-gradient(115deg,#153a55,#286b7c)!important}
+html[data-theme="light"] .map-zoom-controls{background:#fffffff0!important;border-color:#b0cddd!important}
+html[data-theme="light"] .map-zoom-controls button{color:#25526b!important}
+html[data-theme="light"] .map-zoom-controls button#mapTilt{color:#078c83!important}
+html[data-theme="light"] .geo-immersive .map-status{background:#ffffffef!important;color:#1f546c!important}
+html[data-theme="light"] .zyro-map-brand{background:#f7ffffdd!important;color:#206177!important}
+/* Teardrop pins: only REAL authorized members returned by /api/state. */
+.zyro-gl-contact{position:relative!important;width:90px!important;height:78px!important;border:0!important;background:none!important;
+  box-shadow:none!important;display:flex!important;flex-direction:column;justify-content:flex-start;align-items:center;gap:3px;
+  color:#f2ffff!important;filter:drop-shadow(0 5px 8px #050f2699)}
+.zyro-atlas-initial{position:relative;width:35px;height:35px;border:2px solid #cffff3;border-radius:50% 50% 50% 8%;
+  display:grid;place-items:center;background:linear-gradient(140deg,#56edce,#1397af);font-weight:900;font-size:15px;
+  transform:rotate(-45deg);box-shadow:0 0 0 5px #32d5ce38,0 0 18px #25d9dc91}
+.zyro-atlas-initial::first-letter{ /* Initial character remains readable in the rotated pin. */ }
+.zyro-atlas-contact-name{display:block;max-width:90px;padding:4px 7px;border-radius:9px;background:#111c43e8;
+  border:1px solid #3aaeb976;color:#dcfff9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:10px;font-weight:800;line-height:1.2;box-shadow:0 4px 10px #030b2e77}
+.zyro-contact-alert .zyro-atlas-initial{background:linear-gradient(130deg,#ff7192,#d82b64);border-color:#ffe1e8;box-shadow:0 0 0 8px #ff2e5a2e,0 0 22px #fa3879}
+.zyro-contact-alert .zyro-atlas-contact-name{color:#fff2f5;border-color:#ff7192;background:#7b234fe5}
+/* GPS stays clearly distinguishable from friends and incidents. */
+.zyro-gl-location .zyro-gl-arrow{background:#28aaf8!important}
+.zyro-gl-location .zyro-gl-core{background:#13bafa!important;border-color:white!important}
+.zyro-gl-location .zyro-gl-ring{border-color:#40d0ff!important;box-shadow:0 0 0 9px #24bbf52a,0 0 24px #30cdffc0!important}
+@media(max-width:390px){.zyro-atlas-legend{gap:7px;font-size:9px;top:67px;left:10px;padding:6px 8px}.map-top-label{padding:9px 10px!important}}
+@media(prefers-reduced-motion:reduce){.zyro-gl-location .zyro-gl-ring{animation:none!important}}
+
+/* Pin tip is anchored to the actual GPS coordinates. */
+.zyro-gl-contact{flex-direction:column-reverse!important;justify-content:flex-end!important;height:73px!important;gap:4px!important}
+.zyro-atlas-initial b{display:block;font-style:normal;transform:rotate(45deg)}
