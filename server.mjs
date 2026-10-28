@@ -106,6 +106,8 @@ function limit(req, res, next) {
 }
 function requireAuth(req, res, next) { req.user = auth(req); if (!req.user) return res.status(401).json({ error:'Accedi per continuare.' }); next(); }
 app.get('/api/health', (_, res) => res.json({ ok: true }));
+// Google Maps JavaScript API browser key (must be Google Cloud domain- and API-restricted).
+app.get('/api/map-config', requireAuth, (_,res)=>res.json({googleMapsKey:process.env.GOOGLE_MAPS_API_KEY||null}));
 // Live tiles requested only by logged-in users. A modest in-memory cache protects the community tile service.
 // For a public production launch replace this best-effort upstream with a contracted map provider.
 const mapTileCache = new Map();
