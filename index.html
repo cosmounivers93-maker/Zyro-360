@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1831">
+  <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
+  <meta name="color-scheme" content="light">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" type="image/png" href="/assets/icon192.png">
+  <link rel="apple-touch-icon" href="/assets/icon192.png">
+  <link rel="stylesheet" href="/style.css">
+  <title>Zyro 360 — la tua cerchia</title>
+</head>
+<body>
+<div id="authScreen" class="auth-shell">
+  <div class="auth-brand"><div class="brand-emblem">✦</div><span>ZYRO <b>360</b></span></div>
+  <main class="auth-card">
+    <div class="auth-illustration"><div class="orb orb-a">♥</div><div class="orb orb-b">✦</div><div class="orb orb-c">✓</div><div class="orbit-ring"></div><div class="center-shield">✣</div></div>
+    <p class="eyebrow">LA SICUREZZA È PIÙ BELLA INSIEME</p>
+    <h1>La tua cerchia.<br><span>La tua tranquillità.</span></h1>
+    <p class="auth-copy">Resta in contatto con le persone di cui ti fidi. In caso di bisogno, un gesto basta per chiedere aiuto.</p>
+    <div class="auth-tabs" role="tablist"><button class="auth-tab active" data-mode="login" aria-selected="true">Accedi</button><button class="auth-tab" data-mode="register" aria-selected="false">Registrati</button></div>
+    <form id="authForm" autocomplete="on">
+      <label id="nameField" class="field hidden"><span>Il tuo nome</span><input id="name" name="name" type="text" autocomplete="name" maxlength="36" placeholder="Come vuoi essere chiamato"></label>
+      <label class="field"><span>Email</span><input id="email" name="email" type="email" autocomplete="email" required placeholder="nome@email.it"></label>
+      <label class="field"><span>Password</span><input id="password" name="password" type="password" autocomplete="current-password" required minlength="10" placeholder="Almeno 10 caratteri"></label>
+      <button id="authSubmit" class="btn btn-primary btn-wide" type="submit">Entra nella tua cerchia <span>→</span></button>
+    </form>
+    <p class="auth-note">🔒 Solo le persone autorizzate possono vedere la tua posizione.</p>
+  </main>
+  <p class="tiny-auth">Un aiuto tra persone fidate. Non sostituisce i soccorsi d'emergenza.</p>
+</div>
+
+<div id="appScreen" class="app-shell hidden">
+  <header class="topbar">
+    <div class="brand"><div class="brand-emblem">✦</div><span>ZYRO <b>360</b></span></div>
+    <div class="connection-pill"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">Connessione...</span></div>
+  </header>
+  <main class="container">
+    <section id="homeView" class="view home-map-view">
+      <section class="geo-panel geo-immersive" aria-label="Mappa reale della tua posizione">
+        <div id="liveMap" class="live-map" aria-label="Mappa interattiva. Trascina per spostarti, usa due dita per ingrandire.">
+          <div id="googleMap" class="google-map hidden" aria-label="Google Maps con i membri della tua cerchia"></div>
+          <div id="mapTiles" class="map-tiles" aria-hidden="true"></div>
+          <div id="mapPins" class="map-pins" aria-hidden="true"></div>
+          <div class="map-top-label"><span class="map-live-dot"></span> MAPPA IN TEMPO REALE</div>
+          <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
+          <div id="mapUnavailable" class="map-unavailable hidden" role="alert">La mappa incorporata non è disponibile. <a id="mapOpenGoogle" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer">Apri Google Maps</a></div>
+          <div id="mapAttribution" class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">© CARTO</a></div>
+        </div>
+        <div class="home-map-actions">
+          <label class="home-share-action" for="shareToggle"><span class="home-action-symbol">◎</span><span class="home-action-text">Attiva posizione</span><span class="switch"><input id="shareToggle" type="checkbox" aria-label="Attiva o disattiva la condivisione posizione con la cerchia"><span class="switch-slider"></span></span></label>
+          <button id="locateMe" class="home-locate-action" type="button"><span class="home-action-symbol">⌖</span><span>Trova la mia posizione</span></button>
+        </div>
+      <div class="sos-card" id="sosCard">
+        <div class="sos-card-top"><span class="white-dot"></span><span>ALLERTA AI CONTATTI CHE HAI SCELTO</span><span class="sos-sparkle">✧</span></div>
+        <h2 id="sosTitle">Hai bisogno di aiuto?</h2>
+        <p id="sosDescription">Invia una richiesta di aiuto ai contatti SOS scelti. La posizione si condivide separatamente.</p>
+        <button id="sosButton" class="sos-button" type="button" aria-label="Attiva SOS"><span class="sos-button-inner"><span class="sos-icon">✳</span><b>SOS</b><small>PREMI QUI</small></span></button>
+        <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> ALLARME ATTIVO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">🎙 Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div></div>
+        <div id="sosInactiveNote" class="sos-card-bottom"><span>♧</span><span>Avvisa soltanto i destinatari SOS selezionati</span></div>
+      </div>
+      </section>
+    </section>
+
+    <section id="circlesView" class="view hidden">
+      <div class="page-heading"><p class="eyebrow muted">PERSONE SPECIALI</p><h1>Le tue cerchie <span>✧</span></h1><p>Persone fidate, sicurezza e tutte le tue funzioni.</p></div>
+      <div class="greeting"><div><p class="eyebrow muted">UNO SPAZIO DI FIDUCIA</p><h1>Ciao, <span id="greetingName">amico</span> <span class="wave">✳</span></h1><p>La tua sicurezza è la nostra priorità.</p></div><div class="avatar" id="myAvatar">S</div></div>
+      <div class="top-cards">
+        <div class="stat-card"><span class="stat-icon mint">◎</span><div><strong id="totalMembers">0</strong><small>Persone fidate</small></div></div>
+        <div class="stat-card"><span class="stat-icon violet">◈</span><div><strong id="totalCircles">0</strong><small>Le tue cerchie</small></div></div>
+      </div>
+      <section class="circle-location-status panel"><div class="panel-title"><span class="panel-icon">⌖</span><div><h2>La mia posizione</h2><p id="myLocationText">Condivisione disattivata</p></div></div></section>
+      <section class="pick-panel" id="pickPanel">
+        <div class="pick-top"><div class="pick-symbol">🛡</div><div><p class="eyebrow muted">ANTIFURTO SPERIMENTALE</p><h2>Modalità Pick Pocket</h2><p>Rileva uno strappo brusco con i sensori del telefono e prova ad avviare una sirena.</p></div></div>
+        <div class="pick-settings" id="pickSettings">
+          <label class="pick-select-line"><span>Sensibilità ai movimenti</span><select id="pickSensitivity"><option value="normal">Normale (consigliata)</option><option value="high">Alta · più falsi allarmi</option></select></label>
+          <label class="pick-check-line"><input type="checkbox" id="pickNotify"><span><b>Avvisa i miei contatti se scatta l'allarme</b><small>Inoltra un avviso e il GPS solo alle persone che selezioni, se la connessione è disponibile.</small></span></label>
+          <div id="pickRecipients" class="pick-recipients hidden"><p>Scegli chi avvisare:</p><div id="pickRecipientsList"></div></div>
+        </div>
+        <div class="pick-status" id="pickStatus">Protezione disattivata. Per attivarla lascia ZYRO 360 aperta e autorizza i sensori.</div>
+        <button id="pickArm" type="button" class="btn btn-dark btn-wide">Attiva Pick Pocket</button>
+        <button id="pickTest" type="button" class="pick-test">Ascolta la sirena (test locale, nessun avviso)</button>
+        <p class="pick-limits">Non blocca il sistema Android, non impedisce spegnimento o chiusura dell'app e non garantisce l'allarme con schermo spento. La sirena rispetta il volume del dispositivo. Uno strappo può essere confuso con un normale movimento.</p>
+      </section>
+      <section class="panel sos-recipient-panel"><div class="panel-title"><span class="panel-icon">🆘</span><div><h2>Destinatari SOS</h2><p>Scegli le persone da avvisare quando premi SOS. Non attiva la posizione.</p></div></div><div id="sosRecipientList" class="recipient-grid"></div><button id="saveSOSRecipients" class="btn btn-dark btn-wide" type="button">Salva destinatari SOS</button><p id="sosPushNote" class="setting-description"></p></section>
+      <div id="activeAlerts" class="hidden"></div>
+      <div class="section-head space-top"><div><h2>Le persone della tua cerchia</h2><p>Posizione e aggiornamenti condivisi</p></div></div>
+      <div id="contactsList" class="contacts-list"></div>
+      <div class="emergency-card"><span>✚</span><div><b>Emergenza immediata?</b><p>Per un pericolo reale contatta sempre i soccorsi.</p></div><a href="tel:112" class="call-button">Chiama 112</a></div>
+      <div class="page-heading"><p class="eyebrow muted">PERSONE SPECIALI</p><h1>Le tue cerchie <span>✧</span></h1><p>Crea un gruppo privato e invita solo persone di fiducia.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon">＋</span><div><h2>Crea una cerchia</h2><p>Amici, famiglia o persone fidate</p></div></div><form id="createCircleForm" class="inline-form"><input id="circleName" maxlength="48" required placeholder="Es. Famiglia ❤️" aria-label="Nome cerchia"><button class="btn btn-primary" type="submit">Crea</button></form></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">⌘</span><div><h2>Hai ricevuto un codice?</h2><p>Entra nella cerchia di qualcuno</p></div></div><form id="joinCircleForm" class="inline-form"><input id="inviteInput" maxlength="28" required placeholder="Codice di invito" aria-label="Codice di invito" autocapitalize="characters"><button class="btn btn-dark" type="submit">Entra</button></form></div>
+      <div class="section-head space-top"><div><h2>I miei gruppi</h2><p>Un invito dura 24 ore e si usa una volta</p></div></div>
+      <div id="circlesList" class="circle-list"></div>
+    </section>
+
+    <section id="chatsView" class="view hidden zyro-chat-page">
+      <div class="chat-hero">
+        <div class="chat-hero-glow" aria-hidden="true"></div>
+        <div class="chat-hero-copy"><p class="chat-eyebrow"><span class="chat-live-indicator"></span> UNO SPAZIO SOLO VOSTRO</p><h1>Restiamo<br><em>vicini.</em></h1><p>Le persone importanti, sempre a un messaggio di distanza.</p></div>
+        <div class="chat-hero-graphic" aria-hidden="true"><span class="hero-bubble hero-bubble-one"><svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg></span><span class="hero-bubble hero-bubble-two">♥</span><span class="hero-bubble hero-bubble-three">•••</span></div>
+      </div>
+      <section class="chat-hub" id="chatHub">
+        <div class="chat-heading-row"><div><span class="mini-overline">I TUOI MESSAGGI</span><h2>Conversazioni</h2></div><div class="chat-heading-emblem" aria-hidden="true"><svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg></div></div>
+        <div class="chat-filter-bar" aria-label="Filtra le conversazioni"><button type="button" class="chat-filter active" data-chat-filter="all" aria-pressed="true">Tutte</button><button type="button" class="chat-filter" data-chat-filter="circle" aria-pressed="false">Famiglia</button><button type="button" class="chat-filter" data-chat-filter="direct" aria-pressed="false">Amici</button></div>
+        <label class="chat-search"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.6"/><path d="m16 16 5 5"/></svg><input id="chatSearch" autocomplete="off" placeholder="Cerca una persona o un gruppo" aria-label="Cerca conversazioni"></label>
+        <div id="chatRooms" class="chat-rooms" aria-live="polite"></div>
+        <div class="chat-private-footnote"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1"/></svg><span>Le conversazioni sono riservate ai membri autorizzati.</span></div>
+      </section>
+      <div id="chatConversation" class="panel chat-conversation hidden"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatClose" class="chat-close" aria-label="Chiudi conversazione">✕</button></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
+      <p class="small-disclaimer chat-security-note">Questa versione non usa crittografia end-to-end. Non condividere informazioni particolarmente sensibili.</p>
+    </section>
+
+    <section id="settingsView" class="view hidden zyro-profile-page">
+      <div class="profile-heading"><span class="mini-overline">IL TUO ACCOUNT</span><h1>Il tuo profilo<span>.</span></h1><p>La tua identità, protetta e riconoscibile da chi ami.</p></div>
+      <section class="profile-identity-card">
+        <div class="profile-orbit" aria-hidden="true"></div>
+        <div class="profile-avatar-wrap"><div class="profile-avatar" id="profileAvatar">S</div><label class="profile-avatar-camera" title="Cambia foto dalla galleria" for="avatarGallery" aria-label="Cambia la tua foto profilo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h2.5l1.6-2h5.8l1.6 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.3"/></svg></label></div>
+        <div class="profile-id-copy"><span class="profile-id-caption">ACCOUNT PERSONALE <span class="verified-dot">✓</span></span><strong id="profileName">Utente</strong><p id="profileEmail">email</p></div>
+      </section>
+      <section class="profile-photo-editor">
+        <div class="profile-photo-heading"><span class="profile-photo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h2.5l1.6-2h5.8l1.6 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.3"/></svg></span><div><h2>La tua immagine</h2><p>Un volto familiare per chi fa parte della tua cerchia.</p></div></div>
+        <div class="profile-photo-actions">
+          <label class="profile-action gallery-action"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><span><b>Scegli dalla galleria</b><small>Le tue foto preferite</small></span><span class="profile-chevron"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span><input id="avatarGallery" type="file" accept="image/*"></label>
+          <label class="profile-action camera-action"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h2.5l1.6-2h5.8l1.6 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.3"/></svg><span><b>Scatta una nuova foto</b><small>Apri la fotocamera</small></span><span class="profile-chevron"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span><input id="avatarCamera" type="file" accept="image/*" capture="user"></label>
+        </div>
+        <button type="button" id="avatarRemove" class="avatar-remove-action">Rimuovi la foto attuale</button>
+        <div class="photo-privacy-note"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1"/></svg><span>Solo le persone delle tue cerchie vedranno questa foto.</span></div>
+      </section>
+      <div class="panel"><div class="panel-title"><span class="panel-icon">♧</span><div><h2>Avvisi SOS</h2><p>Ricevi notifiche se una persona della tua cerchia chiede aiuto</p></div></div><button id="pushButton" class="btn btn-dark btn-wide" type="button">Attiva notifiche</button><p id="pushStatus" class="setting-description">Le notifiche dipendono dal supporto del browser e dalle impostazioni del dispositivo.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon warm">☏</span><div><h2>Numeri di emergenza</h2><p>In Italia e nell'UE il numero unico è 112</p></div></div><a href="tel:112" class="btn btn-outline btn-wide">Chiama il 112</a></div>
+      <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
+      <p class="small-disclaimer">Questa è una versione iniziale da testare. Connessione Internet, autorizzazioni e app aperta possono essere necessari. Non usarla come unico strumento di emergenza.</p>
+    </section>
+  </main>
+  <nav class="bottom-nav" aria-label="Navigazione principale"><button class="nav-item active" data-view="home" type="button"><span class="nav-icon">⌂</span><span>Home</span></button><button class="nav-item" data-view="circles" type="button"><span class="nav-icon">◎</span><span>Cerchie</span></button><button class="nav-item" data-view="chats" type="button"><span class="nav-icon nav-chat-icon"><svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg></span><span>Chat</span></button><button class="nav-item" data-view="settings" type="button"><span class="nav-icon">⚙</span><span>Profilo</span></button></nav>
+</div>
+<div id="theftOverlay" class="theft-overlay hidden" role="alertdialog" aria-labelledby="theftTitle" aria-modal="true">
+  <div class="theft-content"><div class="theft-symbol">🚨</div><h1 id="theftTitle">ALLARME ANTIFURTO</h1><p id="theftMessage">Movimento sospetto rilevato. Sirena attiva.</p><p id="theftNetwork">Stiamo provando ad avvisare i contatti scelti.</p><label class="field"><span>Password del proprietario</span><input id="theftPassword" type="password" autocomplete="current-password" placeholder="Password del tuo account ZYRO 360"></label><button id="theftStop" class="btn btn-primary btn-wide" type="button">Ferma sirena e allarme</button><p class="theft-subnote">Protezione interna all'app, non blocco Android. Per un pericolo reale chiama il 112.</p><a href="tel:112" class="theft-call">Chiama 112</a></div>
+</div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+<div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
+<script src="/app.js" defer></script>
+</body>
+</html>
