@@ -373,7 +373,18 @@ function chatAccess(viewer,type,target){
 app.get('/api/chat/:type/:target', requireAuth,(req,res)=>{
   const chat=chatAccess(req.user.id,req.params.type,req.params.target);
   if(!chat)return res.status(403).json({error:'Non hai accesso a questa conversazione.'});
-  res.set('Cache-Control','no-store');res.json({messages:(db.messages||{})[chat.key]||[]});
+  // Paginated conversation history; older messages remain stored instead of being cut off.
+  // Durable history requires DATA_DIR on persistent storage (see LEGGIMI).
+  const all=(db.messages||{})[chat.key]||[];
+  const rawBefore=req.query.before;
+  let end=all.length;
+  if(rawBefore!==undefined){
+    if(!/^\d{1,10}$/.test(String(rawBefore)))return res.status(400).json({error:'Pagina dello storico non valida.'});
+    end=Math.min(all.length,Number(rawBefore));
+  }
+  const start=Math.max(0,end-80);
+  res.set('Cache-Control','no-store');
+  res.json({messages:all.slice(start,end),nextBefore:start>0?start:null,total:all.length});
 });
 app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
   const chat=chatAccess(req.user.id,req.params.type,req.params.target);
@@ -388,7 +399,9 @@ app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
   db.messages ||= {};
   const message={id:token(9),from:req.user.id,name:req.user.name,text,image:image||null,at:t};
   db.messages[chat.key] ||= [];db.messages[chat.key].push(message);
-  db.messages[chat.key]=db.messages[chat.key].slice(-60);save();
+  // Do not silently erase messages after 60 sends. Data is stored in DATA_DIR,
+  // which MUST be backed by persistent storage for survival across deployments.
+  save();
   for(const id of chat.members)for(const sock of connections(id))sendSocket(sock,{type:'chat-new',chatType:req.params.type,target:req.params.target,from:req.user.id});
   res.json({ok:true,message});
 });
