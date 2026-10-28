@@ -774,3 +774,69 @@ html[data-theme="dark"] .sos-recipient-panel .recipient-line:has(input:checked){
 html[data-theme="dark"] .sos-recipient-panel .recipient-grid>.setting-description{color:#d4e7ef}
 html[data-theme="dark"] .sos-recipient-panel .sos-push-note{background:#1b3c51;border-color:#49758b;color:#e0f2fa}
 html[data-theme="dark"] .sos-kicker{color:#78f1dc!important}
+
+
+/* ZYRO 360 V14.6.1 · Solo centratura dei testi nelle schede guida e modalità.
+   Gli input, la mappa, il GPS e la logica dell'app non sono alterati. */
+.how-it-works .how-heading {
+  display:grid;
+  grid-template-columns:40px minmax(0,1fr) 40px;
+  align-items:start;
+  column-gap:8px;
+}
+.how-it-works .how-heading > .how-icon {grid-column:1;}
+.how-it-works .how-heading > div {
+  grid-column:2;min-width:0;text-align:center;
+}
+.how-it-works .how-heading .eyebrow {text-align:center;}
+.how-it-works .how-heading h2 {text-align:center;text-wrap:balance;}
+.how-it-works .how-heading > div > p:last-child {
+  text-align:center;max-width:340px;margin-inline:auto;text-wrap:pretty;
+}
+/* Center the actual help item text while keeping +/- on the right. */
+.how-it-works details > summary {
+  display:block;position:relative;
+  padding:18px 38px;
+  text-align:center;
+  text-wrap:balance;
+}
+.how-it-works details > summary > span {
+  position:absolute;right:9px;top:50%;
+  transform:translateY(-50%);
+  transform-origin:center center;
+}
+.how-it-works details[open] > summary > span {
+  transform:translateY(-50%) rotate(45deg);
+}
+/* Center headings, retain icons on left and balanced free space on right. */
+.mode-heading {text-align:center;}
+.mode-heading .eyebrow {text-align:center;}
+.mode-heading > p:last-child {margin-inline:auto;text-wrap:balance;}
+.pick-panel .pick-top,
+.sos-recipient-panel .panel-title {
+  display:grid;
+  grid-template-columns:45px minmax(0,1fr) 45px;
+  gap:9px;
+  align-items:start;
+}
+.pick-panel .pick-top > div:last-child,
+.sos-recipient-panel .panel-title > div:last-child {
+  text-align:center;min-width:0;
+}
+.pick-panel .pick-top h2,
+.sos-recipient-panel .panel-title h2 {
+  text-align:center;text-wrap:balance;
+}
+.pick-panel .pick-top .eyebrow,
+.sos-recipient-panel .panel-title .eyebrow {text-align:center;}
+.pick-panel .pick-top p:not(.eyebrow),
+.sos-recipient-panel .panel-title p:not(.eyebrow) {
+  text-align:center;text-wrap:pretty;
+}
+@media(max-width:380px) {
+  .how-it-works .how-heading {grid-template-columns:32px minmax(0,1fr) 32px;gap:5px;}
+  .how-it-works .how-icon {width:32px;height:32px;}
+  .how-it-works .how-heading h2 {font-size:17px;}
+  .how-it-works details > summary {padding:17px 33px;font-size:12px;}
+  .pick-panel .pick-top,.sos-recipient-panel .panel-title {grid-template-columns:37px minmax(0,1fr) 37px;gap:6px;}
+}
