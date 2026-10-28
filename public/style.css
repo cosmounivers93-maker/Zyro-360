@@ -671,3 +671,8 @@ html[data-theme="light"] .geo-immersive .live-map{background:#e9f2f6!important}
 /* V14.4: keep old map images painted while fresh tiles arrive; reduce flicker on Android. */
 #zyroVectorMap .zyro-raster-tiles{background:transparent;contain:layout style;isolation:isolate;}
 #zyroVectorMap .zyro-raster-tile{object-fit:fill;backface-visibility:hidden;-webkit-backface-visibility:hidden;}
+
+/* V14.5: JS requestAnimationFrame handles the shortest smooth angular route.
+   Avoid a second CSS transition that amplifies sensor jitter or wraps 359 to 0. */
+.zyro-gl-location .zyro-gl-arrow{transition:opacity .18s ease!important;}
+@media(prefers-reduced-motion:reduce){.zyro-gl-location .zyro-gl-arrow{transition:none!important;}}

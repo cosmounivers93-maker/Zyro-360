@@ -29,7 +29,95 @@ let stableAttempts=0, stableBootId=0, stableResizeObserver=null;
 const stableMarkers=new Map();
 let compassHeading = null;
 let gpsCourseActive = false;
-let lastCompassUpdate = 0;
+// V14.5 - A single filtered heading controller. Every displayed rotation is animated
+// through the shortest angle, without duplicating or redrawing map tiles.
+const headingMotion = {
+  compass: null, compassAt: 0, gps: null, gpsAt: 0,
+  target: null, display: null, source: null, frame: null, previousFrame: 0,
+  lastSensorAt: 0, lastAccepted: 0, pendingJump: null
+};
+function normalizeHeading(deg){return Number.isFinite(deg)?((deg%360)+360)%360:null;}
+function headingDelta(a,b){return ((b-a+540)%360)-180;}
+function clearHeadingMotion(){
+  if(headingMotion.frame!==null)cancelAnimationFrame(headingMotion.frame);
+  Object.assign(headingMotion,{compass:null,compassAt:0,gps:null,gpsAt:0,target:null,display:null,
+    source:null,frame:null,previousFrame:0,lastSensorAt:0,lastAccepted:0,pendingJump:null});
+  compassHeading=null;gpsCourseActive=false;
+}
+function renderHeadingOnly(){
+  if(!lastCoords)return;
+  const shown=Number.isFinite(headingMotion.display)?headingMotion.display:null;
+  lastCoords.heading=shown;
+  const pin=stableMap?.pinNodes?.get('me');
+  if(pin)updateGlassHeading(pin,shown);
+  else stableMap?.schedule();
+}
+function selectHeadingSource(now=Date.now()){
+  // Orientation of the PHONE comes first; GPS course is not phone orientation.
+  if(Number.isFinite(headingMotion.compass)&&now-headingMotion.compassAt<4000)
+    return {angle:headingMotion.compass,source:'compass'};
+  if(Number.isFinite(headingMotion.gps)&&now-headingMotion.gpsAt<8000)
+    return {angle:headingMotion.gps,source:'gps'};
+  return null;
+}
+function animateHeading(time){
+  headingMotion.frame=null;
+  if(!lastCoords||!Number.isFinite(headingMotion.target)){headingMotion.previousFrame=0;return;}
+  const dt=headingMotion.previousFrame?Math.min(.06,Math.max(.001,(time-headingMotion.previousFrame)/1000)):1/60;
+  headingMotion.previousFrame=time;
+  if(!Number.isFinite(headingMotion.display))headingMotion.display=headingMotion.target;
+  const diff=headingDelta(headingMotion.display,headingMotion.target);
+  // Angular low-pass with a maximum speed: smooth yet responsive to a real turn.
+  const easing=1-Math.exp(-dt*(Math.abs(diff)>35?11:8));
+  const turn=Math.sign(diff)*Math.min(Math.abs(diff*easing),dt*240);
+  if(Math.abs(diff)<.65)headingMotion.display+=diff;
+  else headingMotion.display+=turn;
+  renderHeadingOnly();
+  if(Math.abs(headingDelta(headingMotion.display,headingMotion.target))>.65)
+    headingMotion.frame=requestAnimationFrame(animateHeading);
+  else headingMotion.previousFrame=0;
+}
+function aimHeading(){
+  const choice=selectHeadingSource();
+  if(!choice){
+    headingMotion.target=null;headingMotion.source=null;
+    if(headingMotion.frame!==null){cancelAnimationFrame(headingMotion.frame);headingMotion.frame=null;}
+    headingMotion.previousFrame=0;headingMotion.display=null;renderHeadingOnly();return;
+  }
+  const current=headingMotion.target;
+  // Ignore tiny compass noise, but allow accumulated real rotation to pass.
+  if(Number.isFinite(current)&&headingMotion.source===choice.source&&
+      Math.abs(headingDelta(current,choice.angle))<1.5)return;
+  headingMotion.target=choice.angle;headingMotion.source=choice.source;
+  if(!Number.isFinite(headingMotion.display)){
+    headingMotion.display=choice.angle;renderHeadingOnly();return;
+  }
+  if(headingMotion.frame===null)headingMotion.frame=requestAnimationFrame(animateHeading);
+}
+function acceptCompassReading(raw,now=Date.now()){
+  const angle=normalizeHeading(raw);if(angle===null)return;
+  // Reject isolated jumps typical of magnetic interference; a sustained turn is accepted.
+  const old=headingMotion.compass;
+  if(Number.isFinite(old)&&now-headingMotion.lastAccepted<300&&
+      Math.abs(headingDelta(old,angle))>75){
+    const pending=headingMotion.pendingJump;
+    if(!pending||now-pending.at>900||Math.abs(headingDelta(pending.angle,angle))>25){
+      headingMotion.pendingJump={angle,at:now};return;
+    }
+  }
+  headingMotion.pendingJump=null;
+  headingMotion.lastAccepted=now;
+  if(!Number.isFinite(old))headingMotion.compass=angle;
+  else {
+    const delta=headingDelta(old,angle);
+    // Circular smoothing avoids the 359°->0° jump and filters sensor jitter.
+    if(Math.abs(delta)>=1.5)
+      headingMotion.compass=normalizeHeading(old+delta*(Math.abs(delta)>25?.65:.40));
+  }
+  headingMotion.compassAt=now;
+  compassHeading=headingMotion.compass;
+  aimHeading();
+}
 const ZYRO_THEME_KEY='zyro360-appearance-v8';
 let zyroTheme='dark';
 // Pick Pocket is a foreground browser experiment, not an Android system lock.
@@ -191,15 +279,22 @@ async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${
 function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
 function showView(view){activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
 function updateGeo(oldOn,newOn){
-  if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;geolocationError='';renderMap();return;}
+  if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();geolocationError='';renderMap();return;}
   if(watchId!==null)return;
   if(!navigator.geolocation){geolocationError='GPS non disponibile su questo browser';toast(geolocationError,true);return;}
   geolocationError='';
   watchId=navigator.geolocation.watchPosition(async(p)=>{
-    // A navigation arrow is shown only for a known movement bearing or a supported compass heading.
-    const gpsSpeed=p.coords.speed;
-    gpsCourseActive=Number.isFinite(p.coords.heading)&&(!Number.isFinite(gpsSpeed)||gpsSpeed>=0.6);
-    lastCoords={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy,heading:gpsCourseActive?p.coords.heading:compassHeading};geolocationError='';
+    // GPS heading is a COURSE of travel, not the direction the phone faces.
+    // Use it only while moving reliably and if a fresh compass is unavailable.
+    const speed=p.coords.speed;
+    const gpsBearing=normalizeHeading(p.coords.heading);
+    gpsCourseActive=gpsBearing!==null&&Number.isFinite(speed)&&speed>=1.5&&
+      Number.isFinite(p.coords.accuracy)&&p.coords.accuracy<=50;
+    headingMotion.gps=gpsCourseActive?gpsBearing:null;
+    headingMotion.gpsAt=gpsCourseActive?Date.now():0;
+    lastCoords={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy,
+      heading:Number.isFinite(headingMotion.display)?headingMotion.display:null};
+    aimHeading();geolocationError='';
     const canShare=!!current?.me?.sharing || (current?.me?.alertKind==='pickpocket' && !!current.me.theftShare);
     if(canShare && Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
     renderHome();
@@ -300,7 +395,8 @@ function updateGlassHeading(pin,heading){
  const arrow=pin.querySelector('.zyro-gl-arrow');if(!arrow)return;
  const valid=typeof heading==='number'&&Number.isFinite(heading);
  pin.classList.toggle('zyro-heading-unknown',!valid);
- if(valid)arrow.style.transform=`rotate(${((heading%360)+360)%360}deg)`;
+ // The angle is intentionally NOT wrapped: a 359°->1° turn must move only 2°.
+ if(valid)arrow.style.transform=`rotate(${heading}deg)`;
 }
 function stableMarker(isSelf,heading,name,alert=false){
  const el=document.createElement('div');el.className=isSelf?'zyro-gl-location':'zyro-gl-contact';
@@ -483,19 +579,20 @@ function renderMap(){
  else if(stableMapState==='ready')mapStatus(geolocationError||'Posizione non attiva');
 }
 function onOrientation(e){
-  // Relative alpha alone is not a reliable North reference. Avoid displaying a false arrow.
-  const direction=Number.isFinite(e.webkitCompassHeading)?e.webkitCompassHeading:
-    (e.absolute===true&&Number.isFinite(e.alpha)?(360-e.alpha)%360:null);
-  if(direction===null)return;
-  compassHeading=direction;
-  if(lastCoords && !gpsCourseActive){
-    const previous=lastCoords.heading;
-    const delta=Number.isFinite(previous)?Math.abs(((direction-previous+540)%360)-180):360;
-    const now=Date.now();
-    if(delta>=3 && now-lastCompassUpdate>=130){
-      lastCompassUpdate=now;lastCoords.heading=direction;stableMap?.schedule();
-    }
+  // Do not use relative alpha as magnetic north: Android often reports it as unstable.
+  let raw=null;
+  if(Number.isFinite(e.webkitCompassHeading)){
+    if(Number.isFinite(e.webkitCompassAccuracy)&&e.webkitCompassAccuracy>45)return;
+    raw=e.webkitCompassHeading;
+  }else if((e.absolute===true||e.type==='deviceorientationabsolute')&&Number.isFinite(e.alpha)){
+    // Account for screen rotation (portrait/landscape), if exposed by the browser.
+    raw=360-e.alpha+(Number.isFinite(screen?.orientation?.angle)?screen.orientation.angle:0);
   }
+  if(raw===null)return;
+  const now=Date.now();
+  if(now-headingMotion.lastSensorAt<45)return; // Cap incoming sensor updates (~22 Hz).
+  headingMotion.lastSensorAt=now;
+  acceptCompassReading(raw,now);
 }
 async function orientationPermission(){
   try{
@@ -650,8 +747,8 @@ async function init(){
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=14.4-map-no-flash').catch(()=>{});
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=14.5-smooth-direction').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
