@@ -1,0 +1,117 @@
+/* ZYRO 360 v16.4 — NEO MAP / Strade futuristiche
+   Presentation-only. Keeps the existing real OpenStreetMap raster tiles,
+   server/authentication, GPS markers, map panning, pinch zoom and SOS unchanged.
+   No animation is applied to raster tiles or map panning surfaces. */
+
+/* Dark city: blue-night base with luminous cyan roads and legible road labels.
+   Only the color treatment changes: no images are duplicated or reloaded. */
+html[data-theme="dark"] .geo-immersive .live-map,
+html[data-theme="dark"] #zyroVectorMap {
+  background:#061826!important;
+}
+html[data-theme="dark"] #zyroVectorMap .zyro-raster-tiles {
+  background:#061826!important;
+}
+html[data-theme="dark"] #zyroVectorMap .zyro-raster-tile {
+  filter:grayscale(1) invert(.89) sepia(.38) saturate(2.1)
+         hue-rotate(158deg) brightness(.81) contrast(1.28)!important;
+}
+/* Fixed transparent city glow, below real GPS/people pins. The overlay does
+   not catch gestures, and streets continue to come from real map tiles. */
+html[data-theme="dark"] #zyroVectorMap .zyro-raster-tiles::after {
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse at 16% 24%,rgba(21,211,237,.10),transparent 57%),
+    radial-gradient(ellipse at 82% 66%,rgba(20,186,224,.065),transparent 62%);
+  box-shadow:inset 0 0 32px rgba(1,14,27,.28);
+  opacity:1;z-index:4;
+}
+/* Light city stays light: ice-blue glass with clean, precise real streets. */
+html[data-theme="light"] .geo-immersive .live-map,
+html[data-theme="light"] #zyroVectorMap,
+html[data-theme="light"] #zyroVectorMap .zyro-raster-tiles {
+  background:#deedf3!important;
+}
+html[data-theme="light"] #zyroVectorMap .zyro-raster-tile {
+  filter:grayscale(.62) sepia(.12) hue-rotate(144deg)
+         saturate(.78) brightness(1.035) contrast(1.12)!important;
+}
+html[data-theme="light"] #zyroVectorMap .zyro-raster-tiles::after {
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 15% 12%,rgba(89,216,220,.045),transparent 55%);
+  box-shadow:inset 0 0 18px rgba(21,70,85,.05);
+  opacity:1;z-index:4;
+}
+
+/* HUD / frosted controls. All native focus and click areas stay unchanged. */
+#liveMap .zyro-atlas-legend {
+  background:rgba(6,30,48,.78)!important;
+  color:#e4fcff!important;
+  border:1px solid rgba(86,218,234,.36)!important;
+  box-shadow:0 5px 18px rgba(0,20,34,.30),inset 0 1px 0 rgba(191,248,255,.08)!important;
+  -webkit-backdrop-filter:blur(9px) saturate(1.18);
+  backdrop-filter:blur(9px) saturate(1.18);
+}
+#liveMap #mapZoomControls {
+  background:rgba(6,30,48,.82)!important;
+  border:1px solid rgba(76,206,223,.44)!important;
+  border-radius:15px!important;
+  box-shadow:0 5px 20px rgba(0,18,35,.31),inset 0 1px 0 rgba(189,245,255,.09)!important;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+#liveMap #mapZoomControls button {
+  background:transparent!important;color:#ddfbff!important;
+}
+#liveMap #mapZoomControls button+button {
+  border-top:1px solid rgba(91,217,229,.23)!important;
+}
+#liveMap #mapZoomControls button:active {
+  background:rgba(34,172,195,.26)!important;
+}
+#liveMap #mapStatus {
+  color:#e4fcff!important;background:rgba(5,27,43,.82)!important;
+  border-color:rgba(77,205,222,.33)!important;
+  box-shadow:0 7px 20px rgba(0,15,28,.24)!important;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+#liveMap .map-attribution {
+  background:rgba(5,24,39,.78)!important;color:#c0e1e8!important;
+  border:1px solid rgba(105,182,199,.20);
+}
+#liveMap .map-attribution a {color:#d4f8ff!important}
+
+/* GPS remains an actual location, not an artificial point. Keep profile
+   photos and heading unaffected; make only the halo subtly luminous. */
+#liveMap .zyro-gl-location .zyro-gl-ring {
+  border-color:rgba(96,232,250,.82)!important;
+  box-shadow:0 0 0 5px rgba(58,215,236,.13),0 0 19px rgba(49,214,247,.25)!important;
+}
+#liveMap .zyro-raster-markers .zyro-gl-contact .zyro-atlas-initial {
+  box-shadow:0 0 0 5px rgba(64,222,202,.16),0 4px 14px rgba(0,26,39,.50)!important;
+}
+/* Preserve the stronger red SOS styling to distinguish genuine alerts. */
+#liveMap .zyro-raster-markers .zyro-gl-contact.zyro-contact-alert .zyro-atlas-initial {
+  box-shadow:0 0 0 6px rgba(250,75,105,.24),0 3px 15px rgba(37,5,20,.6)!important;
+}
+
+/* Theme-aware HUD cards, independent from map tile palette. */
+html[data-theme="light"] #liveMap .zyro-atlas-legend,
+html[data-theme="light"] #liveMap #mapStatus {
+  background:rgba(239,251,253,.90)!important;color:#164357!important;
+  border-color:rgba(73,159,175,.37)!important;
+  box-shadow:0 5px 18px rgba(18,67,82,.11)!important;
+}
+html[data-theme="light"] #liveMap #mapZoomControls {
+  background:rgba(240,252,253,.92)!important;
+  border-color:rgba(92,168,181,.43)!important;
+  box-shadow:0 5px 18px rgba(20,68,82,.12)!important;
+}
+html[data-theme="light"] #liveMap #mapZoomControls button {color:#16536a!important}
+html[data-theme="light"] #liveMap .map-attribution {
+  background:rgba(246,253,255,.9)!important;color:#446c79!important;
+}
+html[data-theme="light"] #liveMap .map-attribution a{color:#205b6c!important}
+@media(prefers-reduced-motion:reduce){
+  /* Respect reduced motion without changing map gestures or live position. */
+  #liveMap .zyro-gl-location .zyro-gl-ring{animation:none!important}
+}

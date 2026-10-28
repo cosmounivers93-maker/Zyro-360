@@ -1,6 +1,6 @@
 'use strict';
-const CACHE='zyro-360-v16.3-glass-balanced';
-const ASSETS=['/','/index.html','/style.css','/zyro-settings-compact.css','/zyro-glass-v162.css','/zyro-settings-balanced-v163.css','/app.js','/manifest.webmanifest','/assets/icon192.png','/assets/icon512.png'];
+const CACHE='zyro-360-v16.4-neo-map-streets';
+const ASSETS=['/','/index.html','/style.css','/zyro-settings-compact.css','/zyro-glass-v162.css','/zyro-settings-balanced-v163.css','/zyro-neo-map-v164.css','/app.js','/manifest.webmanifest','/assets/icon192.png','/assets/icon512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(async cache=>{await Promise.all(ASSETS.map(async url=>{try{await cache.add(url);}catch{/* Asset opzionale mancante: installa comunque l'aggiornamento. */}}));}));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
 self.addEventListener('fetch',event=>{
