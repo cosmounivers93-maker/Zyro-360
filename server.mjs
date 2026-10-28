@@ -6,16 +6,56 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer, WebSocket } from 'ws';
 import webpush from 'web-push';
+import pg from 'pg';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const dbPath = path.join(dataDir, 'zyro360.json');
 const initial = { users: {}, circles: {}, memberships: [], invites: {}, sessions: {}, alerts: {}, messages: {}, journeys: {}, checkins: {} };
-let db;
-try { db = { ...initial, ...JSON.parse(fs.readFileSync(dbPath, 'utf8')) }; }
-catch (err) { if (err.code !== 'ENOENT') throw err; db = structuredClone(initial); }
-db.journeys ||= {}; db.checkins ||= {}; db.adminAudit ||= []; db.userReports ||= [];
+// V15.5: PostgreSQL is the authoritative store. The previous local JSON file was
+// TEMPORARY on free Render and MUST NOT be mistaken for a durable database.
+// This bridge uses one JSONB snapshot for compatibility with existing features;
+// move to relational tables and proper transaction-level concurrency before scaling.
+let db = structuredClone(initial);
+let pgPool = null;
+let persistenceQueue = Promise.resolve();
+let persistenceFailure = null;
+let storageKind = 'temporary';
+const PG_SQL = 'INSERT INTO zyro360_state (id, payload, updated_at) VALUES (1, $1::jsonb, NOW()) ON CONFLICT (id) DO UPDATE SET payload=EXCLUDED.payload, updated_at=NOW()';
+async function initializeStorage() {
+  const url = String(process.env.DATABASE_URL || '').trim();
+  if (url) {
+    if (!/^postgres(?:ql)?:\/\//i.test(url)) throw new Error('DATABASE_URL deve essere un indirizzo PostgreSQL valido.');
+    pgPool = new pg.Pool({ connectionString:url, max:3, connectionTimeoutMillis:12000, idleTimeoutMillis:30000 });
+    pgPool.on('error',err=>console.error('[ZYRO storage] Connessione inattiva:',err.message));
+    await pgPool.query('CREATE TABLE IF NOT EXISTS zyro360_state (id INTEGER PRIMARY KEY CHECK (id=1), payload JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())');
+    const result = await pgPool.query('SELECT payload FROM zyro360_state WHERE id=1');
+    if (result.rowCount) {
+      const saved = result.rows[0].payload;
+      if (!saved || typeof saved !== 'object' || Array.isArray(saved) || !saved.users || !saved.sessions) {
+        throw new Error('Il database contiene un archivio ZYRO non valido: avvio bloccato per proteggere i profili.');
+      }
+      db = { ...initial, ...saved };
+      console.log(`[ZYRO storage] PostgreSQL: ${Object.keys(db.users).length} profili recuperati.`);
+    } else {
+      // IMPORTANT: The first deploy cannot read the PREVIOUS instance's
+      // ephemeral filesystem. Never promise to recover its users automatically.
+      db = structuredClone(initial);
+      await pgPool.query(PG_SQL,[JSON.stringify(db)]);
+      console.warn('[ZYRO storage] Database PostgreSQL nuovo. I vecchi profili su disco temporaneo NON sono stati migrati.');
+    }
+    storageKind = 'postgres';
+  } else {
+    if (process.env.ZYRO_REQUIRE_PERSISTENT_DB === 'true') {
+      throw new Error('Archivio persistente obbligatorio: configura DATABASE_URL prima del deploy.');
+    }
+    try { db = { ...initial, ...JSON.parse(fs.readFileSync(dbPath, 'utf8')) }; }
+    catch (err) { if (err.code !== 'ENOENT') throw err; db = structuredClone(initial); }
+    console.warn('[ZYRO storage] MODALITÀ TEMPORANEA: account e chat possono sparire a ogni deploy/riavvio.');
+  }
+  db.journeys ||= {}; db.checkins ||= {}; db.adminAudit ||= []; db.userReports ||= [];
+}
 // Admin identity is pinned by a server-side user ID, never by a browser flag or email address.
 const ADMIN_ID = String(process.env.ZYRO_ADMIN_USER_ID || '').trim();
 // Browser microphone tracks cannot survive a backend restart; do not claim audio is live.
@@ -43,7 +83,24 @@ const publicCheckin = (c,viewer) => c && (c.userId===viewer || (c.recipients||[]
 
 const cleanText = (s, max = 60) => String(s || '').trim().replace(/[\u0000-\u001F\u007F<>]/g, '').slice(0, max);
 const publicUser = u => ({ id: u.id, name: u.name, avatar: u.avatar || null });
-function save() { const tmp = `${dbPath}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(db), { mode: 0o600 }); fs.renameSync(tmp, dbPath); }
+function save() {
+  if (persistenceFailure) throw new Error('Database temporaneamente indisponibile: modifica non confermata.');
+  const snapshot = JSON.stringify(db);
+  if (pgPool) {
+    // Serialized, immutable snapshots avoid out-of-order writes. Each successful
+    // mutating HTTP response waits for all queued writes before acknowledging.
+    persistenceQueue = persistenceQueue.then(()=>pgPool.query(PG_SQL,[snapshot]));
+    persistenceQueue.catch(err=>{
+      persistenceFailure=err;
+      console.error('[ZYRO storage] Salvataggio PostgreSQL fallito:',err.message);
+    });
+    return;
+  }
+  const tmp = `${dbPath}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp,snapshot,{mode:0o600});
+  fs.renameSync(tmp,dbPath);
+}
+
 function passwordHash(p, salt) { return crypto.scryptSync(p, salt, 64).toString('hex'); }
 function verifyPassword(p, u) { const stored = Buffer.from(u.passwordHash, 'hex'); const calc = Buffer.from(passwordHash(p, u.salt), 'hex'); return stored.length === calc.length && crypto.timingSafeEqual(stored, calc); }
 function getCookie(req, key) { const raw = req.headers.cookie || ''; const part = raw.split(';').map(x => x.trim()).find(x => x.startsWith(`${key}=`)); return part ? decodeURIComponent(part.slice(key.length + 1)) : null; }
@@ -83,7 +140,7 @@ function stateFor(id) {
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
     startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (db.users[a.userId]?.sharing || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -102,6 +159,29 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '350kb' }));
+// Do not claim a successful profile/chat/admin mutation before PostgreSQL confirms the write.
+app.use((req,res,next)=>{
+  if (!pgPool || !['POST','PUT','PATCH','DELETE'].includes(req.method)) return next();
+  const originalSend=res.send.bind(res);
+  res.send=function(body){
+    res.send=originalSend;
+    if (res.statusCode>=400) return originalSend(body);
+    void persistenceQueue.then(()=>{
+      if (!res.writableEnded) originalSend(body);
+    },(err)=>{
+      console.error('[ZYRO storage] Risposta bloccata:',err.message);
+      if (res.writableEnded) return;
+      res.removeHeader('Set-Cookie');
+      res.removeHeader('ETag');
+      res.status(503).type('json');
+      originalSend(JSON.stringify({error:'Database non disponibile: modifica NON confermata. Riprova più tardi.'}));
+      // An in-memory state with uncommitted changes must not be served again.
+      setTimeout(()=>process.exit(1),100).unref();
+    });
+    return res;
+  };
+  next();
+});
 // Requests altering private information must originate from this origin (CSRF protection).
 app.use('/api', (req, res, next) => {
   if (['GET','HEAD','OPTIONS'].includes(req.method)) return next();
@@ -120,12 +200,25 @@ function limit(req, res, next) {
   if (curr.n > 25) return res.status(429).json({error:'Troppi tentativi. Riprova più tardi.'});
   next();
 }
-function requireAuth(req, res, next) { req.user = auth(req); if (!req.user) return res.status(401).json({ error:'Accedi per continuare.' }); if(req.user.bannedAt) return res.status(403).json({error:banNotice,banned:true}); next(); }
+function requireAuth(req, res, next) {
+  req.user=auth(req);
+  if (!req.user) return res.status(401).json({error:'Accedi per continuare.'});
+  if (req.user.bannedAt) return res.status(403).json({error:banNotice,banned:true});
+  // Refresh once after ~7 days of activity. A valid device stays signed in
+  // for up to 30 days since its most recent renewal, not forever.
+  const sid=getCookie(req,'cs_session'), session=sid && db.sessions[hash(sid)];
+  if (session && session.expiresAt-now() < 23*86400*1000) {
+    session.expiresAt=now()+SESSION_MAX_AGE;
+    setCookie(res,sid);
+    save();
+  }
+  next();
+}
 function requireAdmin(req,res,next){if(!isAdmin(req.user))return res.status(403).json({error:'Accesso riservato all’amministratore.'});next();}
 function adminPassword(req,res){if(!String(req.body?.password||'') || !verifyPassword(String(req.body.password),req.user)){res.status(403).json({error:'Conferma con la password del tuo account amministratore.'});return false;}return true;}
 function recordAction(kind,actor,target,detail=''){db.adminAudit.push({id:token(8),kind,by:actor,for:target,detail,at:now()});if(db.adminAudit.length>500)db.adminAudit.splice(0,db.adminAudit.length-500);}
 function auditLogin(req,user){ user.lastLoginIp=String(req.ip || '').slice(0,64);user.lastLoginAt=now(); }
-app.get('/api/health', (_, res) => res.json({ ok: true }));
+app.get('/api/health', (_, res) => res.json({ ok: true, persistentStorage: storageKind==='postgres' }));
 // Live tiles requested only by logged-in users. A modest in-memory cache protects the community tile service.
 // For a public production launch replace this best-effort upstream with a contracted map provider.
 const mapTileCache = new Map();
@@ -564,5 +657,14 @@ setInterval(()=>{
   for(const u of Object.values(db.users))if(u.lastLoginAt && u.lastLoginAt<t-30*86400e3 && u.lastLoginIp){delete u.lastLoginIp;changed=true;}
   if (changed) save();
 },3600000).unref();
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) server.listen(PORT, '0.0.0.0',()=>console.log(`Zyro 360: http://localhost:${PORT}`));
-export { app, server };
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  initializeStorage().then(()=>{
+    server.listen(PORT,'0.0.0.0',()=>console.log(`Zyro 360: http://localhost:${PORT} (${storageKind})`));
+  }).catch(err=>{
+    console.error('[ZYRO storage] AVVIO BLOCCATO:',err.message);
+    process.exitCode=1;
+    // Do not start the app with a blank DB if Postgres is unavailable.
+    if(pgPool) void pgPool.end().catch(()=>{});
+  });
+}
+export { app, server, initializeStorage };
