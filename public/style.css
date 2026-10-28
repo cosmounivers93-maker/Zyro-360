@@ -676,3 +676,101 @@ html[data-theme="light"] .geo-immersive .live-map{background:#e9f2f6!important}
    Avoid a second CSS transition that amplifies sensor jitter or wraps 359 to 0. */
 .zyro-gl-location .zyro-gl-arrow{transition:opacity .18s ease!important;}
 @media(prefers-reduced-motion:reduce){.zyro-gl-location .zyro-gl-arrow{transition:none!important;}}
+
+
+/* ZYRO 360 V14.6: accessible, consistent cards in both themes.
+   Scoped to Help, Pick Pocket and SOS recipients; the GPS map is unchanged. */
+.how-it-works,.pick-panel,.sos-recipient-panel{--z-panel-fg:#172e43;--z-panel-muted:#536d7f;--z-subpanel-bg:#f1f7f9;--z-subpanel-edge:#d6e7ed;--z-accent:#0c897d;--z-section-bg:#f6fafc;--z-status-bg:#e9f3f6}
+.how-it-works summary{border-radius:10px;line-height:1.52;min-height:53px;text-align:left}
+.how-it-works details[open] summary{color:#0c756e}
+.how-it-works summary span{flex:none;font-weight:900}
+.how-it-works .how-content{line-height:1.72}
+.how-it-works .how-content strong{color:#17475a}
+.how-it-works :is(summary,a):focus-visible,
+.pick-panel :is(select,button,input):focus-visible,
+.sos-recipient-panel :is(button,input):focus-visible{outline:3px solid #22c7af;outline-offset:3px}
+.pick-panel .pick-top{margin-bottom:18px}
+.pick-panel .pick-top h2,.sos-recipient-panel .panel-title h2{color:var(--z-panel-fg);line-height:1.32}
+.pick-panel .pick-top p:not(.eyebrow),.sos-recipient-panel .panel-title p:not(.eyebrow){color:var(--z-panel-muted);font-size:12px;line-height:1.6}
+.pick-panel .pick-settings{margin:0;display:grid;gap:12px}
+.pick-section,.sos-section{background:var(--z-section-bg);border:1px solid var(--z-subpanel-edge);border-radius:17px;padding:15px;min-width:0}
+.pick-section-heading,.sos-section-heading{display:flex;align-items:center;gap:11px;margin-bottom:14px;min-width:0}
+.pick-section-icon,.sos-section-icon{display:grid;place-items:center;width:36px;height:36px;flex:none;background:#ddf6f0;color:#087f70;border-radius:12px;font-size:20px;font-weight:800}
+.pick-section-heading strong,.sos-section-heading strong{display:block;font-size:14px;color:var(--z-panel-fg);line-height:1.3}
+.pick-section-heading small,.sos-section-heading small{display:block;color:var(--z-panel-muted);font-size:11px;line-height:1.5;margin-top:4px}
+.pick-select-line{font-size:12px;color:var(--z-panel-fg);font-weight:750;line-height:1.45}
+.pick-select-line select{min-height:45px;max-width:58%;width:auto;font-size:12px;color:var(--z-panel-fg);background:#fff;border-color:#b7d7dd;padding:10px 11px}
+.pick-check-line{margin-top:0;gap:12px;cursor:pointer;align-items:flex-start}
+.pick-check-line input,.recipient-line input,.pick-recipients input{flex:none;width:20px;height:20px;accent-color:#14bca0;cursor:pointer}
+.pick-check-line b,.pick-recipients label{color:var(--z-panel-fg);font-size:12px;line-height:1.5}
+.pick-check-line small{color:var(--z-panel-muted);font-size:11px;line-height:1.6;margin-top:5px}
+.pick-recipients{margin-top:12px;padding:13px;background:var(--z-subpanel-bg);border:1px solid var(--z-subpanel-edge)}
+.pick-recipients>p{font-size:12px;color:var(--z-panel-fg)}
+.pick-recipients .empty-contacts{color:var(--z-panel-muted);font-size:12px;line-height:1.55}
+.pick-control-section{margin-top:12px}
+.pick-status{margin:0 0 12px;background:var(--z-status-bg);color:#20465b;font-size:12px;line-height:1.6;border:1px solid #bcd7e1;padding:13px}
+.pick-panel.armed .pick-status{background:#ddfaf1;color:#096450;border-color:#58bfa2}
+.pick-panel.alarming .pick-status{background:#ffe5e9;color:#9b193a;border-color:#ee8ea1}
+.pick-panel .pick-control-section .btn{margin:0;min-height:47px;border-radius:13px}
+.pick-test{margin:13px auto 0;color:#116c87;font-size:12px;line-height:1.5;font-weight:700;padding:8px 5px;min-height:38px;text-decoration:underline;text-underline-offset:3px}
+.pick-limits{font-size:11px;color:var(--z-panel-muted);line-height:1.7;margin:16px 2px 0}
+.sos-kicker{margin:0 0 5px!important;font-size:10px!important;color:var(--z-accent)!important}
+.sos-section{margin:18px 0 14px}
+.sos-recipient-panel .recipient-grid{margin:0;gap:9px}
+.sos-recipient-panel .recipient-line{background:var(--z-subpanel-bg);border:1px solid var(--z-subpanel-edge);color:var(--z-panel-fg);line-height:1.5;min-height:52px;padding:12px 13px;border-radius:13px}
+.sos-recipient-panel .recipient-line:has(input:checked){border-color:#20a894;background:#e1f8f1}
+.sos-recipient-panel .recipient-grid>.setting-description{color:var(--z-panel-muted);font-size:12px;margin:0;line-height:1.65}
+.sos-recipient-panel #saveSOSRecipients{min-height:47px;border-radius:13px}
+.sos-recipient-panel .sos-push-note{margin-top:13px;padding:13px 14px;border:1px solid var(--z-subpanel-edge);border-radius:12px;background:var(--z-status-bg);color:#315469;font-size:11px;line-height:1.65}
+@media(max-width:420px){
+ .pick-section,.sos-section{padding:12px}
+ .pick-select-line{display:grid;gap:9px}
+ .pick-select-line select{max-width:100%;width:100%}
+ .pick-panel .pick-top{gap:10px}
+ .sos-recipient-panel .panel-title{gap:11px}
+}
+/* Dark mode: enforce legible contrast on native <details> and nested labels. */
+html[data-theme="dark"] .how-it-works,
+html[data-theme="dark"] .pick-panel,
+html[data-theme="dark"] .sos-recipient-panel{--z-panel-fg:#f1fbff;--z-panel-muted:#c0d6e3;--z-subpanel-bg:#17374d;--z-subpanel-edge:#376078;--z-accent:#5be6d2;--z-section-bg:#122e44;--z-status-bg:#1d3a51}
+html[data-theme="dark"] .how-it-works .how-heading h2,
+html[data-theme="dark"] .pick-panel .pick-top h2,
+html[data-theme="dark"] .sos-recipient-panel .panel-title h2{color:#f4fcff}
+html[data-theme="dark"] .how-it-works .how-heading>div>p:last-child,
+html[data-theme="dark"] .pick-panel .pick-top p:not(.eyebrow),
+html[data-theme="dark"] .sos-recipient-panel .panel-title p:not(.eyebrow){color:#c0d6e3}
+html[data-theme="dark"] .how-it-works details{background:#173248;border-color:#376078}
+html[data-theme="dark"] .how-it-works details summary{color:#f2fbff!important;background:#173248;font-weight:750}
+html[data-theme="dark"] .how-it-works details[open] summary{color:#76f4df!important}
+html[data-theme="dark"] .how-it-works details summary span{color:#63ecd7!important}
+html[data-theme="dark"] .how-it-works details .how-content{background:#10283c;color:#e0f1f8;border:1px solid #356077}
+html[data-theme="dark"] .how-it-works details .how-content :is(p,strong){color:#e0f1f8}
+html[data-theme="dark"] .how-it-works details .how-content a{color:#80f3e0;text-decoration:underline;text-underline-offset:3px}
+html[data-theme="dark"] .how-it-works .law-links a{background:#153c50;color:#c8fff1;border:1px solid #4a8595}
+html[data-theme="dark"] .how-it-works .how-caveat{color:#bbd5e0}
+html[data-theme="dark"] .pick-section,
+html[data-theme="dark"] .sos-section{background:#122e44;border-color:#376078}
+html[data-theme="dark"] .pick-section-icon,
+html[data-theme="dark"] .sos-section-icon{background:#174a52;color:#78f3db}
+html[data-theme="dark"] .pick-section-heading strong,
+html[data-theme="dark"] .sos-section-heading strong,
+html[data-theme="dark"] .pick-select-line,
+html[data-theme="dark"] .pick-check-line b,
+html[data-theme="dark"] .pick-recipients>p,
+html[data-theme="dark"] .pick-recipients label{color:#f0fbff}
+html[data-theme="dark"] .pick-section-heading small,
+html[data-theme="dark"] .sos-section-heading small,
+html[data-theme="dark"] .pick-check-line small,
+html[data-theme="dark"] .pick-limits,
+html[data-theme="dark"] .pick-recipients .empty-contacts{color:#bcd6e2}
+html[data-theme="dark"] .pick-select-line select{background:#17374d;color:#eefaff;border:1px solid #578097}
+html[data-theme="dark"] .pick-recipients{background:#17374d;border:1px solid #376078}
+html[data-theme="dark"] .pick-status{background:#1c4055;color:#e4f6ff;border:1px solid #47768b}
+html[data-theme="dark"] .pick-panel.armed .pick-status{background:#103e3c;color:#b5fff0;border-color:#2dbda0}
+html[data-theme="dark"] .pick-panel.alarming .pick-status{background:#512339;color:#ffdfeb;border-color:#ee7d98}
+html[data-theme="dark"] .pick-test{color:#77eada;font-weight:750;text-decoration-color:#77eada}
+html[data-theme="dark"] .sos-recipient-panel .recipient-line{background:#17374d;border-color:#376078;color:#eefbff}
+html[data-theme="dark"] .sos-recipient-panel .recipient-line:has(input:checked){background:#15515a;border-color:#40d5b5;color:#fff}
+html[data-theme="dark"] .sos-recipient-panel .recipient-grid>.setting-description{color:#d4e7ef}
+html[data-theme="dark"] .sos-recipient-panel .sos-push-note{background:#1b3c51;border-color:#49758b;color:#e0f2fa}
+html[data-theme="dark"] .sos-kicker{color:#78f1dc!important}

@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v14.5-smooth-direction">
+  <meta name="zyro-ui-build" content="v14.6-dark-legibility">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="/style.css?v=14.5-smooth-direction">
+  <link rel="stylesheet" href="/style.css?v=14.6-dark-legibility">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -95,16 +95,30 @@
       <section class="pick-panel" id="pickPanel">
         <div class="pick-top"><div class="pick-symbol">🛡</div><div><p class="eyebrow muted">ANTIFURTO SPERIMENTALE</p><h2>Modalità Pick Pocket</h2><p>Rileva uno strappo brusco con i sensori del telefono e prova ad avviare una sirena.</p></div></div>
         <div class="pick-settings" id="pickSettings">
-          <label class="pick-select-line"><span>Sensibilità ai movimenti</span><select id="pickSensitivity"><option value="normal">Normale (consigliata)</option><option value="high">Alta · più falsi allarmi</option></select></label>
-          <label class="pick-check-line"><input type="checkbox" id="pickNotify"><span><b>Avvisa i miei contatti se scatta l'allarme</b><small>Inoltra un avviso e il GPS solo alle persone che selezioni, se la connessione è disponibile.</small></span></label>
-          <div id="pickRecipients" class="pick-recipients hidden"><p>Scegli chi avvisare:</p><div id="pickRecipientsList"></div></div>
+          <div class="pick-section" aria-label="Sensibilità antifurto">
+            <div class="pick-section-heading"><span class="pick-section-icon" aria-hidden="true">◉</span><div><strong>Rilevamento</strong><small>Regola la risposta ai movimenti improvvisi.</small></div></div>
+            <label class="pick-select-line"><span>Sensibilità ai movimenti</span><select id="pickSensitivity"><option value="normal">Normale (consigliata)</option><option value="high">Alta · più falsi allarmi</option></select></label>
+          </div>
+          <div class="pick-section" aria-label="Avvisi antifurto">
+            <div class="pick-section-heading"><span class="pick-section-icon" aria-hidden="true">♧</span><div><strong>Avvisi ai contatti</strong><small>Decidi se informare le persone fidate.</small></div></div>
+            <label class="pick-check-line"><input type="checkbox" id="pickNotify"><span><b>Avvisa i miei contatti se scatta l'allarme</b><small>Invia un avviso e la posizione solo ai destinatari scelti, quando la connessione è disponibile.</small></span></label>
+            <div id="pickRecipients" class="pick-recipients hidden"><p>Scegli chi avvisare:</p><div id="pickRecipientsList"></div></div>
+          </div>
         </div>
-        <div class="pick-status" id="pickStatus">Protezione disattivata. Per attivarla lascia ZYRO 360 aperta e autorizza i sensori.</div>
-        <button id="pickArm" type="button" class="btn btn-dark btn-wide">Attiva Pick Pocket</button>
-        <button id="pickTest" type="button" class="pick-test">Ascolta la sirena (test locale, nessun avviso)</button>
-        <p class="pick-limits">Non blocca il sistema Android, non impedisce spegnimento o chiusura dell'app e non garantisce l'allarme con schermo spento. La sirena rispetta il volume del dispositivo. Uno strappo può essere confuso con un normale movimento.</p>
+        <div class="pick-section pick-control-section" aria-label="Attivazione antifurto">
+          <div class="pick-section-heading"><span class="pick-section-icon" aria-hidden="true">✓</span><div><strong>Stato della protezione</strong><small>Attivazione e test della sirena</small></div></div>
+          <div class="pick-status" id="pickStatus" role="status" aria-live="polite">Protezione disattivata. Per attivarla lascia ZYRO 360 aperta e autorizza i sensori.</div>
+          <button id="pickArm" type="button" class="btn btn-dark btn-wide">Attiva Pick Pocket</button>
+          <button id="pickTest" type="button" class="pick-test">Ascolta la sirena (test locale, nessun avviso)</button>
+        </div>
+        <p class="pick-limits">Questa funzione è sperimentale: non blocca Android, non impedisce lo spegnimento e può fermarsi a schermo spento. Rispetta il volume del dispositivo e può produrre falsi allarmi.</p>
       </section>
-      <section class="panel sos-recipient-panel"><div class="panel-title"><span class="panel-icon">🆘</span><div><h2>Destinatari SOS</h2><p>Scegli le persone da avvisare quando premi SOS. Non attiva la posizione.</p></div></div><div id="sosRecipientList" class="recipient-grid"></div><button id="saveSOSRecipients" class="btn btn-dark btn-wide" type="button">Salva destinatari SOS</button><p id="sosPushNote" class="setting-description"></p></section>
+      <section class="panel sos-recipient-panel" aria-labelledby="sosRecipientTitle">
+        <div class="panel-title"><span class="panel-icon">🆘</span><div><p class="eyebrow muted sos-kicker">AVVISO D'EMERGENZA</p><h2 id="sosRecipientTitle">Destinatari SOS</h2><p>Seleziona le persone da avvisare quando premi SOS. La condivisione della posizione si attiva separatamente.</p></div></div>
+        <div class="sos-section"><div class="sos-section-heading"><span class="sos-section-icon" aria-hidden="true">♧</span><div><strong>Persone da avvisare</strong><small>Solo i contatti che hai scelto riceveranno l'avviso.</small></div></div><div id="sosRecipientList" class="recipient-grid"></div></div>
+        <button id="saveSOSRecipients" class="btn btn-dark btn-wide" type="button">Salva destinatari SOS</button>
+        <p id="sosPushNote" class="setting-description sos-push-note" role="status"></p>
+      </section>
       <div id="activeAlerts" class="hidden"></div>
       <div class="section-head space-top"><div><h2>Le persone della tua cerchia</h2><p>Posizione e aggiornamenti condivisi</p></div></div>
       <div id="contactsList" class="contacts-list"></div>
@@ -181,6 +195,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=14.5-smooth-direction" defer></script>
+<script src="/app.js?v=14.6-dark-legibility" defer></script>
 </body>
 </html>
