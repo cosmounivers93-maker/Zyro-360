@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v16.6-neo-violet">
+  <meta name="zyro-ui-build" content="v16.7-neo-violet-full-ui">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
@@ -17,11 +17,12 @@
   <link rel="stylesheet" href="/zyro-neo-map-v164.css?v=16.4">
   <link rel="stylesheet" href="/zyro-neo-night-v165.css?v=16.5">
   <link rel="stylesheet" href="/zyro-neo-violet-v166.css?v=16.6">
+  <link rel="stylesheet" href="/zyro-neon-ui-v167.css?v=16.7">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
 <div id="authScreen" class="auth-shell">
-  <div class="auth-brand"><div class="brand-emblem">✦</div><span>ZYRO <b>360</b></span></div>
+  <div class="auth-brand"><div class="brand-emblem">Z</div><span>ZYRO <b>360</b></span></div>
   <main class="auth-card">
     <div class="auth-illustration"><div class="orb orb-a">♥</div><div class="orb orb-b">✦</div><div class="orb orb-c">✓</div><div class="orbit-ring"></div><div class="center-shield">✣</div></div>
     <p class="eyebrow">LA SICUREZZA È PIÙ BELLA INSIEME</p>
@@ -41,7 +42,7 @@
 
 <div id="appScreen" class="app-shell hidden">
   <header class="topbar">
-    <div class="brand"><div class="brand-emblem">✦</div><span>ZYRO <b>360</b></span></div>
+    <div class="brand"><div class="brand-emblem">Z</div><span>ZYRO <b>360</b></span></div>
     <div class="connection-pill"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">Connessione...</span></div>
   </header>
   <main class="container">
@@ -49,7 +50,7 @@
       <section class="geo-panel geo-immersive" aria-label="Mappa reale della tua posizione">
         <div id="liveMap" class="live-map" aria-label="Mappa interattiva. Trascina per spostarti, usa due dita per ingrandire.">
           <div id="zyroVectorMap" class="zyro-vector-map" aria-label="Cartografia mondiale interattiva di ZYRO 360"></div>
-          <div class="zyro-neo-night-overlay" aria-hidden="true"><div class="zyro-neo-night-mark">NEO MAP <small>VIOLET 16.6</small></div></div>
+          <div class="zyro-neo-night-overlay" aria-hidden="true"><div class="zyro-neo-night-mark">NEO MAP <small>VIOLET UI 16.7</small></div></div>
           <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button></div>
           <div class="zyro-atlas-legend" aria-label="Legenda GPS, cerchia e SOS"><span><i class="atlas-key-you"></i> Tu</span><span><i class="atlas-key-circle"></i> Cerchia</span><span><i class="atlas-key-sos"></i> SOS</span></div>
           <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
@@ -277,10 +278,10 @@
   </aside>
   <nav class="bottom-nav" aria-label="Navigazione principale">
     <button class="nav-item active" data-view="home" type="button"><span class="nav-icon">⌂</span><span>Home</span></button>
-    <button class="nav-item" data-view="circles" type="button"><span class="nav-icon">◎</span><span>Cerchie</span></button>
+    <button class="nav-item" data-view="circles" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 20v-2.2c0-1.5-1.3-2.8-2.8-2.8H5.8C4.3 15 3 16.3 3 17.8V20"/><circle cx="9.5" cy="8" r="3.2"/><path d="M19 20v-2.2c0-1.4-.8-2.4-2.3-2.7M16 5.3a3.2 3.2 0 0 1 0 6.2"/></svg></span><span>Cerchie</span></button>
     <button class="nav-item" data-view="modes" type="button"><span class="nav-icon nav-mode-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 6v5.7c0 5-3.3 8.2-8 9.8-4.7-1.6-8-4.8-8-9.8V6Z"/><path d="m9 12 2 2 4-4"/></svg></span><span>Modalità</span></button>
     <button class="nav-item" data-view="chats" type="button"><span class="nav-icon nav-chat-icon"><svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg></span><span>Chat</span></button>
-    <button class="nav-item" data-view="settings" type="button"><span class="nav-icon">⚙</span><span>Profilo</span></button>
+    <button class="nav-item" data-view="settings" type="button"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="7.5" r="3.6"/><path d="M4 21v-1.5c0-3.3 2.8-5.5 8-5.5s8 2.2 8 5.5V21"/></svg></span><span>Profilo</span></button>
   </nav>
 </div>
 <div id="theftOverlay" class="theft-overlay hidden" role="alertdialog" aria-labelledby="theftTitle" aria-modal="true">

@@ -1,0 +1,309 @@
+/* ZYRO 360 V16.7 | NEO VIOLET DESIGN SYSTEM
+   Carefully scoped, visual-only. Map raster, GPS, SOS delivery, chat and auth
+   continue to use the existing code. No fake map data or status indicators. */
+:root,
+html[data-theme="dark"],
+html[data-theme="light"]{
+  --neo-bg:#080b22;
+  --neo-surface:#111638;
+  --neo-deep:#080f29;
+  --neo-card:rgba(24,27,71,.92);
+  --neo-edge:rgba(149,106,255,.42);
+  --neo-purple:#ae62ff;
+  --neo-blue:#24a7ff;
+  --neo-cyan:#61deff;
+  --neo-pink:#ff54c5;
+  --neo-text:#f5f3ff;
+  --neo-muted:#afb7e2;
+  --neo-shadow:0 12px 36px rgba(2,4,31,.42);
+  --text:var(--neo-text);
+  --muted:var(--neo-muted);
+  --bg:var(--neo-bg);
+  --border:rgba(136,109,232,.30);
+  --navy:#0a0b2b;
+  --mint:#b97aff;
+  --mint-d:#b47eff;
+}
+html[data-theme="light"]{
+  --neo-bg:#131333;
+  --neo-surface:#1a204b;
+  --neo-deep:#111536;
+  --neo-card:rgba(34,35,87,.94);
+  --neo-muted:#c0c5e9;
+}
+html,body{background:var(--neo-bg)!important;color:var(--neo-text)!important;color-scheme:dark}
+body{background-image:radial-gradient(ellipse at 12% 2%,rgba(107,34,231,.19),transparent 36%),radial-gradient(ellipse at 85% 55%,rgba(23,72,166,.14),transparent 55%)!important;background-attachment:fixed!important}
+#appScreen{background:transparent!important;color:var(--neo-text)!important}
+#appScreen .container{background:transparent!important;color:var(--neo-text)!important}
+/* Brand and global chrome: reproduce the neon-purple Z identity without new assets. */
+#appScreen .topbar{
+  position:relative;z-index:32;height:70px!important;padding:0 17px!important;
+  background:linear-gradient(103deg,rgba(11,13,43,.98),rgba(15,21,58,.98) 65%,rgba(20,15,65,.99))!important;
+  border-bottom:1px solid rgba(139,88,254,.35)!important;
+  box-shadow:0 8px 26px rgba(5,5,32,.35),inset 0 -1px 0 rgba(64,150,255,.08)!important;
+}
+#appScreen .brand{font-size:14px;gap:12px;letter-spacing:1.05px;font-weight:850;color:#f7f6ff!important;white-space:nowrap}
+#appScreen .brand b{color:#57cfff!important;text-shadow:0 0 13px rgba(57,194,255,.40)}
+#appScreen .brand-emblem,
+.auth-brand .brand-emblem{
+  display:grid;place-items:center;width:43px;height:43px;
+  flex:none;color:#eecbff!important;font-size:30px!important;font-weight:1000;letter-spacing:-5px;
+  border:1px solid rgba(190,91,255,.80)!important;border-radius:14px!important;
+  background:linear-gradient(135deg,rgba(126,31,244,.60),rgba(11,25,97,.85) 58%,rgba(34,185,255,.28))!important;
+  text-shadow:-2px 1px 0 #8f39ff,2px 1px 0 #3cb7ff,0 0 12px rgba(167,67,255,.77);
+  box-shadow:0 0 16px rgba(128,60,255,.23),inset 0 1px 8px rgba(199,95,255,.18)!important;
+}
+#appScreen .connection-pill{
+  background:rgba(20,26,69,.75)!important;color:#e9faff!important;
+  border:1px solid rgba(89,173,246,.39)!important;border-radius:24px!important;
+  padding:9px 12px!important;min-height:38px;
+  box-shadow:inset 0 0 12px rgba(48,102,215,.13),0 0 16px rgba(82,61,221,.12)!important;
+  font-size:11px!important;letter-spacing:0!important;
+}
+#appScreen .connection-dot{background:#4cedb0!important;box-shadow:0 0 0 5px rgba(69,239,172,.10),0 0 13px rgba(54,250,170,.78)!important}
+/* Larger coherent navigation, while retaining 5 functional tabs. */
+#appScreen .bottom-nav{
+  box-sizing:border-box!important;height:82px!important;min-height:82px!important;
+  background:linear-gradient(135deg,rgba(13,16,55,.98),rgba(16,23,63,.96))!important;
+  border-top:1px solid rgba(107,92,225,.49)!important;
+  box-shadow:0 -8px 24px rgba(9,6,39,.3),inset 0 1px 0 rgba(92,167,255,.10)!important;
+  padding:8px 3px 8px!important;gap:0!important;z-index:45!important;
+}
+#appScreen .bottom-nav .nav-item{color:#abb6e1!important;font-size:10px!important;font-weight:650!important;gap:4px!important;padding:4px 1px!important;min-height:0!important;line-height:1.2!important}
+#appScreen .bottom-nav .nav-icon{height:29px!important;font-size:26px!important;line-height:1.08!important;filter:drop-shadow(0 1px 1px rgba(5,9,50,.3))}
+#appScreen .bottom-nav .nav-icon svg{width:26px!important;height:26px!important}
+#appScreen .bottom-nav .nav-item.active{color:#f2e5ff!important;text-shadow:0 0 12px rgba(157,81,255,.70)}
+#appScreen .bottom-nav .nav-item.active .nav-icon{color:#c284ff!important;filter:drop-shadow(0 0 6px rgba(185,92,255,.74))}
+#appScreen .bottom-nav .nav-item.active:before{top:auto!important;bottom:0!important;width:36px!important;height:3px!important;background:linear-gradient(90deg,#905dff,#51c8ff)!important;box-shadow:0 0 11px #9860ff!important;border-radius:8px!important}
+#appScreen .home-map-view{top:70px!important;bottom:82px!important}
+/* Home stays a genuine interactive raster map: no overlay intercepts gestures. */
+#homeView #liveMap{background:#0c0929!important}
+#homeView #liveMap .zyro-neo-night-overlay{pointer-events:none!important}
+#homeView #liveMap .zyro-neo-night-overlay:before{opacity:.70!important}
+#homeView #liveMap .zyro-neo-night-overlay:after{border-top-color:rgba(158,75,255,.55)!important;border-bottom-color:rgba(87,164,255,.26)!important;box-shadow:inset 0 12px 22px -18px rgba(203,81,255,.65),inset 0 -10px 20px -18px rgba(73,164,255,.38)!important}
+#homeView #liveMap .zyro-neo-night-mark{border-color:rgba(171,116,255,.66)!important;color:#f2e5ff!important;background:rgba(16,11,53,.87)!important;text-shadow:0 0 11px rgba(195,83,255,.7)!important;border-radius:15px!important;letter-spacing:.7px!important}
+#homeView #liveMap .zyro-neo-night-mark small{color:#a7b6ff!important}
+#homeView #liveMap .zyro-atlas-legend,
+#homeView #liveMap #mapZoomControls,
+#homeView #liveMap #mapStatus{
+ background:rgba(14,16,57,.82)!important;color:#f5f1ff!important;
+ border:1px solid rgba(157,100,255,.47)!important;border-radius:17px!important;
+ box-shadow:0 6px 22px rgba(6,4,31,.40),inset 0 1px 0 rgba(168,155,255,.19)!important;
+ -webkit-backdrop-filter:blur(11px) saturate(1.2);backdrop-filter:blur(11px) saturate(1.2);
+}
+#homeView #liveMap #mapZoomControls button{color:#eee4ff!important;font-weight:450!important}
+#homeView #liveMap .atlas-key-you{background:#a968ff!important}
+#homeView #liveMap .atlas-key-circle{background:#4dd6ff!important}
+#homeView #liveMap .atlas-key-sos{background:#ff64b9!important}
+#homeView #liveMap .zyro-gl-location .zyro-gl-ring{border-color:rgba(198,125,255,.94)!important;box-shadow:0 0 0 5px rgba(171,86,249,.15),0 0 21px rgba(171,77,255,.58)!important}
+#homeView #liveMap .zyro-raster-markers .zyro-gl-location .zyro-gl-core{border-color:#fbebff!important;box-shadow:0 0 0 3px rgba(173,92,255,.53),0 0 18px rgba(196,83,255,.53)!important}
+#homeView #liveMap .zyro-contact-alert .zyro-atlas-initial{box-shadow:0 0 0 5px rgba(255,72,131,.25),0 0 20px rgba(255,63,111,.55)!important}
+#homeView #liveMap .map-attribution{background:rgba(9,11,35,.75)!important;color:#bac3e8!important;border-color:rgba(147,99,250,.22)!important}
+#homeView #liveMap .map-attribution a{color:#c5dcff!important}
+/* Three large, distinct commands as on the concept. Red SOS remains unmistakable. */
+#homeView .zyro-command-row{
+  display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  background:linear-gradient(180deg,#0d1238,#0b0b28)!important;
+  border-top:1px solid rgba(144,90,242,.39)!important;
+  padding:10px 9px!important;gap:8px!important;
+}
+#homeView .zyro-command-btn{
+  box-sizing:border-box;min-width:0!important;height:89px!important;min-height:89px!important;
+  border-radius:19px!important;color:#f9f6ff!important;
+  display:flex!important;flex-direction:column!important;justify-content:center!important;align-items:center!important;
+  padding:7px 4px!important;gap:2px!important;
+  font-size:11px!important;line-height:1.06!important;text-align:center!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.19),0 4px 16px rgba(0,0,30,.27)!important;
+}
+#homeView .zyro-command-share{background:linear-gradient(140deg,#7317db,#361078 83%)!important;border:1px solid #a45bff!important;box-shadow:0 0 16px rgba(140,57,255,.22),inset 0 1px 0 rgba(235,162,255,.38)!important}
+#homeView .zyro-command-locate{background:linear-gradient(145deg,#035c9b,#071950 86%)!important;border:1px solid #25bafd!important;box-shadow:0 0 16px rgba(33,159,252,.18),inset 0 1px 0 rgba(116,211,255,.29)!important}
+#homeView .zyro-command-sos{background:linear-gradient(145deg,#a92875,#5a123d 87%)!important;border:1px solid #ff5cac!important;box-shadow:0 0 16px rgba(249,54,135,.22),inset 0 1px 0 rgba(255,176,209,.31)!important}
+#homeView .zyro-cmd-icon,#homeView .zyro-cmd-icon svg{width:25px!important;height:25px!important;flex:none!important}
+#homeView .zyro-command-share .zyro-cmd-icon{color:#edd5ff!important;filter:drop-shadow(0 0 5px #b55cff)}
+#homeView .zyro-command-locate .zyro-cmd-icon{color:#b5f2ff!important;filter:drop-shadow(0 0 5px #31afff)}
+#homeView .zyro-command-sos .zyro-cmd-icon{color:#ffe2f2!important;filter:drop-shadow(0 0 4px #fc64ae)}
+#homeView .zyro-command-btn .zyro-cmd-title{font-size:11px!important;font-weight:790!important;color:#fff!important;white-space:normal!important}
+#homeView .zyro-command-btn .zyro-cmd-state{font-size:9px!important;letter-spacing:1.1px!important;color:#dbcfff!important}
+#homeView .zyro-command-sos .zyro-cmd-state{color:#ffd4e9!important}
+#homeView .zyro-command-share input{accent-color:#ae65ff}
+#homeView .zyro-sos-status{background:rgba(45,12,52,.99)!important;border-top:1px solid rgba(255,95,153,.6)!important;color:#fff!important}
+/* All content screens: coherent neo-violet background, luminous restrained cards. */
+#appScreen .view:not(.home-map-view){color:var(--neo-text)!important}
+#appScreen .view:not(.home-map-view) :is(.page-heading h1,.profile-heading h1,.section-head h2,.panel-title h2,.chat-heading-row h2,.profile-photo-heading h2,.how-heading h2,.zyro-appearance-header h2){color:var(--neo-text)!important}
+#appScreen .view:not(.home-map-view) :is(.page-heading>p,.profile-heading>p,.setting-description,.panel-title p,.profile-photo-heading p,.profile-action small,.how-heading p:last-child,.zyro-appearance-header p){color:var(--neo-muted)!important}
+#appScreen .view:not(.home-map-view) :is(.panel,.stat-card,.circle-card,.contact-card,.profile-photo-editor,.zyro-appearance-panel,.chat-hub,.chat-room,.how-it-works,.pick-panel,.zyro-v15-panel){
+  background:linear-gradient(139deg,rgba(24,27,72,.94),rgba(12,18,53,.96))!important;
+  color:var(--neo-text)!important;border:1px solid rgba(137,108,241,.41)!important;
+  border-radius:21px!important;
+  box-shadow:0 11px 30px rgba(2,4,31,.28),inset 0 1px 0 rgba(145,142,252,.11)!important;
+}
+#appScreen .view:not(.home-map-view) :is(.eyebrow,.mini-overline){color:#bda1ff!important}
+#appScreen .view:not(.home-map-view) :is(.panel-icon,.stat-icon,.profile-photo-icon,.appearance-emblem,.how-icon){background:linear-gradient(145deg,#4821a1,#161e63)!important;border:1px solid rgba(185,89,255,.53)!important;color:#e4b3ff!important;box-shadow:0 0 17px rgba(130,52,225,.21)!important}
+#appScreen .view:not(.home-map-view) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,textarea){background:#11183a!important;color:#f5f2ff!important;border:1px solid rgba(151,115,236,.49)!important;border-radius:12px!important}
+#appScreen .view:not(.home-map-view) :is(input,select,textarea)::placeholder{color:#a2acd8!important}
+#appScreen .view:not(.home-map-view) :is(.btn,.profile-action,.zyro-theme-option){transition:filter .16s ease,box-shadow .16s ease,border-color .16s ease}
+#appScreen .view:not(.home-map-view) .btn-primary{background:linear-gradient(115deg,#9235f0,#5540c5)!important;color:#fff!important;border:1px solid #ba8aff!important;box-shadow:0 5px 17px rgba(116,61,224,.24)!important}
+#appScreen .view:not(.home-map-view) :is(.btn-outline,.btn-dark){background:rgba(45,38,103,.74)!important;color:#f1e9ff!important;border:1px solid rgba(161,111,255,.50)!important}
+#appScreen .view:not(.home-map-view) .btn-logout{background:#3b194c!important;color:#fff!important;border-color:#9a4e99!important}
+#appScreen .view:not(.home-map-view) .btn:active{filter:brightness(1.12)}
+/* Profile as close as responsive HTML allows to the provided reference. */
+#settingsView.zyro-profile-page{padding:8px 12px 100px!important;max-width:690px!important;margin:0 auto!important}
+#settingsView .profile-heading{padding:15px 0 21px!important;gap:4px 8px!important}
+#settingsView .profile-heading h1{font-size:clamp(26px,7.2vw,35px)!important;line-height:1.1!important;letter-spacing:-1.1px!important;margin:10px 0 7px!important;text-shadow:0 3px 24px rgba(156,86,255,.22)}
+#settingsView .profile-heading h1 span{color:#c274ff!important}
+#settingsView .profile-heading>p{font-size:12px!important;line-height:1.48!important}
+#settingsView .zyro-profile-more{
+  background:linear-gradient(130deg,rgba(61,30,124,.93),rgba(14,38,93,.88))!important;
+  border:1px solid rgba(169,94,255,.62)!important;color:#f6ecff!important;
+  border-radius:14px!important;min-height:39px!important;height:39px!important;
+  padding:5px 9px!important;box-shadow:0 0 17px rgba(119,49,227,.20),inset 0 1px 0 rgba(169,169,255,.10)!important;
+  gap:6px!important;
+}
+#settingsView .zyro-profile-more-label{font-size:11px!important;white-space:normal!important;text-align:left;max-width:109px!important;line-height:1.12!important}
+#settingsView .zyro-profile-more-dots{color:#c487ff!important;text-shadow:0 0 8px #a55dff}
+#settingsView .profile-identity-card{
+  padding:21px 15px!important;gap:13px!important;min-height:181px!important;
+  background:radial-gradient(circle at 4% 0%,rgba(134,35,254,.81),transparent 40%),radial-gradient(circle at 95% 100%,rgba(225,31,255,.34),transparent 39%),linear-gradient(125deg,#230d71,#0a214e 80%)!important;
+  border:1px solid rgba(187,92,255,.78)!important;border-radius:27px!important;
+  box-shadow:0 0 0 1px rgba(79,113,255,.22),0 0 26px rgba(115,43,251,.32),inset 0 1px 0 rgba(177,138,255,.20)!important;
+}
+#settingsView .profile-orbit{opacity:.7;box-shadow:0 0 0 26px rgba(147,79,255,.095),0 0 0 52px rgba(54,147,245,.085)!important}
+#settingsView .profile-avatar-wrap,#settingsView .profile-identity-card .profile-avatar{width:88px!important;height:88px!important}
+#settingsView .profile-identity-card .profile-avatar{border-radius:23px!important;border:2px solid rgba(213,132,255,.92)!important;background:linear-gradient(140deg,#271365,#1b2b79 70%)!important;color:#dcbbff!important;font-size:37px!important;box-shadow:0 0 18px rgba(167,81,255,.49),inset 0 0 20px rgba(162,73,255,.12)!important}
+#settingsView .profile-avatar-camera{background:linear-gradient(145deg,#502bc4,#1a3591)!important;border-color:#9e6dff!important;color:#fff!important}
+#settingsView .profile-id-caption{color:#cdb6ff!important;font-size:9px!important;letter-spacing:1.3px!important}
+#settingsView .verified-dot{background:#47ccff!important;color:#0b1741!important}
+#settingsView .profile-id-copy strong{font-size:clamp(18px,4.8vw,26px)!important;color:#fff!important;overflow-wrap:anywhere;line-height:1.2!important}
+#settingsView .profile-id-copy p{color:#b9c6f5!important;font-size:12px!important;overflow-wrap:anywhere;margin:0!important}
+#settingsView .zyro-profile-access-label{color:#f3e7ff!important;background:linear-gradient(90deg,rgba(122,24,244,.45),rgba(3,111,166,.35))!important;border:1px solid rgba(163,95,255,.76)!important;border-radius:30px!important;text-align:center;font-size:10px!important;box-shadow:0 0 10px rgba(134,48,235,.22)!important}
+#settingsView #profileStorageStatus{color:#bfc5eb!important;border-color:rgba(132,96,242,.33)!important;background:rgba(32,32,86,.54)!important;border-radius:13px!important}
+#settingsView .profile-photo-editor{padding:16px 13px!important}
+#settingsView .profile-photo-actions{gap:9px!important}
+#settingsView .profile-action{
+  background:linear-gradient(140deg,rgba(42,32,105,.92),rgba(15,33,78,.92))!important;
+  border:1px solid rgba(133,95,242,.46)!important;
+  box-shadow:inset 0 1px 0 rgba(149,114,255,.11)!important;color:#d8baff!important;
+  border-radius:17px!important;
+}
+#settingsView .profile-action span:not(.profile-chevron){color:#f5f2ff!important}
+#settingsView .profile-action b{color:#f7f4ff!important}
+#settingsView .profile-action small{color:#b9bde8!important}
+#settingsView :is(.photo-privacy-note,.appearance-note){color:#b1b9e4!important;background:rgba(33,29,82,.59)!important;border-color:rgba(127,106,217,.30)!important}
+/* Other screens: visually consistent circles/modes/chat, same functional DOM. */
+#circlesView .circle-list,#circlesView .contacts-list{gap:10px!important}
+#circlesView :is(.circle-top strong,.contact-name,.circle-member strong){color:#fff!important}
+#modesView .mode-heading{
+  background:radial-gradient(circle at 0% 0%,rgba(156,49,255,.42),transparent 46%),linear-gradient(122deg,#20115e,#101d4f)!important;
+  border:1px solid rgba(154,92,255,.66)!important;border-radius:24px!important;box-shadow:0 13px 28px rgba(31,7,87,.4)!important;
+}
+#modesView .mode-heading :is(h1,.eyebrow){color:#f5eaff!important}
+#modesView .pick-panel{border-color:rgba(159,90,255,.52)!important}
+#modesView .zyro-v15-panel :is(h2,strong){color:#fff!important}
+#chatsView .chat-hero{background:radial-gradient(circle at 100% 0%,rgba(140,49,255,.39),transparent 50%),linear-gradient(125deg,#201263,#09285b)!important;border-color:rgba(147,99,254,.65)!important}
+#chatsView :is(.chat-room,.chat-room-item,.chat-room-card){background:rgba(30,28,80,.92)!important;color:#fff!important;border-color:rgba(148,105,235,.45)!important;border-radius:16px!important}
+body.zyro-chat-full #chatConversation{background:#0b0f2d!important;color:#f3edff!important}
+body.zyro-chat-full #chatConversation .chat-header{background:linear-gradient(115deg,#2c1479,#15275a)!important}
+body.zyro-chat-full #chatConversation .chat-bubble{background:#1d2557!important;color:#f8f4ff!important;border-color:#6253b8!important}
+body.zyro-chat-full #chatConversation .chat-bubble.mine{background:linear-gradient(120deg,#5422a4,#3336a3)!important;color:white!important;border-color:#9d6dfd!important}
+body.zyro-chat-full #chatConversation :is(input,textarea){background:#18224f!important;color:#fff!important;border-color:#8a76e6!important}
+/* Balanced modal: preserves V16.3 geometry and the established close/back events. */
+#profileSettingsBackdrop.zyro-settings-backdrop{background:rgba(5,4,26,.61)!important;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#profileSettingsDrawer.zyro-settings-drawer,
+html[data-theme="dark"] #profileSettingsDrawer.zyro-settings-drawer,
+html[data-theme="light"] #profileSettingsDrawer.zyro-settings-drawer{
+  width:min(440px,92vw)!important;max-width:calc(100vw - 20px)!important;
+  top:var(--zyro-floating-top)!important;
+  padding:17px 15px 19px!important;border-radius:25px!important;
+  background:radial-gradient(circle at 100% 0%,rgba(112,40,247,.24),transparent 48%),linear-gradient(145deg,rgba(25,20,74,.96),rgba(12,20,58,.94))!important;
+  -webkit-backdrop-filter:blur(23px) saturate(1.22)!important;backdrop-filter:blur(23px) saturate(1.22)!important;
+  color:#faf6ff!important;border:1px solid rgba(171,107,255,.80)!important;
+  box-shadow:0 0 0 1px rgba(90,99,238,.25),0 19px 60px rgba(2,3,28,.60),0 0 23px rgba(132,49,248,.32),inset 0 1px 0 rgba(230,183,255,.18)!important;
+}
+#profileSettingsDrawer .zyro-drawer-top{border-color:rgba(139,103,241,.35)!important;padding-bottom:13px!important}
+#profileSettingsDrawer .zyro-drawer-top h2{color:#fff!important;font-size:22px!important;font-weight:800!important}
+#profileSettingsDrawer .mini-overline{color:#bda1ff!important}
+#profileSettingsDrawer .zyro-drawer-icon-button{
+  background:rgba(69,35,138,.74)!important;color:#f7efff!important;border:1px solid #ad69ff!important;
+  border-radius:50%!important;width:36px!important;height:36px!important;box-shadow:0 0 12px rgba(145,62,255,.23)!important;
+}
+#profileSettingsDrawer .zyro-drawer-menu{gap:8px!important;margin-top:13px!important}
+#profileSettingsDrawer .zyro-drawer-menu>button{
+  background:linear-gradient(120deg,rgba(39,33,102,.83),rgba(23,29,77,.81))!important;
+  color:#f8f5ff!important;border:1px solid rgba(136,112,245,.55)!important;
+  border-radius:16px!important;min-height:58px!important;
+  padding:8px 10px!important;box-shadow:inset 0 1px 0 rgba(156,135,255,.10)!important;
+}
+#profileSettingsDrawer .zyro-drawer-menu>button>span:nth-child(2){font-size:12px!important;color:#faf7ff!important}
+#profileSettingsDrawer .zyro-drawer-menu>button small{color:#b0badf!important;font-size:10px!important}
+#profileSettingsDrawer .zyro-drawer-menu>button>b{color:#ba8bff!important}
+#profileSettingsDrawer .zyro-settings-glyph{
+  color:#e9c7ff!important;background:linear-gradient(135deg,rgba(90,32,194,.89),rgba(34,39,115,.91))!important;
+  border:1px solid rgba(165,87,255,.58)!important;border-radius:12px!important;
+  width:35px!important;height:35px!important;font-size:21px!important;
+  box-shadow:0 0 12px rgba(131,58,247,.17)!important;
+}
+#profileSettingsDrawer .zyro-drawer-menu>button:nth-child(2) .zyro-settings-glyph,
+#profileSettingsDrawer .zyro-drawer-menu>button:nth-child(5) .zyro-settings-glyph{color:#a0eaff!important;background:linear-gradient(145deg,rgba(10,84,151,.88),rgba(24,39,117,.95))!important;border-color:rgba(72,170,255,.64)!important}
+#profileSettingsDrawer .zyro-drawer-menu>button:nth-child(4) .zyro-settings-glyph,
+#profileSettingsDrawer .zyro-drawer-menu>button:nth-child(6) .zyro-settings-glyph{color:#ffb3df!important;background:linear-gradient(145deg,rgba(127,23,111,.86),rgba(47,33,102,.95))!important;border-color:rgba(248,80,182,.62)!important}
+#profileSettingsDrawer .zyro-drawer-menu>button:nth-child(7) .zyro-settings-glyph{color:#96ffee!important;background:linear-gradient(140deg,rgba(6,106,103,.70),rgba(23,45,103,.96))!important;border-color:rgba(72,220,201,.62)!important}
+#profileSettingsDrawer .zyro-settings-back{color:#c6a1ff!important}
+#profileSettingsDrawer #settingsDrawerHeading{color:#fff!important}
+#profileSettingsDrawer :is(.panel,.zyro-v15-panel,.zyro-appearance-panel,.how-it-works){
+  color:#f8f4ff!important;background:rgba(24,27,76,.87)!important;border-color:rgba(133,102,234,.51)!important;
+  box-shadow:0 7px 22px rgba(3,4,31,.21)!important;
+}
+#profileSettingsDrawer :is(.panel-title h2,.how-heading h2,.zyro-appearance-header h2,.zyro-v15-heading h2){color:#fbfaff!important}
+#profileSettingsDrawer :is(.setting-description,.how-content,.zyro-v15-note,.zyro-v15-heading p,.appearance-note){color:#c4c6e6!important}
+#profileSettingsDrawer :is(input:not([type="checkbox"]),select,textarea){background:#111638!important;color:#f5f1ff!important;border:1px solid rgba(161,120,255,.44)!important}
+#profileSettingsDrawer :is(.zyro-v15-mic,.zyro-v15-destination,.how-content){background:rgba(29,35,85,.93)!important;color:#f9f5ff!important;border-color:#5745a7!important}
+#profileSettingsDrawer #premiumStatus{color:#e0fff5!important;background:rgba(23,96,75,.54)!important;border:1px solid #55dcb4!important}
+/* Touch access & accessible contrast. No endless map tile animations. */
+#appScreen :is(.nav-item,.zyro-command-btn,.zyro-drawer-menu>button,.profile-action):focus-visible{
+  outline:2px solid #e4b8ff!important;outline-offset:2px!important;
+}
+@media(max-width:360px){
+  #appScreen .brand{font-size:12px!important;gap:8px!important}
+  #appScreen .brand-emblem{width:37px!important;height:37px!important}
+  #appScreen .connection-pill{padding:7px 8px!important}
+  #homeView .zyro-command-row{padding:7px 6px!important;gap:6px!important}
+  #homeView .zyro-command-btn{height:85px!important;min-height:85px!important;border-radius:15px!important}
+  #homeView .zyro-command-btn .zyro-cmd-title{font-size:10px!important}
+  #settingsView .profile-heading h1{font-size:26px!important}
+  #settingsView .profile-identity-card{padding:15px 10px!important;gap:9px!important}
+  #settingsView .profile-avatar-wrap,#settingsView .profile-identity-card .profile-avatar{width:76px!important;height:76px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  #appScreen :is(.zyro-profile-more,.zyro-command-btn,.bottom-nav .nav-item){transition:none!important}
+}
+/* Login/registration also inherit the same brand identity; no auth logic changes. */
+#authScreen.auth-shell{
+  color:#f7f2ff!important;
+  background:radial-gradient(ellipse at 12% 0%,rgba(124,30,242,.33),transparent 45%),radial-gradient(ellipse at 95% 70%,rgba(45,84,242,.25),transparent 46%),#090c28!important;
+}
+#authScreen .auth-brand{color:#f5f4ff!important;font-weight:900!important;gap:13px!important;font-size:17px!important}
+#authScreen .auth-brand b{color:#51c8ff!important}
+#authScreen .auth-card{
+  background:linear-gradient(145deg,rgba(31,25,87,.96),rgba(15,22,62,.97))!important;
+  border:1px solid rgba(166,105,250,.62)!important;border-radius:26px!important;
+  color:#f7f3ff!important;box-shadow:0 0 24px rgba(117,42,255,.25),0 20px 55px rgba(2,2,27,.6)!important;
+}
+#authScreen .auth-card h1{color:#fff!important}
+#authScreen .auth-card h1 span{color:#d48aff!important}
+#authScreen :is(.auth-copy,.auth-note,.tiny-auth){color:#bdc1e6!important}
+#authScreen .auth-card .eyebrow{color:#bf9dff!important}
+#authScreen .auth-tabs{background:rgba(15,21,57,.92)!important;border:1px solid #4b4087!important}
+#authScreen .auth-tab{color:#afb8e3!important}
+#authScreen .auth-tab.active{background:linear-gradient(120deg,#7434d8,#2c41a9)!important;color:#fff!important;box-shadow:0 0 12px rgba(146,65,238,.21)!important}
+#authScreen .auth-card .field span{color:#e5dbff!important}
+#authScreen .auth-card .field input{background:#10173e!important;color:#f8f4ff!important;border:1px solid rgba(149,111,245,.65)!important;border-radius:12px!important}
+#authScreen .auth-card .btn-primary{background:linear-gradient(110deg,#8b39f5,#4758bf)!important;border:1px solid #a98aff!important;color:white!important}
+#authScreen .center-shield{background:linear-gradient(135deg,#7f30f1,#3545c8)!important;box-shadow:0 0 22px rgba(124,53,255,.4)!important}
+#authScreen .orbit-ring{border-color:rgba(164,99,255,.55)!important}
+/* Small-screen legibility, without changing the map gesture surface. */
+@media(max-width:450px){
+  #homeView .zyro-command-btn .zyro-cmd-title{font-size:11.5px!important;line-height:1.14!important}
+  #appScreen .bottom-nav .nav-item{font-size:10.5px!important}
+}
+#toast.toast:not(.error){background:rgba(28,22,85,.97)!important;color:#f3f1ff!important;border:1px solid #855ef3!important;box-shadow:0 12px 35px rgba(5,5,39,.5)!important}
+#audioDock.audio-dock{background:rgba(21,24,76,.96)!important;color:#fff!important;border:1px solid rgba(133,103,246,.61)!important}
