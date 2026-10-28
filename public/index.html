@@ -4,14 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v13.0-google-maps">
+  <meta name="zyro-ui-build" content="v14.1-custom-A">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="/style.css?v=13.0-google-maps">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="/style.css?v=14.1-custom-A">
   <title>Zyro 360 — la tua cerchia</title>
+  <link rel="stylesheet" href="/zyro-map-v14.css?v=14.1-A">
 </head>
 <body>
 <div id="authScreen" class="auth-shell">
@@ -42,14 +44,14 @@
     <section id="homeView" class="view home-map-view">
       <section class="geo-panel geo-immersive" aria-label="Mappa reale della tua posizione">
         <div id="liveMap" class="live-map" aria-label="Mappa interattiva. Trascina per spostarti, usa due dita per ingrandire.">
-          <div id="zyroVectorMap" class="zyro-vector-map" aria-label="Google Maps interattiva di ZYRO 360"></div>
+          <div id="zyroVectorMap" class="zyro-vector-map" aria-label="Cartografia mondiale interattiva di ZYRO 360"></div>
           <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button></div>
-          <div class="map-top-label"><span class="map-live-dot"></span><span>ZYRO · GOOGLE MAPS</span><span class="zyro-map-pill">MONDO · LIVE</span></div>
-          <div class="zyro-map-brand" aria-hidden="true"><span class="zyro-map-orb">✦</span><span>ZYRO 360 · GOOGLE MAPS</span></div>
+          <div class="map-top-label"><span class="map-live-dot"></span><span>ZYRO · MAPPA PERSONALIZZATA</span><span class="zyro-map-pill">MONDO · LIVE</span></div>
+          <div class="zyro-map-brand" aria-hidden="true"><span class="zyro-map-orb">✦</span><span>ZYRO 360 · CUSTOM MAP</span></div>
           <div class="zyro-atlas-legend" aria-label="Legenda GPS, cerchia e SOS"><span><i class="atlas-key-you"></i> Tu</span><span><i class="atlas-key-circle"></i> Cerchia</span><span><i class="atlas-key-sos"></i> SOS</span></div>
           <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
-          <div id="mapUnavailable" class="map-unavailable hidden" role="alert"><strong>Cartografia non disponibile</strong><span id="mapFailureText">Controlla la connessione e riprova.</span><div class="map-recovery-actions"><button type="button" id="mapRetry">Riprova</button><a id="mapOpenGoogle" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer">Apri Google Maps</a></div></div>
-          
+          <div id="mapUnavailable" class="map-unavailable hidden" role="alert"><strong>Cartografia non disponibile</strong><span id="mapFailureText">Controlla la connessione e riprova.</span><div class="map-recovery-actions"><button type="button" id="mapRetry">Riprova</button><a id="mapOpenGoogle" href="https://www.openstreetmap.org/" target="_blank" rel="noopener noreferrer">Apri OpenStreetMap</a></div></div>
+          <div id="mapAttribution" class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a id="mapSourceCredit" href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">© OpenFreeMap</a></div>
         </div>
         <div class="zyro-command-row" role="group" aria-label="Azioni rapide di ZYRO 360">
           <label class="zyro-command-btn zyro-command-share" for="shareToggle" title="Attiva o disattiva la condivisione GPS con le tue cerchie">
@@ -183,6 +185,7 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=13.0-google-maps" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/maplibre-gl@5.6.1/dist/maplibre-gl.js" defer></script>
+<script src="/app.js?v=14.1-custom-A" defer></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='zyro-360-v13-google-maps';
+const CACHE='zyro-360-v14.1-map-custom-A';
 const ASSETS=['/','/index.html','/style.css','/app.js','/manifest.webmanifest','/assets/icon192.png','/assets/icon512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
