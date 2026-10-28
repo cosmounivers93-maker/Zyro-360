@@ -81,7 +81,7 @@ app.use((req, res, next) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.set('Permissions-Policy', 'geolocation=(self), microphone=(self), camera=(self)');
-  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com; img-src 'self' data: https://tile.openstreetmap.org https://tile.openstreetmap.fr https://unpkg.com; connect-src 'self' ws: wss:; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
+  res.set('Content-Security-Policy', "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' https://unpkg.com 'unsafe-inline'; img-src 'self' data: blob: https://tile.openstreetmap.org https://tiles.openfreemap.org https://unpkg.com; connect-src 'self' https://tiles.openfreemap.org https://unpkg.com ws: wss:; worker-src 'self' blob:; font-src 'self' data: https://tiles.openfreemap.org; media-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'");
   res.set('Cache-Control', req.path.startsWith('/api/') ? 'no-store' : 'no-cache');
   next();
 });
