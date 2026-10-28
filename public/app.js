@@ -268,13 +268,53 @@ function renderChatRooms(){
   $('chatRooms').querySelectorAll('.chat-room').forEach(b=>b.addEventListener('click',()=>openChat(b.dataset.typ,b.dataset.id)));
   $('chatInviteNow')?.addEventListener('click',()=>showView('circles'));
 }
-function openChat(type,id){chatRoom={type,id};showView('chats');$('chatsView').classList.add('is-conversation');$('chatConversation').classList.remove('hidden');const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);$('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';$('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · membri della cerchia':'Chat privata · solo voi due';loadChat().catch(e=>toast(e.message,true));}
-async function loadChat(){
+// ZYRO 360 V15.3: full-screen chat and paginated history without deleting older messages.
+let chatHistory={room:'',messages:[],nextBefore:null};
+function closeChat(){
+  chatRoom=null;
+  chatHistory={room:'',messages:[],nextBefore:null};
+  $('chatConversation').classList.add('hidden');
+  $('chatsView').classList.remove('is-conversation');
+  document.body.classList.remove('zyro-chat-full');
+}
+function openChat(type,id){
+  closeChat();
+  chatRoom={type,id};
+  chatHistory={room:`${type}:${id}`,messages:[],nextBefore:null};
+  showView('chats');
+  $('chatsView').classList.add('is-conversation');
+  $('chatConversation').classList.remove('hidden');
+  document.body.classList.add('zyro-chat-full');
+  const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);
+  $('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';
+  $('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · accesso riservato':'Chat privata · non cifrata end-to-end';
+  $('chatMessages').innerHTML='<p class="chat-empty">Caricamento messaggi…</p>';
+  loadChat().catch(e=>toast(e.message,true));
+}
+function renderChatHistory({stickToBottom=false,preserveTop=false}={}){
+  const node=$('chatMessages');
+  const oldHeight=node.scrollHeight,oldTop=node.scrollTop;
+  const bubbles=chatHistory.messages.map(m=>`<article class="chat-bubble ${m.from===current.me.id?'mine':''}"><small>${escapeHtml(m.name)} · ${new Date(m.at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small>${m.text?`<p>${escapeHtml(m.text)}</p>`:''}${m.image?`<img loading="lazy" src="${m.image}" alt="Foto nella conversazione">`:''}</article>`).join('');
+  node.innerHTML=(chatHistory.nextBefore!==null?'<button type="button" id="chatOlder" class="chat-older">↑ Carica messaggi precedenti</button>':'')+(bubbles||'<p class="chat-empty">Nessun messaggio. Inizia tu la conversazione!</p>');
+  $('chatOlder')?.addEventListener('click',()=>loadChat(true).catch(e=>toast(e.message,true)));
+  if(stickToBottom) node.scrollTop=node.scrollHeight;
+  else if(preserveTop)node.scrollTop=oldTop+node.scrollHeight-oldHeight;
+  else node.scrollTop=oldTop;
+}
+async function loadChat(older=false){
   const r=chatRoom;if(!r||!current)return;
-  const response=await api(`/api/chat/${encodeURIComponent(r.type)}/${encodeURIComponent(r.id)}`);
-  if(chatRoom!==r)return;
-  const node=$('chatMessages');node.innerHTML=response.messages.length?response.messages.map(m=>`<article class="chat-bubble ${m.from===current.me.id?'mine':''}"><small>${escapeHtml(m.name)} · ${new Date(m.at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}</small>${m.text?`<p>${escapeHtml(m.text)}</p>`:''}${m.image?`<img loading="lazy" src="${m.image}" alt="Foto nella conversazione">`:''}</article>`).join(''):'<p class="chat-empty">Nessun messaggio. Inizia tu la conversazione!</p>';
-  node.scrollTop=node.scrollHeight;
+  const roomKey=`${r.type}:${r.id}`;
+  if(older && (chatHistory.room!==roomKey||chatHistory.nextBefore===null))return;
+  const before=older?`?before=${chatHistory.nextBefore}`:'';
+  const node=$('chatMessages');
+  const wasNearBottom=!older && (node.scrollHeight-node.scrollTop-node.clientHeight<105 || chatHistory.messages.length===0);
+  const response=await api(`/api/chat/${encodeURIComponent(r.type)}/${encodeURIComponent(r.id)}${before}`);
+  if(chatRoom!==r||chatHistory.room!==roomKey)return;
+  const byId=new Map(chatHistory.messages.map(m=>[m.id,m]));
+  for(const m of response.messages)byId.set(m.id,m);
+  chatHistory.messages=[...byId.values()].sort((a,b)=>a.at-b.at || a.id.localeCompare(b.id));
+  if(older||chatHistory.messages.length===response.messages.length)chatHistory.nextBefore=response.nextBefore;
+  renderChatHistory({stickToBottom:wasNearBottom&&!older,preserveTop:older});
 }
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
@@ -304,7 +344,7 @@ async function sendPushTest(){
     toast(result.notice||'Test inviato.',result.accepted===0);
   }finally{button.disabled=false;}
 }
-function showView(view){activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
+function showView(view){if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();geolocationError='';renderMap();return;}
   if(watchId!==null)return;
@@ -850,7 +890,7 @@ async function init(){
   $('avatarRemove').addEventListener('click',()=>action(async()=>{await post('/api/profile/avatar',{avatar:null});await refresh();toast('Foto profilo rimossa.');}));
   document.querySelectorAll('[data-chat-filter]').forEach(b=>b.addEventListener('click',()=>{chatCategory=b.dataset.chatFilter;document.querySelectorAll('[data-chat-filter]').forEach(t=>{const on=t===b;t.classList.toggle('active',on);t.setAttribute('aria-pressed',String(on));});renderChatRooms();}));
   $('chatSearch').addEventListener('input',e=>{chatSearch=e.target.value.trim();renderChatRooms();});
-  $('chatClose').addEventListener('click',()=>{chatRoom=null;$('chatConversation').classList.add('hidden');$('chatsView').classList.remove('is-conversation');});
+  $('chatClose').addEventListener('click',closeChat);
   $('chatForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const text=$('chatText').value.trim();if(!text&&!chatPhotoData)return;await sendChat(text,chatPhotoData);});});
   $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));

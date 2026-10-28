@@ -907,3 +907,103 @@ html[data-theme="light"] .zyro-raster-markers .zyro-gl-contact .zyro-atlas-conta
 .zyro-push-test-select{display:block;width:100%;min-height:45px;border:1px solid rgba(106,158,177,.4);background:var(--surface,#fff);color:var(--text,#16344a);border-radius:12px;padding:9px 11px;font:inherit}
 html[data-theme="dark"] .zyro-push-test-select{background:#162d47;color:#eaf6fc;border-color:rgba(155,209,227,.4)}
 .zyro-push-test button:disabled{opacity:.5;cursor:not-allowed}
+
+
+/* ══════════════════════════════════════════════════════════════
+   ZYRO 360 V15.3 — full-screen messages, anchored compose, subtle
+   glass-lagoon chat wallpaper (CSS only; no network assets).
+   ══════════════════════════════════════════════════════════════ */
+body.zyro-chat-full{overflow:hidden!important;overscroll-behavior:none}
+body.zyro-chat-full .bottom-nav{display:none!important}
+body.zyro-chat-full .toast{z-index:180;bottom:max(20px,env(safe-area-inset-bottom))}
+body.zyro-chat-full #chatConversation{
+  position:fixed!important;inset:0!important;z-index:110!important;
+  margin:0!important;padding:0!important;max-width:none!important;width:100%!important;
+  height:100dvh!important;min-height:0!important;border:0!important;border-radius:0!important;
+  box-shadow:none!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;
+  background:#e9f7f5;
+}
+body.zyro-chat-full #chatConversation .chat-header{
+  flex:0 0 auto;min-height:79px;padding:calc(15px + env(safe-area-inset-top)) 19px 14px;
+  background:linear-gradient(125deg,#0c2239 0%,#0e4156 66%,#176e72 105%);
+  color:#fff;border-bottom:1px solid #ffffff23;box-shadow:0 4px 18px #061e3140;
+  position:relative;z-index:2;
+}
+body.zyro-chat-full #chatTitle{font-size:19px;letter-spacing:-.3px}
+body.zyro-chat-full #chatSubtitle{font-size:11px;color:#c5e9e7}
+body.zyro-chat-full #chatClose{
+  flex:none;width:44px;height:44px;display:grid;place-items:center;
+  background:#ffffff22;border:1px solid #ffffff34;border-radius:15px;font-size:27px;line-height:1;
+}
+body.zyro-chat-full #chatConversation .chat-messages{
+  flex:1 1 auto;min-height:0;height:auto!important;max-height:none!important;
+  position:relative;overscroll-behavior:contain;overflow-x:hidden;overflow-y:auto;
+  padding:22px max(15px,calc((100% - 780px)/2)) 19px;gap:12px;
+  background-color:#e4f4f1;
+  background-image:
+    radial-gradient(circle at 14px 14px,#269d9a12 1.1px,transparent 1.5px),
+    radial-gradient(ellipse at 12% 16%,#b6ebe6 0%,transparent 58%),
+    radial-gradient(ellipse at 82% 87%,#bbdceb 0%,transparent 60%),
+    linear-gradient(145deg,#eaf8f4,#e0edf3 70%,#dcf4eb);
+  background-size:30px 30px,auto,auto,auto;
+  scrollbar-width:thin;scrollbar-color:#5fa3a580 transparent;
+  -webkit-overflow-scrolling:touch;
+}
+body.zyro-chat-full .chat-bubble{
+  max-width:min(85%,610px);padding:12px 14px;
+  box-shadow:0 5px 18px #15344d14;border:1px solid #d6e6e6;
+  background:#fffefa;font-size:14px;line-height:1.5;
+}
+body.zyro-chat-full .chat-bubble.mine{
+  background:linear-gradient(150deg,#d2f8ed,#c5f3e9);border-color:#afe5d7;
+  box-shadow:0 5px 18px #117b6315;
+}
+body.zyro-chat-full .chat-bubble small{font-size:10px;color:#5e818b;margin-bottom:6px;font-weight:600}
+body.zyro-chat-full .chat-bubble p{line-height:1.55}
+body.zyro-chat-full .chat-bubble img{width:min(280px,100%);border-radius:12px}
+body.zyro-chat-full .chat-empty{font-size:14px;color:#527789;text-shadow:0 1px #fff7}
+body.zyro-chat-full .chat-older{
+  align-self:center;border:1px solid #9ed5cf;background:#ffffffd9;
+  border-radius:999px;padding:10px 17px;color:#0b7775;font-weight:750;font-size:12px;
+  box-shadow:0 4px 15px #0e52601a;margin:4px auto 9px;
+}
+body.zyro-chat-full #chatConversation .quick-messages{
+  flex:0 0 auto;background:#f5fbfaf4;border-top:1px solid #cbe3e1;
+  padding:9px 12px;gap:8px;scrollbar-width:none;
+}
+body.zyro-chat-full .quick-messages button{font-size:12px;padding:9px 13px}
+body.zyro-chat-full #chatConversation .chat-compose{
+  flex:0 0 auto;min-height:68px;padding:10px 12px max(10px,env(safe-area-inset-bottom));
+  background:#fafdfe;border-top:1px solid #cbe4e4;gap:9px;
+}
+body.zyro-chat-full #chatText{
+  font-size:16px;min-height:44px;padding:11px 14px;border-radius:17px;
+  color:#16394a;background:white;border:1px solid #bed5dc;
+}
+body.zyro-chat-full .chat-photo-label{width:44px;height:44px;border-radius:14px}
+body.zyro-chat-full #chatSend{height:44px;min-width:61px;font-size:13px;border-radius:14px;font-weight:800}
+body.zyro-chat-full #chatPendingPhoto:not(:empty){flex:0 0 auto;background:#fafdfe;color:#43637a;padding:4px 15px 10px;font-size:12px}
+body.zyro-chat-full #chatPendingPhoto:empty{display:none}
+body.zyro-chat-full #chatsView>.chat-security-note{display:none}
+@media(max-width:490px){
+  body.zyro-chat-full #chatConversation .chat-header{padding-left:16px;padding-right:16px}
+  body.zyro-chat-full #chatConversation .chat-messages{padding:17px 12px}
+  body.zyro-chat-full #chatConversation .chat-compose{padding-left:8px;padding-right:8px;gap:6px}
+}
+html[data-theme="dark"] body.zyro-chat-full #chatConversation{background:#071c2d}
+html[data-theme="dark"] body.zyro-chat-full #chatConversation .chat-messages{
+  background-color:#081d30;
+  background-image:
+    radial-gradient(circle at 14px 14px,#4ae9cc0e 1px,transparent 1.5px),
+    radial-gradient(ellipse at 10% 20%,#155b5b55 0%,transparent 58%),
+    radial-gradient(ellipse at 90% 90%,#1a3d6455 0%,transparent 60%),
+    linear-gradient(155deg,#081c2e,#0c263b 72%,#0a3037);
+}
+html[data-theme="dark"] body.zyro-chat-full .chat-bubble{background:#173a50;border-color:#2a5465;color:#ebf8fb}
+html[data-theme="dark"] body.zyro-chat-full .chat-bubble.mine{background:linear-gradient(140deg,#175c5a,#146d64);border-color:#328878}
+html[data-theme="dark"] body.zyro-chat-full .chat-bubble small{color:#a5d0d4}
+html[data-theme="dark"] body.zyro-chat-full #chatConversation .quick-messages,
+html[data-theme="dark"] body.zyro-chat-full #chatConversation .chat-compose,
+html[data-theme="dark"] body.zyro-chat-full #chatPendingPhoto:not(:empty){background:#0b2538;border-color:#255566}
+html[data-theme="dark"] body.zyro-chat-full #chatText{background:#123349;border-color:#2b6370;color:#ecfafa}
+html[data-theme="dark"] body.zyro-chat-full .chat-older{background:#113d50;color:#baf7e8;border-color:#2f807a}

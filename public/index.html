@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v15.1-avatar-map">
+  <meta name="zyro-ui-build" content="v15.3-chat-fullscreen">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="/style.css?v=15.0-journeys-premium-prototype">
+  <link rel="stylesheet" href="/style.css?v=15.3-chat">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -171,7 +171,7 @@
         <div id="chatRooms" class="chat-rooms" aria-live="polite"></div>
         <div class="chat-private-footnote"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1"/></svg><span>Le conversazioni sono riservate ai membri autorizzati.</span></div>
       </section>
-      <div id="chatConversation" class="panel chat-conversation hidden"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatClose" class="chat-close" aria-label="Chiudi conversazione">✕</button></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
+      <div id="chatConversation" class="panel chat-conversation hidden" role="dialog" aria-modal="true" aria-label="Conversazione"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatClose" class="chat-close" aria-label="Torna alle conversazioni">←</button></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" enterkeyhint="send" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
       <p class="small-disclaimer chat-security-note">Questa versione non usa crittografia end-to-end. Non condividere informazioni particolarmente sensibili.</p>
     </section>
 
@@ -238,6 +238,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=15.0-journeys-premium-prototype" defer></script>
+<script src="/app.js?v=15.3-chat" defer></script>
 </body>
 </html>
