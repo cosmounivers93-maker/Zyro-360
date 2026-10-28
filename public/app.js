@@ -278,7 +278,32 @@ async function loadChat(){
 }
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
-function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
+function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';renderPushTestContacts();}
+function renderPushTestContacts(){
+  const select=$('pushTestRecipient'), button=$('pushTestButton');
+  if(!select||!button)return;
+  const previous=select.value, contacts=uniqueContacts();
+  const signature=contacts.map(x=>x.id+'|'+x.name).join(';');
+  if(select.dataset.signature!==signature){
+    select.dataset.signature=signature;
+    select.replaceChildren();
+    if(!contacts.length){const option=document.createElement('option');option.value='';option.textContent='Nessun contatto nella cerchia';select.append(option);}
+    else for(const u of contacts){const option=document.createElement('option');option.value=u.id;option.textContent=u.name;select.append(option);}
+    if(contacts.some(c=>c.id===previous))select.value=previous;
+  }
+  select.disabled=!contacts.length||!current?.pushEnabled;
+  button.disabled=!contacts.length||!current?.pushEnabled;
+}
+async function sendPushTest(){
+  const recipientId=$('pushTestRecipient').value;
+  if(!recipientId)throw Error('Scegli prima un contatto nella tua cerchia.');
+  const button=$('pushTestButton');button.disabled=true;
+  try{
+    const result=await post('/api/push/test',{recipientId});
+    $('pushTestStatus').textContent=result.notice||'Invio di prova completato.';
+    toast(result.notice||'Test inviato.',result.accepted===0);
+  }finally{button.disabled=false;}
+}
 function showView(view){activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();geolocationError='';renderMap();return;}
@@ -830,9 +855,10 @@ async function init(){
   $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
   $('pushButton').addEventListener('click',()=>action(enablePush));
+  $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=15.1-profile-map-pins').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=15.2-push-test').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});

@@ -199,7 +199,16 @@
         </div>
         <p class="appearance-note">Il tema rimane selezionato su questo dispositivo, anche dopo aver chiuso l'app. La mappa usa dati geografici reali.</p>
       </section>
-      <div class="panel"><div class="panel-title"><span class="panel-icon">♧</span><div><h2>Avvisi SOS</h2><p>Ricevi notifiche se una persona della tua cerchia chiede aiuto</p></div></div><button id="pushButton" class="btn btn-dark btn-wide" type="button">Attiva notifiche</button><p id="pushStatus" class="setting-description">Le notifiche dipendono dal supporto del browser e dalle impostazioni del dispositivo.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon">♧</span><div><h2>Avvisi SOS</h2><p>Ricevi notifiche se una persona della tua cerchia chiede aiuto</p></div></div><button id="pushButton" class="btn btn-dark btn-wide" type="button">Attiva notifiche</button><p id="pushStatus" class="setting-description">Le notifiche dipendono dal supporto del browser e dalle impostazioni del dispositivo.</p>
+        <div class="zyro-push-test" aria-label="Notifica non di emergenza">
+          <strong>🔔 Prova notifiche con un contatto</strong>
+          <p>Invia un semplice avviso di verifica. Non avvia SOS, non invia la posizione e non apre il microfono.</p>
+          <label for="pushTestRecipient">Scegli chi deve riceverlo</label>
+          <select id="pushTestRecipient" class="zyro-push-test-select" aria-label="Destinatario della notifica di prova"><option value="">Nessun contatto nella cerchia</option></select>
+          <button id="pushTestButton" class="btn btn-outline btn-wide" type="button">Invia notifica di prova</button>
+          <p id="pushTestStatus" class="setting-description" role="status" aria-live="polite">Richiede due account collegati in una cerchia e le notifiche abilitate sul telefono destinatario.</p>
+        </div>
+      </div>
       <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento.</p></div>
       <div class="panel"><div class="panel-title"><span class="panel-icon warm">☏</span><div><h2>Numeri di emergenza</h2><p>In Italia e nell'UE il numero unico è 112</p></div></div><a href="tel:112" class="btn btn-outline btn-wide">Chiama il 112</a></div>
       <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
