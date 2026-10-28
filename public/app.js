@@ -509,25 +509,26 @@ class ZyroNativeMap {
 // ZYRO MAP V9: independent, authored cartographic design on real OSM vector data.
 // Geometry/labels originate from OpenFreeMap (OpenMapTiles schema); no simulated roads.
 function zyroMapStyle(theme='dark'){
-  // ZYRO ATLAS • A fully authored visual language, using actual worldwide OSM geometry.
-  // Dark palette is inspired by the user's reference: deep indigo, blue-violet haze, clear streets.
+  // ZYRO NOCTIS: a quiet, two-dimensional city atlas inspired by the supplied
+  // midnight-blue/violet map reference. Real worldwide OSM geometry only.
+  // Vivid cyan, yellow and pink belong to actual people/alerts, never road geometry.
   const dark=theme!=='light';
   const c=dark?{
-    ground:'#172447',land:'#1a2b50',district:'#20335b',garden:'#194456',forest:'#164452',
-    water:'#112d52',waterline:'#2a6b90',block:'#2e4166',blockOutline:'#43567a',roof:'#36496e',
-    service:'#354970',local:'#42587c',arterial:'#5975a1',main:'#83adca',express:'#3bbec8',
-    rail:'#4a648a',foot:'#417c87',glow:'#36ced1',roadCasing:'#172647',
-    label:'#d8e7ff',small:'#a5bcdc',place:'#f6f8ff',halo:'#1b2a4d',parkLabel:'#76ddc3',
-    admin:'#556d91',poi:'#77d5d4'
+    ground:'#172348',land:'#192650',district:'#202b54',garden:'#293b5d',forest:'#253e59',
+    water:'#112344',waterline:'#344c76',block:'#24345b',blockOutline:'#304166',roof:'#334368',
+    service:'#27345d',local:'#31406b',arterial:'#3b4b77',main:'#445784',express:'#536a98',
+    rail:'#45547b',foot:'#33446c',roadCasing:'#142244',
+    label:'#a7b4d1',small:'#8092ba',place:'#e6ebfa',halo:'#192650',parkLabel:'#8aaeb2',
+    admin:'#526286',poi:'#a7b6d7'
   }:{
-    ground:'#e6f0f8',land:'#eef4f9',district:'#dce8f3',garden:'#bdebdc',forest:'#adddce',
-    water:'#bbdfe9',waterline:'#75b8ca',block:'#d1dfea',blockOutline:'#b0c5d8',roof:'#bdd2e2',
-    service:'#ffffff',local:'#f9ffff',arterial:'#a9d3e2',main:'#66b2c3',express:'#28a6a7',
-    rail:'#9db9c9',foot:'#79baa9',glow:'#5bd2c8',roadCasing:'#b9d0de',
-    label:'#3a5875',small:'#54728d',place:'#183653',halo:'#f4f8fc',parkLabel:'#207b68',
-    admin:'#91adbf',poi:'#0e988a'
+    ground:'#e7eef5',land:'#e6eef6',district:'#dfe5f1',garden:'#d5e7e1',forest:'#cce4de',
+    water:'#c9e2ec',waterline:'#9bbecf',block:'#d2dae8',blockOutline:'#b5c3d7',roof:'#c5d1df',
+    service:'#e9edf5',local:'#c1cee1',arterial:'#a2b3d2',main:'#879fc2',express:'#7694b9',
+    rail:'#9baec4',foot:'#adc3d0',roadCasing:'#d3dce9',
+    label:'#566886',small:'#687994',place:'#28466d',halo:'#e8f0f7',parkLabel:'#577e78',
+    admin:'#95a5bc',poi:'#5f8696'
   };
-  const S='atlas', layers=[];
+  const S='atlas',layers=[];
   const z=(...stops)=>['interpolate',['linear'],['zoom'],...stops];
   const cls=(...names)=>['in',['get','class'],['literal',names]];
   const road=['match',['get','class'],
@@ -538,40 +539,38 @@ function zyroMapStyle(theme='dark'){
   const layer=(id,type,sourceLayer,options={})=>layers.push({id,type,...(sourceLayer?{source:S,'source-layer':sourceLayer}:{}),...options});
   const labelName=['coalesce',['get','name:latin'],['get','name:en'],['get','name'],''];
   layer('atlas-ground','background',null,{paint:{'background-color':c.ground}});
-  layer('atlas-land','fill','landcover',{paint:{'fill-color':c.land,'fill-opacity':.90}});
-  layer('atlas-districts','fill','landuse',{filter:cls('residential','commercial','industrial'),paint:{'fill-color':c.district,'fill-opacity':.65}});
-  layer('atlas-forests','fill','landcover',{filter:cls('wood','forest','scrub','grass'),paint:{'fill-color':c.forest,'fill-opacity':.9}});
-  layer('atlas-gardens','fill','landuse',{filter:cls('park','grass','recreation_ground','garden','cemetery','allotments'),paint:{'fill-color':c.garden,'fill-opacity':.85}});
-  layer('atlas-parks','fill','park',{paint:{'fill-color':c.garden,'fill-opacity':.86}});
+  layer('atlas-land','fill','landcover',{paint:{'fill-color':c.land,'fill-opacity':.72}});
+  layer('atlas-districts','fill','landuse',{filter:cls('residential','commercial','industrial'),paint:{'fill-color':c.district,'fill-opacity':.58}});
+  layer('atlas-forests','fill','landcover',{filter:cls('wood','forest','scrub','grass'),paint:{'fill-color':c.forest,'fill-opacity':.66}});
+  layer('atlas-gardens','fill','landuse',{filter:cls('park','grass','recreation_ground','garden','cemetery','allotments'),paint:{'fill-color':c.garden,'fill-opacity':.70}});
+  layer('atlas-parks','fill','park',{paint:{'fill-color':c.garden,'fill-opacity':.72}});
   layer('atlas-water','fill','water',{paint:{'fill-color':c.water,'fill-opacity':1}});
-  layer('atlas-rivers','line','waterway',{paint:{'line-color':c.waterline,'line-width':z(7,.3,14,1.3,18,2.6),'line-opacity':.62}});
-  layer('atlas-shoreline','line','water',{paint:{'line-color':c.waterline,'line-width':z(4,.25,12,1,18,2),'line-opacity':.50}});
-  layer('atlas-boundaries','line','boundary',{minzoom:3,maxzoom:12,paint:{'line-color':c.admin,'line-width':z(3,.5,10,1),'line-dasharray':[2,2],'line-opacity':.45}});
-  layer('atlas-rail','line','transportation',{filter:cls('rail','transit'),minzoom:11,paint:{'line-color':c.rail,'line-width':z(11,.5,17,2.5),'line-dasharray':[2,1.4],'line-opacity':.77}});
-  layer('atlas-building-shadow','fill','building',{minzoom:12,paint:{'fill-color':dark?'#111d3b':'#a9c2d0','fill-opacity':z(12,.2,15,.8)}});
-  layer('atlas-building-footprint','fill','building',{minzoom:13,paint:{'fill-color':c.block,'fill-outline-color':c.blockOutline,'fill-opacity':z(13,.3,16,.9)}});
-  // Muted streets in the reference image; brighter teal highlights are reserved for arterial roads.
+  layer('atlas-rivers','line','waterway',{paint:{'line-color':c.waterline,'line-width':z(7,.3,14,.8,18,1.6),'line-opacity':.58}});
+  layer('atlas-shoreline','line','water',{paint:{'line-color':c.waterline,'line-width':z(4,.2,12,.65,18,1.1),'line-opacity':.32}});
+  layer('atlas-boundaries','line','boundary',{minzoom:3,maxzoom:12,paint:{'line-color':c.admin,'line-width':z(3,.35,10,.8),'line-dasharray':[2,2],'line-opacity':.37}});
+  layer('atlas-rail','line','transportation',{filter:cls('rail','transit'),minzoom:11,paint:{'line-color':c.rail,'line-width':z(11,.4,17,1.5),'line-dasharray':[2,1.6],'line-opacity':.62}});
+  layer('atlas-building-shadow','fill','building',{minzoom:12,paint:{'fill-color':dark?'#17264b':'#bfc9da','fill-opacity':z(12,.12,15,.60)}});
+  layer('atlas-building-footprint','fill','building',{minzoom:13,paint:{'fill-color':c.block,'fill-outline-color':c.blockOutline,'fill-opacity':z(13,.26,16,.83)}});
   const navigable=['!',cls('rail','path','track','pedestrian','footway','steps')];
-  layer('atlas-road-casing','line','transportation',{filter:navigable,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':c.roadCasing,'line-width':z(8,1.4,12,3.4,15,6.4,18,16),'line-opacity':.83}});
-  layer('atlas-road-surface','line','transportation',{filter:navigable,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':road,'line-width':z(8,.65,12,1.6,15,3.4,18,10.5),'line-opacity':dark?.84:.98}});
-  layer('atlas-walking-paths','line','transportation',{filter:cls('path','track','pedestrian','footway','steps'),minzoom:13,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':c.foot,'line-width':z(13,.5,18,1.8),'line-dasharray':[1.2,2],'line-opacity':.65}});
-  layer('atlas-arterial-halo','line','transportation',{filter:cls('motorway','trunk','primary'),minzoom:10,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':c.glow,'line-width':z(10,1,13,3,16,7,19,16),'line-blur':6,'line-opacity':dark?.26:.14}});
-  layer('atlas-arterial-surface','line','transportation',{filter:cls('motorway','trunk','primary'),minzoom:7,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':road,'line-width':z(7,.7,12,2,15,4.4,18,9.5),'line-opacity':.97}});
-  layer('atlas-arterial-core','line','transportation',{filter:cls('motorway','trunk'),minzoom:13,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':dark?'#93e8e0':'#d7ffff','line-width':z(13,.3,17,1.3,19,2.5),'line-opacity':.58}});
-  // Optional authentic 3D, available in supported cities and activated with 3D button.
+  // Unobtrusive streets. No neon glow, bright cores or lighting effects.
+  layer('atlas-road-casing','line','transportation',{filter:navigable,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':c.roadCasing,'line-width':z(8,.9,12,2.7,15,5.5,18,13),'line-opacity':.70}});
+  layer('atlas-road-surface','line','transportation',{filter:navigable,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':road,'line-width':z(8,.55,12,1.5,15,3.3,18,8.5),'line-opacity':dark?.88:.94}});
+  layer('atlas-walking-paths','line','transportation',{filter:cls('path','track','pedestrian','footway','steps'),minzoom:13,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':c.foot,'line-width':z(13,.35,18,1.2),'line-dasharray':[1.2,2],'line-opacity':.55}});
+  layer('atlas-arterial-surface','line','transportation',{filter:cls('motorway','trunk','primary'),minzoom:7,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':road,'line-width':z(7,.6,12,1.8,15,4,18,9),'line-opacity':.90}});
+  // 3D remains available for older users but OFF by default, matching the reference's flat look.
   layer('atlas-buildings-3d','fill-extrusion','building',{minzoom:14,layout:{'visibility':'none'},paint:{
-     'fill-extrusion-color':c.roof,
-     'fill-extrusion-height':['coalesce',['to-number',['get','render_height']],['to-number',['get','height']],8],
-     'fill-extrusion-base':['coalesce',['to-number',['get','render_min_height']],['to-number',['get','min_height']],0],
-     'fill-extrusion-opacity':dark?.72:.49
+    'fill-extrusion-color':c.roof,
+    'fill-extrusion-height':['coalesce',['to-number',['get','render_height']],['to-number',['get','height']],8],
+    'fill-extrusion-base':['coalesce',['to-number',['get','render_min_height']],['to-number',['get','min_height']],0],
+    'fill-extrusion-opacity':dark?.57:.42
   }});
-  const label=(id,src,filter,minzoom,size,color,extra={})=>layer(id,'symbol',src,{minzoom,...(filter?{filter}:{}),layout:{'text-field':labelName,'text-font':['Noto Sans Regular'],'text-size':size,'text-max-width':12,'text-letter-spacing':.025,...extra},paint:{'text-color':color,'text-halo-color':c.halo,'text-halo-width':dark?1.9:1.5,'text-halo-blur':.25}});
-  label('atlas-city-names','place',cls('city','town'),3,z(3,12,7,15,12,19),c.place,{'text-max-width':16});
-  label('atlas-suburb-names','place',cls('suburb','quarter','neighbourhood','village'),11,z(11,10,16,12),c.label);
-  label('atlas-road-names','transportation_name',null,13,z(13,9,16,11,19,13),c.small,{'symbol-placement':'line','symbol-spacing':235,'text-max-angle':33});
+  const label=(id,src,filter,minzoom,size,color,extra={})=>layer(id,'symbol',src,{minzoom,...(filter?{filter}:{}),layout:{'text-field':labelName,'text-font':['Noto Sans Regular'],'text-size':size,'text-max-width':12,'text-letter-spacing':.012,...extra},paint:{'text-color':color,'text-halo-color':c.halo,'text-halo-width':dark?1.15:1.3,'text-halo-blur':.35}});
+  label('atlas-city-names','place',cls('city','town'),3,z(3,11,7,14,12,17),c.place,{'text-max-width':16});
+  label('atlas-suburb-names','place',cls('suburb','quarter','neighbourhood','village'),11,z(11,9,16,11),c.label);
+  label('atlas-road-names','transportation_name',null,13,z(13,9,16,10,19,12),c.small,{'symbol-placement':'line','symbol-spacing':260,'text-max-angle':30});
   label('atlas-park-names','park',null,14,z(14,9,17,11),c.parkLabel);
   label('atlas-poi-names','poi',cls('hospital','school','university'),15,z(15,9,18,11),c.poi);
-  return {version:8,name:`ZYRO ATLAS WORLD • ${dark?'NOTTE':'GIORNO'}`,
+  return {version:8,name:`ZYRO NOCTIS • ${dark?'NOTTE':'GIORNO'}`,
     glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
     sources:{atlas:{type:'vector',url:'https://tiles.openfreemap.org/planet/latest',attribution:'© OpenFreeMap · © OpenStreetMap contributors'}},layers};
 }
@@ -601,9 +600,10 @@ function applyZyroTheme(next,persist=true){
   try{zyroVectorMap.setStyle(zyroStyleUrl());}catch(e){vectorStyleIsChanging=false;console.warn('Tema mappa non disponibile',e);}
  }else if(zyroMap){zyroMap.queueDraw();}
 }
-function zyroVectorMarker(isMe,heading,person){
+function zyroVectorMarker(isMe,heading,person,tone='mint'){
   const el=document.createElement('div');
   el.className=isMe?'zyro-gl-location':'zyro-gl-contact';
+  if(!isMe)el.dataset.tone=tone;
   if(isMe){
     const ring=document.createElement('span'),arrow=document.createElement('span'),core=document.createElement('span');
     ring.className='zyro-gl-ring';arrow.className='zyro-gl-arrow';core.className='zyro-gl-core';
@@ -624,13 +624,13 @@ function syncZyroVector(){
   if(!zyroVectorMap||!current)return;
   const people=uniqueContacts().filter(u=>u.location&&Number.isFinite(Number(u.location.lat))&&Number.isFinite(Number(u.location.lon)));
   const wanted=new Set();
-  const points=people.map(u=>({id:'contact:'+u.id,lon:Number(u.location.lon),lat:Number(u.location.lat),heading:null,name:u.name,alert:!!u.sos}));
+  const points=people.map(u=>({id:'contact:'+u.id,lon:Number(u.location.lon),lat:Number(u.location.lat),heading:null,name:u.name,alert:!!u.sos,tone:['mint','amber','pink','blue'][[...String(u.id)].reduce((n,ch)=>n+ch.charCodeAt(0),0)%4]}));
   if(lastCoords)points.push({id:'me',lon:Number(lastCoords.lon),lat:Number(lastCoords.lat),heading:lastCoords.heading,name:'Tu'});
   for(const p of points){
     if(Math.abs(p.lat)>85||Math.abs(p.lon)>180)continue;
     wanted.add(p.id);let mark=zyroVectorMarkers.get(p.id);
     if(!mark){
-      const elem=zyroVectorMarker(p.id==='me',p.heading,p.name);
+      const elem=zyroVectorMarker(p.id==='me',p.heading,p.name,p.tone);
       elem.classList.toggle('zyro-contact-alert',!!p.alert);
       mark=new window.maplibregl.Marker({element:elem,anchor:p.id==='me'?'center':'bottom'}).setLngLat([p.lon,p.lat]).addTo(zyroVectorMap);
       zyroVectorMarkers.set(p.id,mark);
@@ -874,7 +874,7 @@ async function init(){
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();resetZyroVector();googleMarkers.forEach(m=>m.setMap(null));googleMarkers=[];googleMap=null;$('googleMap').classList.add('hidden');$('mapTiles').classList.remove('hidden');$('mapPins').classList.remove('hidden');$('mapAttribution').classList.remove('hidden');googleInitAttempted=false;current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=10.0-zyro-atlas-world').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=11.0-zyro-noctis').catch(()=>{});
   try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});

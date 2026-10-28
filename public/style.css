@@ -499,3 +499,51 @@ html[data-theme="light"] .zyro-map-brand{background:#f7ffffdd!important;color:#2
 /* Pin tip is anchored to the actual GPS coordinates. */
 .zyro-gl-contact{flex-direction:column-reverse!important;justify-content:flex-end!important;height:73px!important;gap:4px!important}
 .zyro-atlas-initial b{display:block;font-style:normal;transform:rotate(45deg)}
+
+
+/* ═══ V11 ZYRO NOCTIS — faithful 2D blue/indigo map reference ═══
+   Vivid colors signal real location, contacts and SOS only.
+   Map data remains worldwide and geographically accurate. */
+html[data-theme="dark"] .zyro-vector-map,
+.zyro-vector-map{background:#172348!important}
+/* The soft violet/blue vignette matches the supplied reference; never draws streets. */
+html[data-theme="dark"] .geo-immersive .live-map::before{
+  background:
+    radial-gradient(ellipse 120% 78% at -18% 101%,rgba(102,45,172,.42) 0%,rgba(70,34,127,.24) 34%,transparent 71%),
+    radial-gradient(ellipse 108% 76% at 87% -11%,rgba(48,103,203,.25),transparent 68%),
+    linear-gradient(180deg,rgba(7,21,57,.03) 0%,rgba(13,22,62,.10) 66%,rgba(48,29,92,.23) 100%)!important;
+  box-shadow:inset 0 12px 35px #06143255,inset 0 -20px 40px #1b1b5970!important;
+  z-index:7;pointer-events:none;
+}
+html[data-theme="light"] .geo-immersive .live-map::before{
+  background:radial-gradient(ellipse at 0 100%,rgba(156,164,224,.12),transparent 70%),
+             linear-gradient(180deg,#d9eaf620,transparent 55%)!important;
+  box-shadow:inset 0 0 25px #bdd4ef44!important;
+}
+/* Map controls: subdued and compact instead of neon outlines. */
+html[data-theme="dark"] .map-top-label{background:#14254ccf!important;border:1px solid #8290b05e!important;box-shadow:0 5px 18px #08153565!important;border-radius:20px!important;letter-spacing:.9px!important;color:#eef3ff!important}
+html[data-theme="dark"] .map-top-label .zyro-map-pill{color:#78dfd6!important;background:#3c868545!important;border-color:#76c7c164!important}
+html[data-theme="dark"] .map-zoom-controls{background:#17254bbc!important;border:1px solid #7585b36b!important;box-shadow:0 6px 22px #0d153a7a!important;border-radius:18px!important;backdrop-filter:blur(12px)}
+html[data-theme="dark"] .map-zoom-controls button{color:#e7efff!important}
+html[data-theme="dark"] .geo-immersive .map-status{background:#182344de!important;border:1px solid #8b91bb73!important;color:#deeaf8!important;border-radius:14px!important}
+html[data-theme="dark"] .zyro-atlas-legend{background:#202a54bd!important;border:1px solid #8d98bd57!important;color:#c9d8f0!important;box-shadow:0 5px 18px #0c174259!important}
+html[data-theme="dark"] .zyro-map-brand{background:#1b2951ca!important;border:1px solid #829cb55b!important;color:#d2deef!important}
+/* True cartographic view is flat by default; retain older optional tilt control. */
+html[data-theme="dark"] .map-tiles{filter:grayscale(1) invert(.90) sepia(.25) hue-rotate(175deg) saturate(.68) brightness(.63) contrast(1.04)!important}
+/* Reference-style drop pins, subtle shadows, consistent hues per real member. */
+.zyro-gl-contact{--pin-body:#38cbbb;--pin-light:#82efe2;--pin-glow:#26c4bf59;
+  filter:drop-shadow(0 5px 8px #09112d70)!important}
+.zyro-gl-contact[data-tone="amber"]{--pin-body:#f0bc45;--pin-light:#ffe08e;--pin-glow:#f7bd4770}
+.zyro-gl-contact[data-tone="pink"]{--pin-body:#e85e91;--pin-light:#ffb6cd;--pin-glow:#f05d9180}
+.zyro-gl-contact[data-tone="blue"]{--pin-body:#40bbd5;--pin-light:#8fe7fa;--pin-glow:#24c8f06b}
+.zyro-atlas-initial{width:36px!important;height:36px!important;background:var(--pin-body)!important;border:2.5px solid #f6f5ff!important;border-radius:50% 50% 50% 7px!important;box-shadow:0 0 0 6px var(--pin-glow),0 4px 12px #0c18418c!important;color:#fff!important;transform:rotate(-45deg)!important}
+.zyro-atlas-contact-name{background:#192244e5!important;border-color:#778ca76a!important;color:#f2f3ff!important;box-shadow:0 4px 15px #0b153a70!important}
+.zyro-contact-alert{--pin-body:#f14b79!important;--pin-glow:#f13d7b79!important}
+.zyro-contact-alert .zyro-atlas-initial{background:#f14b79!important;border-color:#ffe9f1!important;box-shadow:0 0 0 6px #ee447869,0 0 16px #ec2f8b85!important}
+.zyro-contact-alert::before{content:'';position:absolute;left:50%;bottom:-8px;width:132px;height:132px;transform:translate(-50%,50%);border-radius:50%;background:#e8448838;border:1px solid #ff80ae3b;box-shadow:inset 0 0 35px #f24a7d2b,0 0 20px #e73d8422;pointer-events:none;z-index:-1}
+/* This halo is an alert highlight, NOT a geographic risk radius. */
+.zyro-gl-location{filter:none!important}
+.zyro-gl-location .zyro-gl-ring{background:#40a5e91a!important;border:2px solid #61b6ee65!important;box-shadow:0 0 0 6px #3887d121!important}
+.zyro-gl-location .zyro-gl-core{background:#36bafa!important;border-color:#fff!important;box-shadow:0 0 0 4px #2cafff3e,0 0 12px #45bffab5!important}
+.zyro-gl-location .zyro-gl-arrow{background:#2aa6f0!important;filter:drop-shadow(0 2px 4px #0c276a90)!important}
+.atlas-key-you{background:#36bafa!important}.atlas-key-circle{background:#3ed2bc!important}.atlas-key-sos{background:#fa5789!important}
