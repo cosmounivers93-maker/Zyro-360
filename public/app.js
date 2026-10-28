@@ -506,62 +506,75 @@ class ZyroNativeMap {
   }
 }
 
-// ZYRO MAP v7. Styled vector map with GPU panning. OpenFreeMap/Osm map data, no fake streets.
-// If MapLibre, WebGL, CDN or the vector tile provider is unavailable, the older raster map remains usable.
-// ZYRO MAP V8: the base cartography is real OpenFreeMap vector data.
-// Neon colors and 3D extrusions are visual styling, never fabricated geographic features.
-function zyroStyleUrl(){return zyroTheme==='dark'?'https://tiles.openfreemap.org/styles/dark':'https://tiles.openfreemap.org/styles/positron';}
-function zyroStylePaint(map){
-  const dark=zyroTheme==='dark';
-  const layers=map.getStyle()?.layers||[];
-  const neonRoads=dark?'#23cdd9':'#cbdbe2';
-  for(const layer of layers){
-    const name=String(layer.id||'').toLowerCase(),paint=layer.paint||{};
-    try{
-      if(layer.type==='background')map.setPaintProperty(layer.id,'background-color',dark?'#071626':'#eef5f8');
-      if(layer.type==='fill'&&!paint['fill-pattern']){
-        const color=/water|lake|ocean|sea|riverbank/.test(name)?(dark?'#0a334a':'#bcdfe5'):
-          /park|wood|forest|grass|green|garden|landcover|nature|pitch/.test(name)?(dark?'#123d34':'#d6efe5'):
-          /building/.test(name)?(dark?'#1e3248':'#d8e3e9'):
-          /residential|suburb|urban/.test(name)?(dark?'#10263d':'#e9f2f5'):(dark?'#101f35':'#edf4f7');
-        map.setPaintProperty(layer.id,'fill-color',color);
-      }
-      if(layer.type==='line'&&!paint['line-pattern']){
-        const color=/water|stream|river|canal/.test(name)?(dark?'#14566b':'#87c7d5'):
-          /motorway|trunk|highway/.test(name)?(dark?'#269fa8':'#bad4d8'):
-          /primary|secondary|tertiary|road|street|residential|transportation/.test(name)?(dark?'#276377':'#ffffff'):
-          /boundary|border|admin/.test(name)?(dark?'#294356':'#b6cbd1'):
-          /path|track|pedestrian|footway/.test(name)?(dark?'#28685c':'#b5d4c9'):(dark?'#223b50':'#c9d8dc');
-        map.setPaintProperty(layer.id,'line-color',color);
-      }
-      if(layer.type==='symbol'&&layer.layout?.['text-field']!==undefined){
-        map.setPaintProperty(layer.id,'text-color',dark?'#b6d4e3':(/water/.test(name)?'#3d879a':'#36576b'));
-        map.setPaintProperty(layer.id,'text-halo-color',dark?'#102338':'#f5fafc');
-        map.setPaintProperty(layer.id,'text-halo-width',dark?1.6:1.25);
-      }
-    }catch{/* Some provider layers use expressions that cannot be replaced. */}
-  }
-  const labelLayer=layers.find(l=>l.type==='symbol'&&l.layout?.['text-field']);
-  const buildingLayer=layers.find(l=>l['source-layer']==='building'&&l.source);
-  if(buildingLayer&& !map.getLayer('zyro-buildings-3d')){
-    try{map.addLayer({id:'zyro-buildings-3d',type:'fill-extrusion',source:buildingLayer.source,'source-layer':'building',minzoom:14,
-      filter:['!=',['get','hide_3d'],true],paint:{
-       'fill-extrusion-color':dark?'#284960':'#b7d0da',
-       'fill-extrusion-height':['interpolate',['linear'],['zoom'],14,0,16,['coalesce',['get','render_height'],['get','height'],12]],
-       'fill-extrusion-base':['interpolate',['linear'],['zoom'],14,0,16,['coalesce',['get','render_min_height'],['get','min_height'],0]],
-       'fill-extrusion-opacity':dark?.95:.78
-      }},labelLayer?.id);}catch(error){console.warn('Edifici 3D non disponibili:',error?.message);}
-  }
-  // Neon edges are restricted to the road network from the same vector source.
-  const roads=layers.find(l=>l.type==='line'&&l['source-layer']==='transportation'&&l.source);
-  if(dark&&roads&&!map.getLayer('zyro-neon-road-glow')){
-    try{
-      map.addLayer({id:'zyro-neon-road-glow',type:'line',source:roads.source,'source-layer':'transportation',minzoom:11,
-        filter:['in',['get','class'],['literal',['motorway','trunk','primary','secondary','tertiary']]],
-        paint:{'line-color':'#23d6d6','line-opacity':.35,'line-blur':5,'line-width':['interpolate',['linear'],['zoom'],11,1.5,17,8]}},labelLayer?.id);
-    }catch(error){console.warn('Bagliore strade non disponibile:',error?.message);}
-  }
+// ZYRO MAP V9: independent, authored cartographic design on real OSM vector data.
+// Geometry/labels originate from OpenFreeMap (OpenMapTiles schema); no simulated roads.
+function zyroMapStyle(theme='dark'){
+  const dark=theme!=='light';
+  const c=dark?{
+    ground:'#081827', land:'#0b2033',district:'#0e2940',park:'#103d38',forest:'#17433e',
+    water:'#082e44',waterLine:'#1b809b',building:'#16334b',buildingEdge:'#35677a',roof:'#2a5168',
+    path:'#236557',minor:'#23516b',motorway:'#32c2cf',main:'#26e1db',mid:'#2a9da9',roadCore:'#b0fff0',
+    glow:'#00d8df',label:'#e8fbff',smallLabel:'#9abdd2',place:'#dffff9',halo:'#091b2e',poi:'#55d7cd',
+    outline:'#0b2941',boundary:'#38667b',badge:'#10f1d2'
+  }:{
+    ground:'#e7f4f5',land:'#f0f9f9',district:'#deefef',park:'#bde9d5',forest:'#a4d7c4',
+    water:'#a4dce6',waterLine:'#3ba3b4',building:'#d0e3e9',buildingEdge:'#a5c0c9',roof:'#b7d5e0',
+    path:'#78bca7',minor:'#ffffff',motorway:'#43a8bf',main:'#43c5c2',mid:'#88d2d1',roadCore:'#ffffff',
+    glow:'#38c6c4',label:'#1c4c61',smallLabel:'#47778a',place:'#153f51',halo:'#f0f9f9',poi:'#158c7b',
+    outline:'#c5dcde',boundary:'#a4c7cc',badge:'#128e87'
+  };
+  const S='openmaptiles';
+  const name=['coalesce',['get','name:latin'],['get','name:en'],['get','name'],''];
+  const zm=(...stops)=>['interpolate',['linear'],['zoom'],...stops];
+  const major=['in',['get','class'],['literal',['motorway','trunk','primary']]];
+  const arterial=['in',['get','class'],['literal',['motorway','trunk','primary','secondary','tertiary']]];
+  const local=['in',['get','class'],['literal',['minor','residential','living_street','service']]];
+  const foot=['in',['get','class'],['literal',['path','track','pedestrian','footway','steps']]];
+  const roadColors=['match',['get','class'],'motorway',c.motorway,'trunk',c.motorway,'primary',c.main,'secondary',c.mid,'tertiary',c.mid,'residential',c.minor,'minor',c.minor,'service',c.minor,'living_street',c.minor,'path',c.path,'pedestrian',c.path,'footway',c.path,c.minor];
+  const L=[];
+  const add=(id,type,sourceLayer,extra={})=>{
+    const obj={id,type,...(sourceLayer?{source:S,'source-layer':sourceLayer}:{}) ,...extra};L.push(obj);return obj;
+  };
+  add('zyro-background','background',null,{paint:{'background-color':c.ground}});
+  add('zyro-land','fill','landcover',{paint:{'fill-color':c.land,'fill-opacity':.89}});
+  add('zyro-district','fill','landuse',{filter:['in',['get','class'],['literal',['residential','commercial','industrial']]],paint:{'fill-color':c.district,'fill-opacity':.52}});
+  add('zyro-green-land','fill','landcover',{filter:['in',['get','class'],['literal',['wood','forest','grass','scrub']]],paint:{'fill-color':c.forest,'fill-opacity':.87}});
+  add('zyro-parks','fill','park',{paint:{'fill-color':c.park,'fill-opacity':.94}});
+  add('zyro-parks-alt','fill','landuse',{filter:['in',['get','class'],['literal',['park','grass','cemetery','recreation_ground','garden','allotments']]],paint:{'fill-color':c.park,'fill-opacity':.9}});
+  add('zyro-water','fill','water',{paint:{'fill-color':c.water}});
+  add('zyro-water-edge','line','water',{paint:{'line-color':c.waterLine,'line-width':zm(4,.2,12,.8,17,1.8),'line-opacity':dark?.62:.55}});
+  add('zyro-waterway','line','waterway',{paint:{'line-color':c.waterLine,'line-width':zm(8,.2,14,1.2,18,2.5),'line-opacity':.76}});
+  add('zyro-rail','line','transportation',{filter:['==',['get','class'],'rail'],paint:{'line-color':dark?'#43627c':'#aec5ce','line-width':zm(9,.4,15,1.8,18,3),'line-dasharray':[2,2],'line-opacity':.8}});
+  // Colored housing blocks and realistic heights come exclusively from vector building features.
+  add('zyro-building-shadow','fill','building',{minzoom:12,paint:{'fill-color':c.outline,'fill-opacity':zm(12,.18,16,.72)}});
+  add('zyro-building-area','fill','building',{minzoom:13,paint:{'fill-color':c.building,'fill-outline-color':c.buildingEdge,'fill-opacity':zm(13,.46,16,.95)}});
+  // Road geometry is shared with all normal cartographic maps; only rendering is unique.
+  add('zyro-road-casing','line','transportation',{filter:['!=',['get','class'],'rail'],layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':dark?'#061522':'#c5e0e4','line-width':zm(8,1.5,12,3.2,15,7.5,18,19),'line-opacity':.9}});
+  add('zyro-street-base','line','transportation',{filter:['all',['!=',['get','class'],'rail'],['!',foot]],layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':roadColors,'line-width':zm(8,.8,12,1.6,15,4,18,12),'line-opacity':dark?.9:.94}});
+  add('zyro-walking-tracks','line','transportation',{filter:foot,minzoom:14,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':c.path,'line-width':zm(14,.5,18,2),'line-dasharray':[1.3,2], 'line-opacity':.74}});
+  add('zyro-arterial-glow','line','transportation',{filter:arterial,minzoom:10,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':c.glow,'line-width':zm(10,1,13,4,16,12,19,24),'line-blur':dark?5.5:2,'line-opacity':dark?.55:.19}});
+  add('zyro-arterial-color','line','transportation',{filter:arterial,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':roadColors,'line-width':zm(8,1,12,2.1,15,4.6,18,11),'line-opacity':1}});
+  add('zyro-arterial-core','line','transportation',{filter:major,minzoom:13,layout:{'line-cap':'round','line-join':'round'},paint:{'line-color':c.roadCore,'line-width':zm(13,.35,16,1,18,2.2),'line-opacity':dark?.53:.7}});
+  add('zyro-building-3d','fill-extrusion','building',{minzoom:14,paint:{'fill-extrusion-color':c.roof,'fill-extrusion-height':zm(14,0,16,['coalesce',['get','render_height'],['get','height'],10]),'fill-extrusion-base':zm(14,0,16,['coalesce',['get','render_min_height'],['get','min_height'],0]),'fill-extrusion-opacity':dark?.78:.53,'fill-extrusion-vertical-gradient':true}});
+  add('zyro-boundaries','line','boundary',{minzoom:4,filter:['<=',['get','admin_level'],4],paint:{'line-color':c.boundary,'line-opacity':.45,'line-dasharray':[3,3],'line-width':zm(4,.45,10,1.4)}});
+  // Only a short list of useful landmark labels, with no visual clutter at street level.
+  const label=(id,sourceLayer,filter,minzoom,size,color,layoutExtra={},paintExtra={})=>add(id,'symbol',sourceLayer,{
+    minzoom, ...(filter?{filter}:{}),layout:{'text-field':name,'text-font':['Noto Sans Regular'],'text-size':size,'text-letter-spacing':.02,'text-max-width':10,'text-allow-overlap':false,...layoutExtra},
+    paint:{'text-color':color,'text-halo-color':c.halo,'text-halo-width':dark?1.9:1.4,'text-halo-blur':.35,...paintExtra}
+  });
+  label('zyro-cities','place',['in',['get','class'],['literal',['city','town']]],4,zm(4,11,8,14,13,18),c.place,{'text-transform':'uppercase','text-max-width':14},{'text-halo-width':2.2});
+  label('zyro-neighborhoods','place',['in',['get','class'],['literal',['village','suburb','neighbourhood','quarter']]],11,zm(11,10,16,13),c.smallLabel);
+  label('zyro-road-names','transportation_name',null,13,zm(13,9,16,11,19,13),c.smallLabel,{'symbol-placement':'line','text-rotation-alignment':'map','symbol-spacing':260,'text-padding':8,'text-max-angle':35});
+  label('zyro-park-names','park',null,13,zm(13,10,17,12),c.poi,{'text-transform':'uppercase'});
+  label('zyro-hospital-labels','poi',['in',['get','class'],['literal',['hospital','clinic','doctors']]],14,zm(14,10,18,12),dark?'#ffa5ba':'#a74f65');
+  label('zyro-school-labels','poi',['in',['get','class'],['literal',['school','college','university']]],14,zm(14,10,18,12),dark?'#f1d79d':'#967143');
+  return {version:8,name:`ZYRO 360 • ${dark?'Midnight':'Daylight'}`,glyphs:'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
+    sources:{openmaptiles:{type:'vector',url:'https://tiles.openfreemap.org/planet',attribution:'© OpenFreeMap · © OpenStreetMap contributors'}},layers:L};
 }
+// Unlike the older releases, no provider style is recolored after loading.
+// The style itself (all layers, palette and labeling rules) belongs to ZYRO 360.
+function zyroStyleUrl(){return zyroMapStyle(zyroTheme);}
+function zyroStylePaint(){/* ZYRO's complete style is assembled before rendering. */}
 function currentZyroPitch(){return zyroMap3D&&Math.max(zyroVectorMap?.getZoom()||0,lastCoords?16:0)>=14?52:0;}
 function update3DView(){
  const button=$('mapTilt');if(button){button.disabled=!zyroVectorMap;button.textContent=zyroMap3D?'3D':'2D';button.setAttribute('aria-pressed',String(zyroMap3D));button.title=zyroMap3D?'Disattiva la prospettiva 3D':'Attiva la prospettiva 3D';}
@@ -642,7 +655,7 @@ function maybeInitZyroVector(){
   try{
     const pos=lastCoords?{lat:lastCoords.lat,lon:lastCoords.lon,zoom:16}:
       zyroMap?{lat:zyroMap.center.lat,lon:zyroMap.center.lon,zoom:zyroMap.zoom}:{lat:41.9,lon:12.5,zoom:6};
-    candidate=new window.maplibregl.Map({container:el,style:zyroStyleUrl(),center:[pos.lon,pos.lat],zoom:pos.zoom,minZoom:3,maxZoom:19,pitch:zyroMap3D&&pos.zoom>=14?52:0,bearing:zyroMap3D&&pos.zoom>=14?-12:0,
+    candidate=new window.maplibregl.Map({container:el,style:zyroStyleUrl(),center:[pos.lon,pos.lat],zoom:pos.zoom,minZoom:3,maxZoom:19,pitch:zyroMap3D&&pos.zoom>=14?52:0,bearing:0,
       attributionControl:false,dragRotate:false,touchPitch:false,pitchWithRotate:false,scrollZoom:false,dragPan:true,touchZoomRotate:true,
       fadeDuration:170,antialias:false,renderWorldCopies:true,cooperativeGestures:false});
     candidate.on('load',()=>{

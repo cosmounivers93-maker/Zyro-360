@@ -400,3 +400,37 @@ html[data-theme="dark"] .profile-chevron{color:#56dccd}
 html[data-theme="dark"] .mode-heading{background:linear-gradient(115deg,#0b263d,#14546b)}
 html[data-theme="dark"] .profile-photo-editor .photo-privacy-note span{color:#bfd8df}
 #mapTilt:disabled{opacity:.45;cursor:not-allowed}
+
+/* ================================================================
+   ZYRO ORIGINAL MAP · V9 — Authored live map visual language
+   Real features are rendered by MapLibre, never painted as fake roads.
+   ================================================================ */
+.zyro-vector-map{background:#081827!important;isolation:isolate}
+html[data-theme="light"] .zyro-vector-map{background:#e7f4f5!important}
+.geo-immersive .live-map{position:relative}
+/* Edge tint frames the map without blocking gestures or map text. */
+.geo-immersive .live-map::before{content:"";position:absolute;inset:0;z-index:7;pointer-events:none;background:linear-gradient(180deg,rgba(2,17,33,.18) 0%,transparent 25%,transparent 72%,rgba(2,17,33,.2) 100%);box-shadow:inset 0 0 45px #02192e42}
+html[data-theme="light"] .geo-immersive .live-map::before{background:linear-gradient(180deg,rgba(233,248,248,.2),transparent 22%,transparent 75%,rgba(192,229,230,.12));box-shadow:inset 0 0 38px #5f9a9d29}
+.map-top-label{background:linear-gradient(120deg,#06172cf4,#103b4fe7)!important;border:1px solid #3bdac1a0!important;box-shadow:0 10px 27px #020d2299, inset 0 1px #ffffff18!important;display:flex;align-items:center;gap:8px;letter-spacing:1.5px!important;padding:10px 13px!important}
+.map-top-label .zyro-map-pill{border-radius:99px;padding:5px 7px!important;background:#22e6b823!important;color:#b8fff2!important;font-weight:800;font-size:8px!important;letter-spacing:1px!important;border:1px solid #30e2c06b}
+.map-top-label .map-live-dot{box-shadow:0 0 0 4px #20dbba22,0 0 12px 3px #35e9be99}
+.zyro-map-brand{border-color:#31cbbb79!important;border-radius:11px!important;background:#07172ae6!important;color:#85e9da!important;padding:7px 9px!important;letter-spacing:1.2px}
+.zyro-map-brand .zyro-map-orb{color:#5ffff0;font-size:17px;filter:drop-shadow(0 0 6px #33ffe3)}
+.map-zoom-controls{background:#06192ce8!important;border:1px solid #53b9c57a!important;box-shadow:0 12px 30px #0009!important;border-radius:14px!important;overflow:hidden}
+.map-zoom-controls button{background:transparent!important;color:#dffffc!important}
+.map-zoom-controls button:active{background:#2c637d!important}
+.geo-immersive .map-status{background:linear-gradient(125deg,#071c32ed,#103849e8)!important;border:1px solid #4cbdaf78!important;color:#e2fff9!important;box-shadow:0 8px 25px #06122285!important}
+.zyro-gl-location{filter:drop-shadow(0 0 8px #1bd8ffc0)}
+.zyro-gl-location .zyro-gl-ring{border:2px solid #46dbf2!important;background:#38def31a!important;box-shadow:0 0 0 8px #26d5fc12,0 0 22px #10c1f870!important}
+.zyro-gl-location .zyro-gl-arrow{background:#23b7ef!important;filter:drop-shadow(0 0 8px #1aaafa)!important}
+.zyro-gl-location .zyro-gl-core{background:#05bef1!important;border:4px solid #e9fdff!important;box-shadow:0 0 0 5px #1c9bed4d,0 0 24px #00f0f7!important}
+.zyro-gl-contact{background:linear-gradient(145deg,#18f7cb,#067a95)!important;border:2px solid #dbfffa!important;box-shadow:0 0 0 5px #11c9b22a,0 0 18px #0bcca5b9!important}
+html[data-theme="light"] .map-top-label{background:linear-gradient(125deg,#102f45,#206478)!important}
+html[data-theme="light"] .zyro-map-brand{background:#ffffffef!important;color:#185b64!important;border-color:#b4d8df!important}
+html[data-theme="light"] .zyro-map-brand .zyro-map-orb{color:#12877c}
+html[data-theme="light"] .map-zoom-controls{background:#fffefaee!important;border-color:#9ecbcf!important}
+html[data-theme="light"] .map-zoom-controls button{color:#134b62!important}
+html[data-theme="light"] .geo-immersive .map-status{background:#f8fffff0!important;color:#185568!important;border-color:#a5c8d0!important}
+/* Keep the already-approved three equally sized controls, not the old SOS panel. */
+.zyro-command-row{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+@media(max-width:360px){.map-top-label{gap:5px;padding:8px 10px!important}.map-top-label .zyro-map-pill{font-size:7px!important}.zyro-map-brand{font-size:8px!important}}
