@@ -1,0 +1,93 @@
+/* ZYRO 360 V16.1 | Mobile compact settings. No changes to map, GPS or SOS logic. */
+/* Place a readable settings label and small three-dot symbol above the profile title. */
+.profile-heading {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  grid-template-areas:'eyebrow more' 'title title' 'caption caption';
+  align-items:center;
+  column-gap:8px;
+  padding-right:0;
+}
+.profile-heading > .mini-overline{grid-area:eyebrow;min-width:0}
+.profile-heading > h1{grid-area:title}
+.profile-heading > p{grid-area:caption}
+.zyro-profile-more {
+  grid-area:more;
+  position:static;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+  width:auto;
+  height:34px;
+  min-height:34px;
+  max-width:100%;
+  padding:0 9px;
+  margin:0;
+  border-radius:11px;
+  font-size:11.5px;
+  font-weight:750;
+  letter-spacing:0;
+  line-height:1.2;
+  white-space:nowrap;
+  box-shadow:0 2px 9px rgba(11,48,65,.07);
+}
+.zyro-profile-more-label{font-size:11.5px;letter-spacing:0;white-space:nowrap}
+.zyro-profile-more-dots{font-size:19px;font-weight:750;line-height:1;letter-spacing:0;display:inline-block;transform:translateY(-1px)}
+.zyro-settings-drawer {
+  width:min(350px,86vw);
+  padding:max(14px,env(safe-area-inset-top)) 12px max(18px,env(safe-area-inset-bottom));
+  font-size:12.5px;
+  line-height:1.45;
+  overflow-x:hidden;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+.zyro-drawer-top{gap:10px;padding:0 0 13px}
+.zyro-drawer-top h2{font-size:19px;line-height:1.2;margin:4px 0 0}
+.zyro-drawer-icon-button{flex:none;width:34px;height:34px;border-radius:10px;font-size:17px}
+.zyro-drawer-menu{gap:8px;margin-top:13px}
+.zyro-drawer-menu>button{min-height:57px;gap:9px;padding:8px 10px;border-radius:12px}
+.zyro-drawer-menu>button>span:nth-child(2){font-size:12.5px}
+.zyro-drawer-menu>button small{font-size:10px;line-height:1.35}
+.zyro-drawer-menu>button>b{font-size:19px}
+.zyro-settings-glyph{height:32px;width:32px;border-radius:10px;font-size:17px}
+.zyro-settings-detail{padding:12px 0 8px}
+.zyro-settings-back{padding:8px 0;font-size:12px}
+#settingsDrawerHeading{font-size:17px;line-height:1.2;margin:5px 0 12px}
+#zyroSettingsPanels,.zyro-settings-pane{width:100%;min-width:0;max-width:100%}
+.zyro-settings-pane{font-size:12px;line-height:1.48;overflow-wrap:break-word}
+.zyro-settings-pane .panel,.zyro-settings-pane .zyro-appearance-panel,
+.zyro-settings-pane .how-it-works,.zyro-settings-pane .zyro-v15-panel{
+  padding:13px 12px;
+  border-radius:16px;
+  margin:8px 0 12px;
+  max-width:100%;
+  min-width:0;
+}
+.zyro-settings-pane .zyro-v15-heading{gap:9px;align-items:flex-start;margin-bottom:10px}
+.zyro-settings-pane .zyro-v15-heading h2{font-size:17px;line-height:1.2;margin:3px 0 6px}
+.zyro-settings-pane .zyro-v15-heading p:not(.eyebrow){font-size:12px;line-height:1.43}
+.zyro-settings-pane .zyro-v15-symbol{width:35px;height:35px;border-radius:10px;font-size:18px}
+.zyro-settings-pane .zyro-v15-panel .eyebrow{font-size:9px;letter-spacing:1.5px}
+.zyro-settings-pane .zyro-v15-status{padding:10px;border-radius:10px;font-size:12px;line-height:1.46}
+.zyro-settings-pane .zyro-v15-mic{gap:8px;padding:10px;margin:10px 0;border-radius:10px;font-size:12px}
+.zyro-settings-pane .zyro-v15-mic small{font-size:11px;line-height:1.45}
+.zyro-settings-pane .zyro-v15-note{font-size:11px;line-height:1.48}
+.zyro-settings-pane .zyro-v15-panel :is(p,label,li){font-size:12px;line-height:1.48}
+.zyro-settings-pane .zyro-v15-field :is(input,select){font-size:13px;min-height:40px;padding:9px}
+.zyro-settings-pane .zyro-v15-plans{grid-template-columns:1fr}
+.zyro-settings-pane .zyro-v15-plans>div{padding:9px;gap:6px}
+.zyro-settings-pane .zyro-v15-plans strong{font-size:14px}
+.zyro-settings-pane .zyro-appearance-header{gap:9px;margin-bottom:11px}
+.zyro-settings-pane .zyro-appearance-header h2,.zyro-settings-pane .how-heading h2{font-size:15px}
+.zyro-settings-pane .appearance-emblem,.zyro-settings-pane .how-icon{width:34px;height:34px;font-size:19px;border-radius:10px}
+.zyro-settings-pane .how-it-works summary{padding:11px 0;font-size:12px}
+.zyro-settings-pane .how-content{padding:10px;font-size:11px;line-height:1.55}
+.zyro-settings-pane .zyro-theme-option{border-radius:12px;padding:8px}
+.zyro-settings-pane .zyro-theme-choices{gap:7px}
+@media(max-width:370px){
+  .zyro-profile-more{gap:5px;padding:0 7px}
+  .zyro-profile-more-label{font-size:10.5px}
+  .zyro-settings-drawer{width:87vw;padding-left:10px;padding-right:10px}
+}
