@@ -1,0 +1,24 @@
+/* ZYRO 360 V14 / Variante A: essenziale, premium, blu notte e turchese. */
+html[data-theme="dark"] .geo-immersive .live-map{background:#0b1929!important}
+html[data-theme="dark"] #zyroVectorMap{background:#0b1929!important}
+html[data-theme="light"] #zyroVectorMap{background:#e9f3f7!important}
+/* Nessun glow viola o effetto che compromette la leggibilità della cartografia */
+html[data-theme="dark"] .geo-immersive .live-map::before,
+html[data-theme="dark"] .geo-immersive .live-map::after{opacity:0!important;pointer-events:none!important}
+#zyroVectorMap .maplibregl-control-container{display:block!important;pointer-events:none}
+#zyroVectorMap .maplibregl-ctrl-attrib{display:block!important;pointer-events:auto;font-size:9px;background:rgba(6,22,33,.76);color:#d7e8ef;max-width:65vw}
+#zyroVectorMap .maplibregl-ctrl-attrib a{color:#a9e4db!important}
+#zyroVectorMap .maplibregl-ctrl-logo{display:block!important}
+#zyroVectorMap .maplibregl-ctrl-top-left,
+#zyroVectorMap .maplibregl-ctrl-top-right,
+#zyroVectorMap .maplibregl-ctrl-bottom-left{display:none!important}
+.map-top-label{background:#0a1b2bea!important;color:#dbf1f2!important;border:1px solid #4faea755!important;box-shadow:0 8px 22px #04141c77!important}
+.zyro-map-brand{background:#091e2ae3!important;color:#aee3df!important;border-color:#6ab6b34f!important}
+#mapZoomControls{background:#0a1d2be8!important;border:1px solid #55a2a077!important;border-radius:12px!important}
+#mapZoomControls button{color:#cde8e8!important}
+.zyro-atlas-legend{background:#0a1b2be0!important;color:#e2f0f4!important;border-color:#4fa9a64f!important}
+.zyro-gl-location{filter:none!important}
+.zyro-gl-location .zyro-gl-ring{border-color:#50c5d2!important;box-shadow:0 0 0 5px #50c5d215!important}
+.zyro-gl-location .zyro-gl-core{background:#45b7ec!important;box-shadow:0 0 0 3px #45b7ec35,0 2px 8px #06172799!important}
+.zyro-contact-alert .zyro-atlas-initial{background:#e9617d!important}
+html[data-theme="light"] #zyroVectorMap .maplibregl-ctrl-attrib{background:rgba(247,253,255,.9);color:#365468}
