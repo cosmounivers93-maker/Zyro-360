@@ -15,7 +15,9 @@ const initial = { users: {}, circles: {}, memberships: [], invites: {}, sessions
 let db;
 try { db = { ...initial, ...JSON.parse(fs.readFileSync(dbPath, 'utf8')) }; }
 catch (err) { if (err.code !== 'ENOENT') throw err; db = structuredClone(initial); }
-db.journeys ||= {}; db.checkins ||= {};
+db.journeys ||= {}; db.checkins ||= {}; db.adminAudit ||= []; db.userReports ||= [];
+// Admin identity is pinned by a server-side user ID, never by a browser flag or email address.
+const ADMIN_ID = String(process.env.ZYRO_ADMIN_USER_ID || '').trim();
 // Browser microphone tracks cannot survive a backend restart; do not claim audio is live.
 for (const alert of Object.values(db.alerts)) alert.hasAudio = false;
 let locations = new Map();
@@ -30,7 +32,9 @@ const token = (n = 24) => crypto.randomBytes(n).toString('base64url');
 const now = () => Date.now();
 // Only a verified, server-side purchase may set premiumUntil. Never trust premium=true from a browser.
 // Actual Play Billing purchase verification is NOT configured in this web prototype.
-const premiumActive = user => Number(user?.premiumUntil || 0) > now();
+const premiumActive = user => user?.premiumGiftLifetime === true || Number(user?.premiumUntil || 0) > now();
+const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
+const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
 function validCoords(point){const lat=Number(point?.lat),lon=Number(point?.lon),accuracy=Number(point?.accuracy||0);return Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180&&Number.isFinite(accuracy)&&accuracy>=0&&accuracy<=100000?{lat,lon,accuracy,updatedAt:now()}:null;}
 function metersBetween(a,b){const r=Math.PI/180,phi=(b.lat-a.lat)*r,l=(b.lon-a.lon)*r;const q=Math.sin(phi/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(l/2)**2;return 12742000*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
@@ -79,7 +83,7 @@ function stateFor(id) {
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
     startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (db.users[a.userId]?.sharing || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), premiumUntil: premiumActive(me)?me.premiumUntil:null, journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY), vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -116,7 +120,11 @@ function limit(req, res, next) {
   if (curr.n > 25) return res.status(429).json({error:'Troppi tentativi. Riprova più tardi.'});
   next();
 }
-function requireAuth(req, res, next) { req.user = auth(req); if (!req.user) return res.status(401).json({ error:'Accedi per continuare.' }); next(); }
+function requireAuth(req, res, next) { req.user = auth(req); if (!req.user) return res.status(401).json({ error:'Accedi per continuare.' }); if(req.user.bannedAt) return res.status(403).json({error:banNotice,banned:true}); next(); }
+function requireAdmin(req,res,next){if(!isAdmin(req.user))return res.status(403).json({error:'Accesso riservato all’amministratore.'});next();}
+function adminPassword(req,res){if(!String(req.body?.password||'') || !verifyPassword(String(req.body.password),req.user)){res.status(403).json({error:'Conferma con la password del tuo account amministratore.'});return false;}return true;}
+function recordAction(kind,actor,target,detail=''){db.adminAudit.push({id:token(8),kind,by:actor,for:target,detail,at:now()});if(db.adminAudit.length>500)db.adminAudit.splice(0,db.adminAudit.length-500);}
+function auditLogin(req,user){ user.lastLoginIp=String(req.ip || '').slice(0,64);user.lastLoginAt=now(); }
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 // Live tiles requested only by logged-in users. A modest in-memory cache protects the community tile service.
 // For a public production launch replace this best-effort upstream with a contracted map provider.
@@ -150,13 +158,14 @@ app.post('/api/register', limit, (req, res) => {
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({error:'Email già registrata.'});
   const id = token(12), salt = token(16);
   db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], sosRecipients: [], avatar: null };
-  loginUser(res, id); res.json({ ok:true });
+  auditLogin(req, db.users[id]); loginUser(res, id); res.json({ ok:true });
 });
 app.post('/api/login', limit, (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase(), password = String(req.body.password || '');
   const u = Object.values(db.users).find(x => x.email === email);
   if (!u || !verifyPassword(password, u)) return res.status(401).json({error:'Email o password non corretti.'});
-  loginUser(res, u.id); res.json({ok:true});
+  if(u.bannedAt) return res.status(403).json({error:banNotice,banned:true});
+  auditLogin(req,u);loginUser(res, u.id); res.json({ok:true});
 });
 app.post('/api/logout', requireAuth, (req,res) => {
   const sid = getCookie(req, 'cs_session'); if (sid) delete db.sessions[hash(sid)];
@@ -165,6 +174,52 @@ app.post('/api/logout', requireAuth, (req,res) => {
   res.json({ok:true});
 });
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
+// ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
+const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?(u.lastLoginIp||null):null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
+app.get('/api/admin/users',requireAuth,requireAdmin,(req,res)=>{
+ res.set('Cache-Control','no-store');
+ res.json({users:Object.values(db.users).map(adminUser).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)),reports:db.userReports.slice(-100).reverse(),audit:db.adminAudit.slice(-50).reverse()});
+});
+// Reports are accepted only for another user actually sharing a circle with the reporter.
+app.post('/api/report',requireAuth,limit,(req,res)=>{
+ const target=String(req.body.userId||''),reason=cleanText(req.body.reason,400);
+ if(target===req.user.id||!db.users[target]||!sharedCircle(req.user.id,target))return res.status(403).json({error:'Puoi segnalare soltanto un altro membro della tua cerchia.'});
+ if(reason.length<12)return res.status(400).json({error:'Descrivi brevemente il motivo della segnalazione (almeno 12 caratteri).'});
+ db.userReports.push({id:token(9),reporterId:req.user.id,userId:target,reason,at:now(),status:'open'});
+ if(db.userReports.length>300)db.userReports.splice(0,db.userReports.length-300);
+ save();res.json({ok:true,message:'Segnalazione ricevuta. Sarà esaminata dall’amministratore.'});
+});
+app.post('/api/admin/ban',requireAuth,requireAdmin,limit,(req,res)=>{
+ if(!adminPassword(req,res))return;
+ const id=String(req.body.userId||''),ban=req.body.banned===true,u=db.users[id],reason=cleanText(req.body.reason,300);
+ if(!u||id===ADMIN_ID)return res.status(403).json({error:'Non puoi sospendere questo account.'});
+ if(ban && reason.length<8)return res.status(400).json({error:'Scrivi una motivazione (almeno 8 caratteri).'});
+ if(ban){u.bannedAt=now();u.banReason=reason;u.sharing=false;locations.delete(id);for(const alert of Object.values(db.alerts))if(alert.userId===id && alert.active){alert.active=false;alert.endedAt=now();alert.hasAudio=false;}}
+ else{delete u.bannedAt;delete u.banReason;}
+ // Force sign-out on suspension so old cookies no longer work.
+ if(ban){for(const [k,s] of Object.entries(db.sessions))if(s.userId===id)delete db.sessions[k];for(const ws of connections(id)){sendSocket(ws,{type:'account-banned',notice:banNotice});setTimeout(()=>ws.close(1008,'Account sospeso'),250).unref();}}
+ recordAction(ban?'ban':'unban',req.user.id,id,reason);save();refreshRelated(id);if(ban)void sendEventPush([id],'Account sospeso • ZYRO 360',banNotice);
+ res.json({ok:true,user:adminUser(u),notice:ban?banNotice:null});
+});
+app.post('/api/admin/premium-gift',requireAuth,requireAdmin,limit,(req,res)=>{
+ if(!adminPassword(req,res))return;
+ const id=String(req.body.userId||''),u=db.users[id],enabled=req.body.enabled===true;
+ if(!u||id===ADMIN_ID)return res.status(403).json({error:'Utente non valido.'});
+ // This is an owner-issued complimentary entitlement, NOT a Play Billing purchase.
+ u.premiumGiftLifetime=enabled;
+ if(enabled){u.premiumGiftGrantedAt=now();u.premiumGiftBy=req.user.id;}
+ else {delete u.premiumGiftGrantedAt;delete u.premiumGiftBy;}
+ recordAction(enabled?'premium-gift':'premium-revoke',req.user.id,id);
+ save();pushState(id);res.json({ok:true,user:adminUser(u)});
+});
+app.post('/api/admin/report-resolve',requireAuth,requireAdmin,limit,(req,res)=>{
+ if(!adminPassword(req,res))return;
+ const report=db.userReports.find(x=>x.id===String(req.body.reportId||''));
+ if(!report)return res.status(404).json({error:'Segnalazione non trovata.'});
+ report.status=req.body.status==='dismissed'?'dismissed':'reviewed';report.reviewedAt=now();
+ recordAction('report-'+report.status,req.user.id,report.userId,report.id);save();res.json({ok:true});
+});
+
 app.post('/api/circles', requireAuth, limit, (req,res) => {
   const name = cleanText(req.body.name, 48);
   if (name.length < 2) return res.status(400).json({error:'Dai un nome alla cerchia.'});
@@ -466,7 +521,7 @@ server.on('upgrade',(req,socket,head) => {
   const origin = req.headers.origin;
   const expected = `${req.headers['x-forwarded-proto'] || (prod?'https':'http')}://${req.headers.host}`;
   const user = auth(req);
-  if (!user || !origin || origin !== expected || !req.url?.startsWith('/ws')) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return; }
+  if (!user || user.bannedAt || !origin || origin !== expected || !req.url?.startsWith('/ws')) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); socket.destroy(); return; }
   wss.handleUpgrade(req,socket,head,ws=>{ws.userId=user.id;wss.emit('connection',ws,req);});
 });
 function relay(id, msg, preferMicrophone=false) { const con=[...connections(id)].filter(x=>x.readyState===WebSocket.OPEN); const pick = preferMicrophone ? con.find(x=>x.microphoneReady) : con[con.length-1]; if (pick) sendSocket(pick,msg); }
@@ -479,6 +534,7 @@ wss.on('connection', ws => {
     let m; try {m=JSON.parse(data.toString());}catch{return;}
     if (!m || typeof m.type !== 'string') return;
     const self=ws.userId;
+    if(db.users[self]?.bannedAt){ws.close(1008,'Account sospeso');return;}
     if (m.type==='audio-ready') {
       const a=currentAlert(self); if (!a) return;
       ws.microphoneReady = m.ready === true;
@@ -505,6 +561,7 @@ setInterval(()=>{
   for (const [k,s] of Object.entries(db.sessions)) if (s.expiresAt<t) {delete db.sessions[k];changed=true;}
   for (const [k,v] of Object.entries(db.invites)) if (v.expiresAt<t) {delete db.invites[k];changed=true;}
   for (const [k,a] of Object.entries(db.alerts)) if (!a.active && a.endedAt<t-7*86400*1000) {delete db.alerts[k];changed=true;}
+  for(const u of Object.values(db.users))if(u.lastLoginAt && u.lastLoginAt<t-30*86400e3 && u.lastLoginIp){delete u.lastLoginIp;changed=true;}
   if (changed) save();
 },3600000).unref();
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) server.listen(PORT, '0.0.0.0',()=>console.log(`Zyro 360: http://localhost:${PORT}`));
