@@ -1,0 +1,129 @@
+/* ZYRO 360 V16.2 - Glass Light UI | visual-only adjustments
+   Preserves the existing map rendering, SOS behavior and user permissions.
+   Designed for WebView / PWA, including light and dark mode. */
+:root{--zyro-glass-stroke:rgba(88,182,188,.21);--zyro-soft-glow:rgba(46,200,185,.10)}
+
+/* Floating drawer: narrower, shorter when contents are short, softened corners. */
+.zyro-settings-backdrop{
+  background:rgba(5,19,35,.32);
+  -webkit-backdrop-filter:blur(2px);
+  backdrop-filter:blur(2px);
+}
+.zyro-settings-drawer,
+html[data-theme="dark"] .zyro-settings-drawer{
+  top:max(9px,env(safe-area-inset-top));
+  right:9px;
+  bottom:auto;
+  width:min(336px,80vw);
+  max-width:calc(100vw - 32px);
+  height:auto;
+  max-height:calc(100dvh - 24px);
+  min-height:0;
+  padding:15px 12px 17px;
+  border-radius:20px;
+  border:1px solid rgba(255,255,255,.68);
+  box-shadow:0 18px 55px rgba(6,26,47,.28),inset 0 1px 0 rgba(255,255,255,.55);
+  background:linear-gradient(145deg,rgba(249,253,255,.93),rgba(237,249,250,.88));
+  -webkit-backdrop-filter:blur(18px) saturate(1.13);
+  backdrop-filter:blur(18px) saturate(1.13);
+  overflow-x:hidden;
+  overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
+}
+/* Keep contrast high enough for controls even with transparency. */
+.zyro-settings-drawer .zyro-drawer-menu>button{
+  background:rgba(255,255,255,.79);
+  border:1px solid rgba(143,191,197,.37);
+  border-radius:13px;
+  box-shadow:0 4px 14px rgba(7,45,65,.045),inset 0 1px 0 rgba(255,255,255,.67);
+}
+.zyro-settings-drawer .zyro-drawer-menu>button:active{background:rgba(225,250,246,.92)}
+.zyro-settings-drawer .zyro-settings-glyph{
+  background:linear-gradient(150deg,rgba(213,250,243,.85),rgba(218,244,250,.73));
+  border:1px solid rgba(64,192,175,.12);
+}
+.zyro-settings-drawer .zyro-drawer-icon-button{
+  background:rgba(232,246,249,.76);
+  border:1px solid rgba(132,185,196,.38);
+}
+.zyro-settings-drawer :is(.panel,.zyro-v15-panel,.zyro-appearance-panel,.how-it-works){
+  border-radius:15px;
+  box-shadow:0 6px 20px rgba(9,40,60,.07);
+}
+.zyro-settings-drawer :is(.zyro-appearance-panel,.how-it-works,.panel){
+  background:rgba(255,255,255,.82);
+  border:1px solid rgba(132,186,194,.30);
+}
+/* Light frosted page chrome and cards. Map tiles and controls remain untouched. */
+.topbar{
+  background:rgba(8,27,46,.94);
+  -webkit-backdrop-filter:blur(9px) saturate(1.10);
+  backdrop-filter:blur(9px) saturate(1.10);
+  box-shadow:0 6px 20px rgba(2,22,41,.13);
+}
+.bottom-nav{
+  background:rgba(251,254,255,.94);
+  border-top:1px solid rgba(134,187,196,.29);
+  box-shadow:0 -5px 18px rgba(8,35,53,.07);
+}
+:is(.panel,.stat-card,.circle-card,.contact-card,.profile-photo-editor,.zyro-appearance-panel){
+  background:rgba(255,255,255,.88);
+  border-color:rgba(130,187,196,.30);
+  box-shadow:0 9px 25px rgba(10,45,67,.07), inset 0 1px 0 rgba(255,255,255,.72);
+}
+.profile-identity-card,
+.chat-hero,
+.mode-heading{
+  box-shadow:0 15px 30px rgba(4,28,47,.17),inset 0 1px 0 rgba(255,255,255,.11);
+}
+.connection-pill{
+  background:rgba(255,255,255,.10);
+  border-color:rgba(159,231,228,.31);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 4px 14px rgba(0,0,0,.08);
+}
+/* Discrete feedback, no movement in SOS/map interfaces. */
+:is(.btn,.chat-filter,.zyro-profile-more,.zyro-drawer-menu>button){
+  transition:background-color .20s ease,border-color .20s ease,box-shadow .20s ease,filter .20s ease;
+}
+:is(.btn,.chat-filter,.zyro-profile-more):active{filter:brightness(1.035)}
+:is(.zyro-settings-drawer button,.zyro-profile-more):focus-visible{outline:2px solid #1bbaad;outline-offset:2px}
+
+html[data-theme="dark"] .zyro-settings-drawer{
+  color:#e9faf9;
+  border-color:rgba(105,195,195,.28);
+  background:linear-gradient(145deg,rgba(10,34,52,.94),rgba(11,40,55,.89));
+  box-shadow:0 18px 55px rgba(0,8,21,.46),inset 0 1px 0 rgba(137,233,221,.11);
+}
+html[data-theme="dark"] .zyro-settings-drawer .zyro-drawer-menu>button{
+  background:rgba(24,63,80,.78);
+  border-color:rgba(117,196,196,.27);
+  color:#e8faf9;
+  box-shadow:inset 0 1px 0 rgba(168,236,232,.06);
+}
+html[data-theme="dark"] .zyro-settings-drawer .zyro-drawer-menu>button:active{background:rgba(24,85,91,.92)}
+html[data-theme="dark"] .zyro-settings-drawer .zyro-settings-glyph{background:rgba(41,105,113,.42);border-color:rgba(130,219,205,.16)}
+html[data-theme="dark"] .zyro-settings-drawer .zyro-drawer-icon-button{background:rgba(37,82,102,.70);border-color:rgba(105,168,185,.32);color:#e9faf9}
+html[data-theme="dark"] .zyro-settings-drawer :is(.zyro-appearance-panel,.how-it-works,.panel){
+  background:rgba(19,49,67,.88);
+  border-color:rgba(120,198,199,.24);
+}
+html[data-theme="dark"] .bottom-nav{background:rgba(8,26,44,.94);border-top-color:rgba(89,174,184,.28)}
+html[data-theme="dark"] :is(.panel,.stat-card,.circle-card,.contact-card,.profile-photo-editor,.zyro-appearance-panel){
+  background:rgba(15,40,60,.90);
+  border-color:rgba(97,169,189,.25);
+  box-shadow:0 10px 26px rgba(0,12,25,.25),inset 0 1px 0 rgba(153,223,227,.05);
+}
+/* Slightly narrower on very small phones but no text clipping. */
+@media(max-width:370px){
+  .zyro-settings-drawer,html[data-theme="dark"] .zyro-settings-drawer{
+    width:82vw;right:7px;padding-left:10px;padding-right:10px;
+  }
+}
+/* Avoid expensive blur on low-capability browsers. */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .zyro-settings-drawer,html[data-theme="dark"] .zyro-settings-drawer{background:#f3fbfc}
+  html[data-theme="dark"] .zyro-settings-drawer{background:#112b3e}
+}
+@media(prefers-reduced-motion:reduce){
+  :is(.btn,.chat-filter,.zyro-profile-more,.zyro-drawer-menu>button){transition:none!important}
+}
