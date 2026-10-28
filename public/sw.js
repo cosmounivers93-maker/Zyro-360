@@ -1,11 +1,11 @@
 'use strict';
-const CACHE='zyro-360-v11-noctis';
+const CACHE='zyro-360-v13-google-maps';
 const ASSETS=['/','/index.html','/style.css','/app.js','/manifest.webmanifest','/assets/icon192.png','/assets/icon512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
 self.addEventListener('fetch',event=>{
   if(event.request.method!=='GET'||new URL(event.request.url).pathname.startsWith('/api/'))return;
-  event.respondWith(fetch(event.request).catch(()=>caches.match(event.request)));
+  event.respondWith(fetch(event.request).catch(()=>caches.match(event.request,{ignoreSearch:true})));
 });
 self.addEventListener('push',event=>{
   let info={title:'🆘 Nuovo SOS',body:'Una persona fidata ha bisogno di aiuto.',url:'/'};

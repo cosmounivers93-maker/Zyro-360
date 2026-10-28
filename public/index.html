@@ -4,14 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v11.0-zyro-noctis">
+  <meta name="zyro-ui-build" content="v13.0-google-maps">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.15.0/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="/style.css?v=10.0-zyro-atlas-world">
+  <link rel="stylesheet" href="/style.css?v=13.0-google-maps">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -43,17 +42,14 @@
     <section id="homeView" class="view home-map-view">
       <section class="geo-panel geo-immersive" aria-label="Mappa reale della tua posizione">
         <div id="liveMap" class="live-map" aria-label="Mappa interattiva. Trascina per spostarti, usa due dita per ingrandire.">
-          <div id="zyroVectorMap" class="zyro-vector-map hidden" aria-label="Mappa vettoriale ZYRO 360 con GPS e posizioni condivise"></div>
-          <div id="googleMap" class="google-map hidden" aria-label="Google Maps con i membri della tua cerchia"></div>
-          <div id="mapTiles" class="map-tiles" aria-hidden="true"></div>
-          <div id="mapPins" class="map-pins" aria-hidden="true"></div>
-          <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button><button type="button" id="mapTilt" title="Attiva o disattiva la visuale 3D" aria-label="Passa da vista 3D a 2D" aria-pressed="true">3D</button></div>
-          <div class="map-top-label"><span class="map-live-dot"></span><span>ZYRO NOCTIS</span><span class="zyro-map-pill">MONDO · LIVE</span></div>
-          <div class="zyro-map-brand" aria-hidden="true"><span class="zyro-map-orb">✦</span><span>ZYRO 360 · WORLD MAP</span></div>
+          <div id="zyroVectorMap" class="zyro-vector-map" aria-label="Google Maps interattiva di ZYRO 360"></div>
+          <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button></div>
+          <div class="map-top-label"><span class="map-live-dot"></span><span>ZYRO · GOOGLE MAPS</span><span class="zyro-map-pill">MONDO · LIVE</span></div>
+          <div class="zyro-map-brand" aria-hidden="true"><span class="zyro-map-orb">✦</span><span>ZYRO 360 · GOOGLE MAPS</span></div>
           <div class="zyro-atlas-legend" aria-label="Legenda GPS, cerchia e SOS"><span><i class="atlas-key-you"></i> Tu</span><span><i class="atlas-key-circle"></i> Cerchia</span><span><i class="atlas-key-sos"></i> SOS</span></div>
           <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
-          <div id="mapUnavailable" class="map-unavailable hidden" role="alert">La mappa incorporata non è disponibile. <a id="mapOpenGoogle" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer">Apri Google Maps</a></div>
-          <div id="mapAttribution" class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a id="mapSourceCredit" href="https://openfreemap.org/" target="_blank" rel="noopener noreferrer">© OpenFreeMap</a></div>
+          <div id="mapUnavailable" class="map-unavailable hidden" role="alert"><strong>Cartografia non disponibile</strong><span id="mapFailureText">Controlla la connessione e riprova.</span><div class="map-recovery-actions"><button type="button" id="mapRetry">Riprova</button><a id="mapOpenGoogle" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer">Apri Google Maps</a></div></div>
+          
         </div>
         <div class="zyro-command-row" role="group" aria-label="Azioni rapide di ZYRO 360">
           <label class="zyro-command-btn zyro-command-share" for="shareToggle" title="Attiva o disattiva la condivisione GPS con le tue cerchie">
@@ -187,7 +183,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="https://unpkg.com/maplibre-gl@5.15.0/dist/maplibre-gl.js" defer></script>
-<script src="/app.js?v=10.0-zyro-atlas-world" defer></script>
+<script src="/app.js?v=13.0-google-maps" defer></script>
 </body>
 </html>
