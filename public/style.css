@@ -667,3 +667,7 @@ html[data-theme="light"] .geo-immersive .live-map{background:#e9f2f6!important}
  .zyro-gl-location .zyro-gl-ring{animation:none!important}
  .zyro-gl-location .zyro-gl-arrow{transition:none!important}
 }
+
+/* V14.4: keep old map images painted while fresh tiles arrive; reduce flicker on Android. */
+#zyroVectorMap .zyro-raster-tiles{background:transparent;contain:layout style;isolation:isolate;}
+#zyroVectorMap .zyro-raster-tile{object-fit:fill;backface-visibility:hidden;-webkit-backface-visibility:hidden;}
