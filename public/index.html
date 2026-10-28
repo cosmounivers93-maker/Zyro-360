@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v14.6.1-centered-headings">
+  <meta name="zyro-ui-build" content="v15.0-journeys-premium-prototype">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="/style.css?v=14.6.1-centered-headings">
+  <link rel="stylesheet" href="/style.css?v=15.0-journeys-premium-prototype">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -113,8 +113,41 @@
         </div>
         <p class="pick-limits">Questa funzione è sperimentale: non blocca Android, non impedisce lo spegnimento e può fermarsi a schermo spento. Rispetta il volume del dispositivo e può produrre falsi allarmi.</p>
       </section>
+
+      <section class="zyro-v15-panel" id="journeyPanel">
+        <div class="zyro-v15-heading"><span class="zyro-v15-symbol">↗</span><div><p class="eyebrow muted">VIAGGIA CON PIÙ TRANQUILLITÀ</p><h2>Accompagnami</h2><p>Condividi il percorso con i contatti scelti e indica quando pensi di arrivare.</p></div></div>
+        <div id="journeyInactive">
+          <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, lavoro, stazione" autocomplete="off"></label>
+          <label class="zyro-v15-field">Tempo previsto<select id="journeyMinutes"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e mezza</option><option value="120">2 ore</option><option value="240">4 ore</option></select></label>
+          <div class="zyro-v15-destination"><label><input id="journeyAuto" type="checkbox"> Arrivo automatico (se imposti il centro della mappa come destinazione)</label><small>Seleziona la destinazione spostando prima la mappa nella Home. Il rilevamento automatico richiede GPS e app aperta.</small><button id="journeySetTarget" type="button" class="zyro-v15-secondary">Usa il centro della mappa come meta</button><span id="journeyTargetInfo">Nessuna meta GPS impostata</span></div>
+          <p class="zyro-v15-subhead">Chi può seguire il tuo percorso?</p><div id="journeyRecipients" class="zyro-v15-contacts"></div>
+          <button id="journeyStart" type="button" class="zyro-v15-primary">Avvia Accompagnami</button>
+        </div>
+        <div id="journeyActive" class="hidden zyro-v15-active"><strong id="journeyStatus">Percorso in corso</strong><p id="journeyDetail"></p><div class="zyro-v15-actions"><button id="journeyArrived" type="button" class="zyro-v15-primary">✓ Sono arrivato/a</button><button id="journeyCancel" type="button" class="zyro-v15-secondary">Interrompi percorso</button></div></div>
+        <div id="journeyContactsStatus" class="zyro-v15-feed"></div>
+      </section>
+      <section class="zyro-v15-panel" id="checkinPanel">
+        <div class="zyro-v15-heading"><span class="zyro-v15-symbol">✓</span><div><p class="eyebrow muted">UN CONTROLLO IN PIÙ</p><h2>Check-in intelligente</h2><p>Imposta un orario entro cui confermare che va tutto bene. Se scade, i contatti ricevono una richiesta di verifica, quando le notifiche sono disponibili.</p></div></div>
+        <div id="checkinInactive">
+          <label class="zyro-v15-field">Quando vuoi confermare?<select id="checkinMinutes"><option value="15">Tra 15 minuti</option><option value="30" selected>Tra 30 minuti</option><option value="60">Tra 1 ora</option><option value="120">Tra 2 ore</option><option value="240">Tra 4 ore</option><option value="480">Tra 8 ore</option></select></label>
+          <p class="zyro-v15-subhead">Chi deve essere avvisato in caso di mancata risposta?</p><div id="checkinRecipients" class="zyro-v15-contacts"></div>
+          <button id="checkinStart" type="button" class="zyro-v15-primary">Imposta check-in</button>
+        </div>
+        <div id="checkinActive" class="hidden zyro-v15-active"><strong id="checkinStatus">Check-in in corso</strong><p id="checkinDetail"></p><div class="zyro-v15-actions"><button id="checkinConfirm" type="button" class="zyro-v15-primary">✓ Tutto bene</button><button id="checkinCancel" type="button" class="zyro-v15-secondary">Annulla</button></div></div>
+        <div id="checkinContactsStatus" class="zyro-v15-feed"></div>
+        <p class="zyro-v15-note">⚠ I controlli automatici non sono garantiti sul piano gratuito Render quando il server va in pausa. Non sostituiscono le chiamate personali o i soccorsi.</p>
+      </section>
+      <section class="zyro-v15-panel" id="premiumPanel">
+        <div class="zyro-v15-heading"><span class="zyro-v15-symbol">✦</span><div><p class="eyebrow muted">ABBONAMENTI</p><h2>SOS Premium</h2><p>Notifica ai destinatari scelti, posizione GPS in diretta, strada se disponibile e ascolto audio con consenso.</p></div></div>
+        <div class="zyro-v15-plans"><div><b>ZYRO Premium</b><strong>3,99 € <small>/mese</small></strong></div><div><b>ZYRO Family</b><strong>6,99 € <small>/mese</small></strong></div></div>
+        <p id="premiumStatus" class="zyro-v15-status" role="status">Verifica abbonamento…</p>
+        <label class="zyro-v15-mic"><input id="sosAudioConsent" type="checkbox"> <span><b>Chiedi di attivare il microfono quando premi SOS</b><small>Il browser chiederà l'autorizzazione. Audio in diretta, non registrato dal server; serve l'app aperta e il consenso.</small></span></label>
+        <p class="zyro-v15-note">Solo un acquisto verificato dal server potrà attivare SOS Premium. La fatturazione Play Store non è ancora collegata: nessun pagamento viene richiesto né elaborato in questa versione. Non viene inviato alcun SOS Premium con abbonamento inattivo.</p>
+        <button id="premiumDetails" type="button" class="zyro-v15-secondary">Informazioni su Premium</button>
+        <a class="zyro-v15-emergency" href="tel:112">Emergenza reale? Chiama il 112 — sempre disponibile</a>
+      </section>
       <section class="panel sos-recipient-panel" aria-labelledby="sosRecipientTitle">
-        <div class="panel-title"><span class="panel-icon">🆘</span><div><p class="eyebrow muted sos-kicker">AVVISO D'EMERGENZA</p><h2 id="sosRecipientTitle">Destinatari SOS</h2><p>Seleziona le persone da avvisare quando premi SOS. La condivisione della posizione si attiva separatamente.</p></div></div>
+        <div class="panel-title"><span class="panel-icon">🆘</span><div><p class="eyebrow muted sos-kicker">AVVISO D'EMERGENZA</p><h2 id="sosRecipientTitle">Destinatari SOS</h2><p>Prepara la lista dei destinatari. L’invio SOS Premium richiede un abbonamento verificato; il GPS può essere condiviso solo con i destinatari durante l’allarme.</p></div></div>
         <div class="sos-section"><div class="sos-section-heading"><span class="sos-section-icon" aria-hidden="true">♧</span><div><strong>Persone da avvisare</strong><small>Solo i contatti che hai scelto riceveranno l'avviso.</small></div></div><div id="sosRecipientList" class="recipient-grid"></div></div>
         <button id="saveSOSRecipients" class="btn btn-dark btn-wide" type="button">Salva destinatari SOS</button>
         <p id="sosPushNote" class="setting-description sos-push-note" role="status"></p>
@@ -174,7 +207,8 @@
         <div class="how-heading"><span class="how-icon">?</span><div><p class="eyebrow muted">GUIDA E TRASPARENZA</p><h2 id="howTitle">Come funziona ZYRO 360?</h2><p>Tutto quello che devi sapere su protezione, privacy e uso corretto.</p></div></div>
         <details><summary>La mappa e la posizione condivisa <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Usa «Trova la mia posizione» per visualizzarti sulla mappa. Solo con «Attiva posizione» autorizzi la condivisione GPS con i membri delle tue cerchie. Puoi disattivarla in ogni momento. La precisione dipende dal GPS, dalla connessione e dai permessi del telefono. Sul web, il tracciamento può interrompersi a schermo spento. Il fornitore della cartografia riceve richieste tecniche come indirizzo IP e area consultata: consulta anche la sua informativa privacy.</p></div></details>
         <details><summary>Cerchie, inviti e chat <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea una cerchia, genera un codice o link temporaneo e invialo alle persone fidate. Chi riceve l'invito deve accedere all'app e confermare l'ingresso. Le chat private e quelle di gruppo sono destinate ai membri autorizzati. In questo prototipo i messaggi non hanno crittografia end-to-end: non inviare dati particolarmente sensibili.</p></div></details>
-        <details><summary>SOS, notifiche e microfono <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Il tasto SOS invia una richiesta d'aiuto ai contatti selezionati, senza attivare automaticamente la condivisione GPS. Se scegli «Attiva microfono» durante l'SOS, il browser ti richiede l'autorizzazione per trasmettere audio in diretta; puoi fermarlo in ogni momento. Il flusso audio non viene registrato sul server da questo prototipo. Le notifiche push funzionano solo se il server è configurato e il destinatario ha autorizzato le notifiche.</p><p>Se sei in pericolo reale chiama immediatamente il <a href="tel:112">112</a>: ZYRO 360 non sostituisce i soccorsi.</p></div></details>
+        <details><summary>SOS, notifiche e microfono <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Il tasto SOS Premium richiede un abbonamento verificato; se non è attivo, nessun messaggio SOS viene inviato. Se attivo, condivide la posizione durante l’allarme soltanto con i destinatari selezionati, senza attivare la condivisione generale della cerchia. Se scegli di attivare il microfono durante l'SOS, il browser ti richiede l'autorizzazione per trasmettere audio in diretta; puoi fermarlo in ogni momento. Il flusso audio non viene registrato sul server da questo prototipo. Le notifiche push funzionano solo se il server è configurato e il destinatario ha autorizzato le notifiche. La consegna e la lettura non sono garantite. La via esatta viene mostrata soltanto quando è disponibile un servizio autorizzato di geocodifica; in alternativa sono mostrate le coordinate.</p><p>Se sei in pericolo reale chiama immediatamente il <a href="tel:112">112</a>: ZYRO 360 non sostituisce i soccorsi.</p></div></details>
+        <details><summary>Accompagnami e Check-in <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Con «Accompagnami» scegli una meta, un tempo previsto e i contatti che possono seguire il percorso quando hai abilitato la condivisione GPS. «Sono arrivato/a» conferma l’arrivo; il rilevamento automatico funziona solo se imposti una meta GPS e l’app continua a inviare posizioni. Con Check-in imposti una scadenza e confermi di stare bene. Un ritardo richiede una verifica, non indica automaticamente un pericolo. Su Render gratuito i controlli in background del server possono fermarsi quando il servizio è inattivo.</p></div></details>
         <details><summary>Modalità Pick Pocket <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Rileva alcuni movimenti bruschi tramite i sensori del browser e prova ad attivare una sirena. Può generare falsi allarmi; non garantisce il rilevamento dei furti, non impedisce di spegnere il telefono e potrebbe smettere di funzionare con schermo bloccato o app in background. Puoi scegliere se avvisare i contatti autorizzati.</p></div></details>
         <details><summary>Privacy, consenso e riferimenti legali <span aria-hidden="true">＋</span></summary><div class="how-content"><p><strong>Norme di riferimento:</strong> Regolamento UE 2016/679 (GDPR), in particolare principi dell'art. 5, basi giuridiche art. 6, informativa art. 13, sicurezza art. 32 e diritti dell'interessato (artt. 15–22); in Italia anche il D.Lgs. 196/2003, come modificato.</p><p>Per un servizio pubblico occorrono un'informativa privacy completa con identità e contatti del titolare, finalità, basi giuridiche, tempi di conservazione, fornitori, trasferimenti e modalità per esercitare i diritti; autorizzazioni chiare per GPS, notifiche e microfono; misure di sicurezza, verifica degli accessi e valutazione dell'eventuale necessità di una DPIA. La sola presenza di questa guida <strong>non rende automaticamente il servizio conforme alla legge</strong>.</p><p>Condividi posizioni e audio solo con persone autorizzate. Non registrare o diffondere conversazioni altrui senza una base lecita; la liceità dipende dal contesto e dalle norme applicabili.</p><div class="law-links"><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=it" target="_blank" rel="noopener noreferrer">Testo ufficiale GDPR</a><a href="https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2003-06-30;196" target="_blank" rel="noopener noreferrer">Codice Privacy italiano</a><a href="https://www.garanteprivacy.it/" target="_blank" rel="noopener noreferrer">Garante Privacy</a></div></div></details>
         <p class="how-caveat">Informazioni orientative, non consulenza legale. Prima di pubblicare ZYRO 360 come servizio di sicurezza è necessaria una verifica tecnica, legale e di protezione dei dati.</p>
@@ -195,6 +229,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=14.6.1-centered-headings" defer></script>
+<script src="/app.js?v=15.0-journeys-premium-prototype" defer></script>
 </body>
 </html>
