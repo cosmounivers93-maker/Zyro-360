@@ -1,0 +1,307 @@
+/* ZYRO 360 V27 · all-section responsive and smooth Android WebView
+   Scoped to layout and presentation. Does not change GPS, SOS, Pick Pocket,
+   microphone, billing, push APIs, route controls or user permissions. */
+
+/* Foundation: account for 320px screens, large accessibility fonts, long
+   contact names, email addresses, server messages and device safe areas. */
+html,body{max-width:100%;overflow-x:clip}
+body{min-width:0;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+#appScreen,#authScreen{min-width:0;max-width:100%}
+#appScreen :where(.view,.panel,.zyro-v15-panel,.stat-card,.pick-panel,
+ .sos-section,.contact-card,.circle-card,.zyro-admin-panel,.chat-hub,
+ .chat-room,.zyro-settings-pane,.zyro-settings-detail,.zyro-access-card,
+ .profile-identity-card,.profile-photo-editor,.zyro-sos-mic-choice,
+ .zyro-native-monitor,.top-cards,.panel-title,.circle-top,
+ .chat-header,.chat-compose,.zyro-drawer-top,.zyro-access-top,
+ .zyro-v15-heading,.zyro-v15-actions,.zyro-v15-plans,
+ .zyro-chat-page,.zyro-profile-page,.modes-page,.circles-clean-page,
+ .zyro-invitees-intro,.zyro-access-name,.profile-id-copy,
+ .contact-info,.contact-actions,.chat-room-text){min-width:0}
+#appScreen :where(h1,h2,h3,h4,p,small,strong,b,span,label,code,
+ .setting-description,.sos-push-note,.zyro-v15-note,.pick-status,
+ .zyro-admin-meta,.zyro-invitee-flag,.chat-bubble,.chat-room-text,
+ .zyro-access-status,.zyro-native-monitor-note){overflow-wrap:anywhere}
+#appScreen :where(input,textarea,select,button){max-width:100%;min-width:0}
+#appScreen :where(input:not([type="checkbox"]),textarea,select){width:100%;font-size:max(16px,1rem)}
+#appScreen :where(button,.btn,.zyro-v15-primary,.zyro-v15-secondary){
+  white-space:normal;overflow-wrap:anywhere;line-height:1.32}
+#appScreen :where(.btn,.zyro-v15-primary,.zyro-v15-secondary,
+ .zyro-native-check,.zyro-native-battery,.zyro-sos-mic-test){
+  min-height:44px;touch-action:manipulation}
+#appScreen :where(.panel-title,.zyro-v15-heading,.pick-top,
+ .zyro-chat-page .chat-heading-row,.profile-photo-heading){
+  align-items:flex-start;gap:clamp(8px,2.8vw,15px)}
+#appScreen :where(.panel-title,.zyro-v15-heading,.pick-top)>:last-child{flex:1;min-width:0}
+#appScreen :where(.panel,.pick-panel,.zyro-v15-panel,
+ .zyro-saved-invitees .zyro-sos-mic-choice){max-width:100%}
+
+/* Topbar and fixed bottom nav. Keep map safe-area measurements from previous
+   release; fix labels without increasing nav footprint or clipping fonts. */
+.topbar{gap:9px;min-width:0}
+.topbar .brand{min-width:0;flex:1;overflow:hidden}
+.topbar .brand>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.topbar .connection-pill{min-width:0;flex:0 0 auto;max-width:47vw}
+.topbar .connection-pill>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bottom-nav{width:100%;max-width:100vw;gap:0!important;justify-content:space-around}
+.bottom-nav .nav-item{
+  width:20%!important;max-width:none!important;min-width:0!important;
+  flex:1 1 20%!important;padding-inline:2px!important;
+  white-space:normal;overflow-wrap:normal;line-height:1.15;
+  text-align:center;touch-action:manipulation
+}
+.bottom-nav .nav-item .nav-icon{min-height:26px;flex-shrink:0}
+.bottom-nav .nav-item>span:not(.nav-icon){max-width:100%;font-size:clamp(9px,2.5vw,12px);line-height:1.25}
+#appScreen .container{max-width:100%;overflow-x:clip}
+#appScreen .view:not(.home-map-view){max-width:min(100%,780px)}
+
+/* Home: keep fullscreen map, three equally sized action controls, SOS modal
+   within available height. Never apply costly blur/filter to moving map tiles. */
+#homeView,#homeView .geo-immersive,#homeView .live-map{min-width:0;max-width:100%}
+#homeView .geo-immersive{min-height:0;overflow:hidden}
+#homeView .live-map{flex:1 1 auto;min-height:110px;touch-action:none;overscroll-behavior:contain}
+#homeView .zyro-vector-map{contain:layout style;touch-action:none}
+#homeView .zyro-command-row{
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  width:100%;gap:clamp(5px,1.8vw,11px);min-width:0;
+  padding-inline:clamp(7px,1.8vw,14px)
+}
+#homeView .zyro-command-btn{
+  width:100%;min-width:0;
+  min-height:67px;height:auto!important;
+  padding:9px clamp(3px,1vw,10px);
+  align-self:stretch;gap:3px
+}
+#homeView .zyro-cmd-title{
+  display:block;width:100%;max-width:100%;
+  white-space:normal;overflow-wrap:anywhere;
+  line-height:1.14;font-size:clamp(10px,2.65vw,13px)
+}
+#homeView .zyro-cmd-state{font-size:clamp(9px,2vw,11px);line-height:1.15}
+#homeView .zyro-atlas-legend{max-width:calc(100% - 110px);flex-wrap:wrap;gap:5px}
+#homeView .map-zoom-controls{right:max(9px,env(safe-area-inset-right));z-index:12}
+#homeView .map-status{max-width:min(78vw,320px);overflow-wrap:anywhere}
+#homeView #sosCard.zyro-sos-status.is-active{
+  min-width:0;width:auto;flex-shrink:1!important;
+  max-height:min(52dvh,500px);
+  overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin
+}
+#homeView #sosCard :where(.zyro-sos-status-header,
+ .sos-actions,.zyro-sos-audio-state){min-width:0;max-width:100%}
+#homeView #sosCard .zyro-sos-status-header strong{overflow-wrap:anywhere}
+#homeView #sosCard #stopSOS{width:100%;min-height:46px}
+#homeView #sosCard .zyro-sos-quick-call{width:100%;text-align:center}
+#homeView .map-attribution{max-width:calc(100% - 8px)}
+
+/* Circles: names and invitation links can be unusually long. */
+#circlesView :where(.inline-form,.circle-actions,.invite-share-actions){
+  display:flex;flex-wrap:wrap;gap:9px;max-width:100%}
+#circlesView .inline-form>*{min-width:0}
+#circlesView .inline-form input{flex:1 1 170px}
+#circlesView .inline-form button{flex:1 1 130px;min-height:46px}
+#circlesView :where(.circle-card,.circle-top,.circle-members,.invite-code-box,
+ .invite-target,.status-chip){max-width:100%;min-width:0}
+#circlesView .circle-top>div{flex:1;min-width:0}
+#circlesView .circle-top strong{overflow-wrap:anywhere;line-height:1.36}
+#circlesView .circle-actions>button,
+#circlesView .invite-share-actions>button{flex:1 1 125px;min-height:41px}
+#circlesView .member-pill{max-width:100%;overflow-wrap:anywhere}
+#circlesView .invite-code-box code,
+#circlesView .invite-code-box input{
+  display:block;max-width:100%;min-width:0;
+  overflow-x:auto;overflow-wrap:anywhere
+}
+#circlesView .invite-code-box input{width:100%}
+
+/* Modalità: Pick Pocket, Android diagnostics, journey, check-in, Premium, SOS. */
+#modesView :where(.top-cards,.stat-card,.pick-settings,.pick-section,
+ .pick-select-line,.pick-recipients,.zyro-v15-active,.zyro-v15-field,
+ .zyro-v15-contacts,.zyro-v15-plans,.sos-recipient-panel,
+ .sos-section,.recipient-grid,.contact-card,.emergency-card){min-width:0;max-width:100%}
+#modesView .top-cards{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#modesView .stat-card{gap:8px;padding:clamp(11px,2.6vw,17px)}
+#modesView .stat-card strong{font-size:clamp(16px,5vw,24px)}
+#modesView .stat-card small{line-height:1.3;overflow-wrap:anywhere}
+#modesView .pick-top>div:last-child{min-width:0;flex:1}
+#modesView .pick-section{padding-inline:clamp(10px,3vw,18px)}
+#modesView .pick-section-heading>div:last-child{min-width:0}
+#modesView .pick-select-line{gap:10px;flex-wrap:wrap}
+#modesView .pick-recipients label{max-width:100%;overflow-wrap:anywhere}
+#modesView .zyro-v15-panel{padding:clamp(14px,4vw,24px)}
+#modesView .zyro-v15-heading h2{font-size:clamp(18px,4.8vw,24px);line-height:1.25}
+#modesView .zyro-v15-field input,
+#modesView .zyro-v15-field select{min-height:46px}
+#modesView .zyro-v15-actions{grid-template-columns:minmax(0,1fr)!important;gap:9px}
+#modesView .zyro-v15-actions>button{max-width:100%;min-height:45px}
+#modesView .zyro-v15-plans{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#modesView .zyro-v15-plans>*{min-width:0;max-width:100%}
+#modesView .zyro-v15-plans strong{font-size:clamp(15px,4vw,20px)}
+#modesView .sos-recipient-panel .recipient-grid{
+  display:grid;grid-template-columns:minmax(0,1fr);gap:9px
+}
+#modesView .recipient-line{min-width:0;max-width:100%;gap:10px}
+#modesView .recipient-line>span{flex:1;min-width:0;overflow-wrap:anywhere}
+#modesView :where(.contact-card,.emergency-card){gap:11px}
+#modesView .contact-info{flex:1 1 auto}
+#modesView .contact-actions{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end}
+#modesView .emergency-card>div{min-width:0;flex:1}
+#modesView .emergency-card .call-button{white-space:normal;text-align:center}
+#modesView .zyro-native-monitor-head>div{min-width:0;flex:1}
+#modesView #zyroNativeMonitorText{overflow-wrap:anywhere;white-space:pre-line}
+
+/* Chat hub, open chat, composer and message attachments. */
+#chatsView :where(.chat-hero,.chat-hub,.chat-heading-row,
+ .chat-room,.chat-room-text,.chat-search,.chat-filter-bar,
+ .chat-header,.chat-conversation,.chat-messages,.chat-compose,
+ .chat-bubble,.chat-private-footnote){min-width:0;max-width:100%}
+#chatsView .chat-hero{overflow:hidden}
+#chatsView .chat-hero-copy{position:relative;z-index:1;min-width:0}
+#chatsView .chat-hero-graphic{pointer-events:none}
+#chatsView .chat-room{gap:11px}
+#chatsView .chat-room-text{flex:1;min-width:0}
+#chatsView .chat-room-text :where(b,small){overflow-wrap:anywhere;line-height:1.4}
+#chatsView .chat-room-chevron{flex-shrink:0}
+#chatsView .chat-filter-bar>*{min-width:0;flex:1}
+#chatsView .chat-compose{gap:8px;max-width:100%}
+#chatsView .chat-compose :where(textarea,input){min-width:0;flex:1 1 auto;width:auto}
+#chatsView .chat-messages{overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
+#chatsView .chat-bubble{max-width:min(90%,560px);min-width:0;overflow-wrap:anywhere}
+#chatsView .chat-bubble :where(img,video){max-width:100%;height:auto}
+#chatsView .chat-header>div:first-child{min-width:0;flex:1}
+#chatsView .chat-header :where(strong,small){overflow-wrap:anywhere}
+#chatsView #chatConversation:not(.hidden){max-width:100%;min-height:0}
+#chatsView .chat-search{overflow:hidden}
+#chatsView .chat-search input{flex:1;width:auto;min-width:0}
+
+/* Profile, drawer, invitee controls, photo editor, microphone, admin panel. */
+#settingsView :where(.profile-heading,.profile-identity-card,
+ .profile-id-copy,.profile-photo-editor,.profile-action,
+ .zyro-theme-choices,.zyro-appearance-panel,.zyro-admin-users,
+ .zyro-admin-user,.zyro-admin-actions,.zyro-admin-meta,.how-it-works){min-width:0;max-width:100%}
+#settingsView .profile-id-copy{flex:1;min-width:0}
+#settingsView .profile-id-copy :where(strong,span,small,p){overflow-wrap:anywhere}
+#settingsView .profile-identity-card{gap:clamp(9px,2.5vw,18px)}
+#settingsView .profile-photo-editor{padding-inline:clamp(12px,3vw,22px)}
+#settingsView .profile-action{gap:10px}
+#settingsView .profile-action>span:nth-child(2){min-width:0;flex:1}
+#settingsView .zyro-admin-actions{display:flex;flex-wrap:wrap;gap:9px}
+#settingsView .zyro-admin-actions>button{flex:1 1 140px;min-height:44px}
+#settingsView .zyro-admin-meta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px}
+#settingsView .zyro-admin-meta :where(code,span){min-width:0;overflow-wrap:anywhere}
+#settingsView .how-it-works details{max-width:100%;overflow-wrap:anywhere}
+.zyro-settings-drawer{
+  width:min(440px,100vw)!important;
+  max-width:100vw!important;max-height:100dvh;
+  overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding-inline:clamp(13px,3.5vw,22px)!important
+}
+.zyro-settings-drawer :where(.zyro-drawer-top,.zyro-drawer-menu,
+ .zyro-settings-pane,.zyro-settings-detail,.zyro-saved-invitees,
+ .zyro-access-card,.zyro-access-toggle,.zyro-access-top,
+ .zyro-sos-mic-choice,.zyro-invitees-intro,
+ .zyro-mic-diagnostic-result){max-width:100%;min-width:0}
+.zyro-settings-drawer .zyro-drawer-top>div{min-width:0;flex:1}
+.zyro-settings-drawer #zyroSettingsTitle{font-size:clamp(18px,5.2vw,25px);overflow-wrap:anywhere}
+.zyro-settings-drawer :where(.zyro-drawer-menu>button,
+ .zyro-settings-back,.zyro-access-toggle){min-height:44px}
+.zyro-settings-drawer .zyro-drawer-menu>button{
+  display:flex;align-items:center;gap:10px;white-space:normal;text-align:left;
+}
+.zyro-settings-drawer .zyro-drawer-menu>button>span:nth-child(2){
+  flex:1;min-width:0;overflow-wrap:anywhere
+}
+.zyro-settings-drawer .zyro-drawer-menu>button small{
+  display:block;white-space:normal;overflow-wrap:anywhere
+}
+.zyro-settings-drawer .zyro-access-name{flex:1;min-width:0}
+.zyro-settings-drawer .zyro-invitee-flag{flex:0 1 auto;min-width:0;max-width:42%;white-space:normal;text-align:right}
+.zyro-settings-drawer .zyro-access-toggle>span{flex:1;min-width:0;overflow-wrap:anywhere}
+.zyro-settings-drawer .zyro-sos-mic-toggle{align-items:center;gap:9px}
+.zyro-settings-drawer .zyro-mic-diagnostic-result{
+  width:100%;overflow-wrap:anywhere;white-space:pre-line
+}
+.zyro-settings-drawer .zyro-v15-plans{grid-template-columns:repeat(2,minmax(0,1fr))}
+.zyro-settings-drawer :where(.zyro-settings-glyph,.zyro-drawer-icon-button){flex-shrink:0}
+.zyro-settings-drawer :where(input,select,textarea){max-width:100%;min-width:0}
+.zyro-settings-drawer :where(button,a,input,textarea,select):focus-visible{
+  outline:2px solid #54dcca;outline-offset:2px
+}
+
+/* Antifurto, SOS audio bar, toast, emergency dialog: preserve emergency
+   action availability while avoiding screen-edge clipping. */
+#theftOverlay .theft-content{
+  width:min(452px,100%)!important;max-width:100%;
+  overflow-x:hidden!important;overflow-wrap:anywhere
+}
+#theftOverlay .zyro-alert-brand{min-width:0;flex-wrap:wrap}
+#theftOverlay .zyro-alert-brand-mode{min-width:0}
+#theftOverlay :where(h1,p,button,a,label,input){max-width:100%;overflow-wrap:anywhere}
+#toast.toast{max-width:min(92vw,560px);max-height:38dvh;overflow:auto;overflow-wrap:anywhere}
+.audio-dock{max-width:100vw;min-width:0;overflow-wrap:anywhere}
+.audio-dock audio{max-width:100%}
+
+/* Lower work per frame: the interactive map should be isolated from the page
+   flow; do not create hundreds of 'will-change' layers on raster tiles. */
+#homeView .zyro-raster-tiles,
+#homeView .zyro-raster-markers{pointer-events:none}
+#homeView .zyro-raster-pin{will-change:transform}
+#homeView .zyro-gl-arrow{will-change:transform}
+#chatsView .chat-hero-glow{pointer-events:none}
+:where(.bottom-nav .nav-item,.zyro-command-btn,.zyro-settings-drawer button){
+  -webkit-tap-highlight-color:transparent
+}
+@supports(content-visibility:auto){
+  /* Only panels below the fold. Never defer live map, chat conversation,
+     microphone diagnostics, active SOS or Pick Pocket critical controls. */
+  #modesView > :is(#journeyPanel,#checkinPanel,#premiumPanel,.sos-recipient-panel),
+  #settingsView > :is(.how-it-works,.zyro-admin-panel){
+    content-visibility:auto;
+    contain-intrinsic-size:auto 370px
+  }
+}
+
+/* Small Android phones and unusually large system text settings. */
+@media(max-width:390px){
+  #appScreen .container{padding-inline:clamp(9px,3vw,14px)}
+  #appScreen .view:not(.home-map-view) :where(.panel,.pick-panel,.zyro-v15-panel){
+    padding-inline:clamp(11px,3.5vw,16px)}
+  #settingsView .profile-identity-card{
+    padding:17px 12px;gap:9px;border-radius:21px
+  }
+  #settingsView .profile-avatar-wrap,
+  #settingsView .profile-identity-card .profile-avatar{width:76px;height:76px}
+  #settingsView .profile-id-copy strong{font-size:clamp(15px,4.6vw,19px)}
+  #homeView .zyro-command-row{padding-inline:6px;gap:5px}
+  #homeView .zyro-cmd-icon svg{width:22px;height:22px}
+  #homeView .zyro-cmd-title{font-size:clamp(9px,2.5vw,11px)}
+  #homeView #sosCard.zyro-sos-status.is-active{margin-inline:6px!important}
+  #chatsView .chat-hero-copy h1{font-size:clamp(28px,8vw,39px)}
+  .zyro-settings-drawer{padding-inline:12px!important}
+}
+@media(max-width:340px){
+  #appScreen .container{padding-inline:8px}
+  .topbar{padding-inline:9px}
+  .topbar .brand{gap:5px}
+  .topbar .brand>span{font-size:10px;letter-spacing:.02em}
+  .topbar .connection-pill{padding:6px 8px}
+  #homeView .zyro-command-btn{min-height:64px;padding:6px 3px}
+  #homeView .zyro-cmd-title{font-size:9px}
+  #modesView .zyro-v15-plans,
+  .zyro-settings-drawer .zyro-v15-plans{grid-template-columns:minmax(0,1fr)}
+  #settingsView .profile-identity-card{flex-wrap:wrap}
+  #settingsView .profile-id-copy{flex-basis:100%}
+  #circlesView .inline-form{flex-direction:column}
+  #circlesView .inline-form>*{width:100%;flex:auto}
+}
+@media(max-height:680px){
+  #homeView #sosCard.zyro-sos-status.is-active{max-height:44dvh}
+  #homeView .live-map{min-height:95px}
+  #homeView .zyro-command-btn{min-height:61px;padding-block:5px}
+}
+@media(prefers-reduced-motion:reduce){
+  .bottom-nav .nav-item,.zyro-command-btn,.zyro-settings-drawer,
+  .zyro-settings-backdrop,.zyro-profile-more{transition:none!important}
+  #appScreen :where(.pulse-dot,.zyro-gl-ring,.chat-live-indicator){
+    animation:none!important
+  }
+}

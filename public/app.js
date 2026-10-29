@@ -333,21 +333,31 @@ function renderHome(){
       :sosAudioError?'⚠ Audio non disponibile: '+sosAudioError
       :'Audio autorizzato · avvio microfono in corso…';
   }
-  $('contactsList').innerHTML=contacts.length?contacts.map((u,i)=>{
+  const contactsRoot=$('contactsList');
+  const contactHtml=contacts.length?contacts.map((u,i)=>{
     const status=u.sos?(u.sos.kind==='pickpocket'?'🚨 POSSIBILE FURTO':'🆘 SOS ATTIVO'):u.online?(u.sharing?'Posizione attiva':'Online'):'Offline';
     const loc=u.location, time=loc?when(loc.updatedAt):(u.sharing?'Posizione in attesa':'Posizione non condivisa');
     return `<div class="contact-card"><div class="contact-avatar ${i%2?'alt':''}">${avatarHTML(u)}</div><div class="contact-info"><b>${escapeHtml(u.name)}</b><small>${escapeHtml(time)}</small></div><div class="contact-actions"><span class="status-chip ${u.sos?'alert':!u.online?'off':''}">${escapeHtml(status)}</span>${loc?`<a class="mini-btn" target="_blank" rel="noopener noreferrer" href="${locationUrl(loc)}">📍 Mappa</a>`:''}${u.sos?.hasAudio?`<button type="button" class="mini-btn audio" data-listen="${escapeHtml(u.id)}">🎧 Ascolta</button>`:''}</div></div>`;
   }).join(''):`<div class="empty-state"><div class="empty-symbol">♧</div><strong>La tua cerchia inizia da qui</strong>Aggiungi le persone di cui ti fidi per condividere la posizione e ricevere SOS.</div>`;
+  if(contactsRoot._zyroHtml!==contactHtml){contactsRoot.innerHTML=contactHtml;contactsRoot._zyroHtml=contactHtml;}
   const otherAlerts=current.alerts.filter(a=>a.userId!==me.id);
   $('activeAlerts').classList.toggle('hidden',!otherAlerts.length);
-  $('activeAlerts').innerHTML=otherAlerts.map(a=>`<div class="alert-box"><h3>${a.kind==='pickpocket'?'🚨 Possibile furto:':'🆘'} ${escapeHtml(a.name)} ${a.kind==='pickpocket'?'potrebbe aver subito uno scippo':'chiede aiuto'}</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p><div class="action-row">${a.address?`<p>📍 ${escapeHtml(a.address)}</p>`:''}${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
-  document.querySelectorAll('[data-listen]').forEach(btn=>btn.addEventListener('click',()=>action(()=>listenTo(btn.dataset.listen))));
+  const alertsRoot=$('activeAlerts');
+  const alertsHtml=otherAlerts.map(a=>`<div class="alert-box"><h3>${a.kind==='pickpocket'?'🚨 Possibile furto:':'🆘'} ${escapeHtml(a.name)} ${a.kind==='pickpocket'?'potrebbe aver subito uno scippo':'chiede aiuto'}</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p><div class="action-row">${a.address?`<p>📍 ${escapeHtml(a.address)}</p>`:''}${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
+  if(alertsRoot._zyroHtml!==alertsHtml){alertsRoot.innerHTML=alertsHtml;alertsRoot._zyroHtml=alertsHtml;}
+  document.querySelectorAll('[data-listen]:not([data-zyro-wired])').forEach(btn=>{
+    btn.dataset.zyroWired='1';
+    btn.addEventListener('click',()=>action(()=>listenTo(btn.dataset.listen)));
+  });
   renderMap();
 }
 function inviteBox(code){const link=location.origin+'/?invite='+encodeURIComponent(code);return `<div class="invite-code-box"><small>LINK E CODICE MONOUSO · VALIDI 24 ORE</small><code>${escapeHtml(code)}</code><button type="button" class="copy-code">Copia codice</button><input readonly aria-label="Link invito" value="${escapeHtml(link)}"><div class="invite-share-actions"><button type="button" class="copy-invite-link">🔗 Copia link</button><button type="button" class="share-invite-link">↗ Condividi</button></div></div>`;}
 function renderCircles(){
   if(!current)return;
   const list=$('circlesList');
+  const sig=JSON.stringify([current.me.id,(current.circles||[]).map(c=>[c.id,c.name,c.mine,(c.members||[]).map(m=>[m.id,m.name])]),[...inviteCodes.entries()]]);
+  if(list._zyroSig===sig&&list.children.length)return;
+  list._zyroSig=sig;
   list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions"><button type="button" data-chatcircle="${escapeHtml(c.id)}">💬 Chat gruppo</button><button type="button" data-invite="${escapeHtml(c.id)}">✚ Genera codice invito</button>${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
   list.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
     const r=await post('/api/invites',{circleId:b.dataset.invite});
@@ -372,6 +382,9 @@ function renderSOSRecipients(){
   if(!current)return;
   const contacts=uniqueContacts(), selected=new Set(sosPending===null ? (current.me.sosRecipients||[]) : sosPending);
   const node=$('sosRecipientList');
+  const sig=JSON.stringify([contacts.map(u=>[u.id,u.name,u.avatar||'']),[...selected],current.me.premiumActive,current.pushEnabled]);
+  if(node._zyroSig===sig&&node.children.length)return;
+  node._zyroSig=sig;
   node.innerHTML=contacts.length?contacts.map(u=>`<label class="recipient-line"><input type="checkbox" data-sos-to="${escapeHtml(u.id)}" ${selected.has(u.id)?'checked':''}><span>${avatarHTML(u)} ${escapeHtml(u.name)}</span></label>`).join(''):'<p class="setting-description">Invita prima una persona nella cerchia.</p>';
   $('sosPushNote').textContent=(current.me.premiumActive?'Premium attivo. ':'Premium non attivo: SOS non inviabile. ')+(current.pushEnabled?'Push configurate; consegna non garantita.':'Push non configurate su Render.');
 }
@@ -397,6 +410,10 @@ const roomChatIcon=`<svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg
 function renderChatRooms(){
   if(!current)return;
   const circles=current.circles||[], contacts=uniqueContacts();
+  const list=$('chatRooms');
+  const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
+  if(list._zyroSig===sig&&list.children.length)return;
+  list._zyroSig=sig;
   const matching=(name)=>String(name).toLocaleLowerCase('it').includes(chatSearch.toLocaleLowerCase('it'));
   const rooms=[];
   if(chatCategory!=='direct')for(const c of circles.filter(c=>matching(c.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(c.name)}</b><small>Gruppo famiglia · ${c.members.length} ${c.members.length===1?'persona':'persone'}</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
@@ -1110,7 +1127,11 @@ function renderPickControls(){
   if(!current)return;
   const contacts=uniqueContacts(), validIds=new Set(contacts.map(c=>c.id));
   for(const id of [...pickSelected])if(!validIds.has(id))pickSelected.delete(id);
-  $('pickRecipientsList').innerHTML=contacts.length?contacts.map(c=>`<label><input type="checkbox" data-pickcontact="${escapeHtml(c.id)}" ${pickSelected.has(c.id)?'checked':''}><span>${escapeHtml(c.name)}</span></label>`).join(''):'<span class="empty-contacts">Prima aggiungi qualcuno a una cerchia.</span>';
+  const pickRoot=$('pickRecipientsList');
+  const pickHtml=contacts.length?contacts.map(c=>`<label><input type="checkbox" data-pickcontact="${escapeHtml(c.id)}" ${pickSelected.has(c.id)?'checked':''}><span>${escapeHtml(c.name)}</span></label>`).join(''):'<span class="empty-contacts">Prima aggiungi qualcuno a una cerchia.</span>';
+  // User-selectable Pick Pocket recipients remain in place during unrelated
+  // live-location and FCM updates; delegated change handler still works.
+  if(pickRoot._zyroHtml!==pickHtml){pickRoot.innerHTML=pickHtml;pickRoot._zyroHtml=pickHtml;}
   $('pickRecipients').classList.toggle('hidden',!$('pickNotify').checked);
   $('pickPanel').classList.toggle('armed',pickArmed);
   $('pickPanel').classList.toggle('alarming',theftTriggered);
@@ -1118,7 +1139,7 @@ function renderPickControls(){
   $('pickArm').disabled=theftTriggered;
   $('pickSensitivity').disabled=pickArmed;
   $('pickNotify').disabled=pickArmed;
-  $('pickRecipientsList').querySelectorAll('input').forEach(el=>el.disabled=pickArmed);
+  pickRoot.querySelectorAll('input').forEach(el=>{if(el.disabled!==pickArmed)el.disabled=pickArmed;});
   const nativeStatus=window.ZyroNativeSafety;
   $('pickStatus').textContent=theftTriggered
     ?'🚨 Movimento sospetto rilevato. Inserisci la password nella schermata di allarme.'
@@ -1547,6 +1568,9 @@ function closeProfileSettings(){
 }
 function renderInvitedPeople(){
  const root=$('savedInvitees');if(!root || !current)return;
+ const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.gpsRecipients,current.me.sosRecipients,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.invitedByMe])])]);
+ if(root._zyroSig===sig&&root.children.length)return;
+ root._zyroSig=sig;
  const byId=new Map();
  for(const circle of current.circles||[]){
    for(const member of circle.members||[]){
