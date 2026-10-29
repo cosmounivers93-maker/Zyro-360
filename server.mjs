@@ -1,4 +1,5 @@
 import express from 'express';
+import {PlayBilling,PlayRepository,GooglePlayApi,createTokenCipher,accountId,PACKAGE} from './play-billing.mjs';
 import {isIP} from 'node:net';
 import http from 'node:http';
 import crypto from 'node:crypto';
@@ -36,6 +37,10 @@ if (fcmSecret) {
 // move to relational tables and proper transaction-level concurrency before scaling.
 let db = structuredClone(initial);
 let pgPool = null;
+let playBilling=null;
+const billingReady=()=>playBilling?.ready===true;
+const paidReceipt=user=>user?playBilling?.entitlement(user.id):null;
+const premiumExpiry=user=>Math.max(Number(user?.premiumUntil||0),paidReceipt(user)?.expiresAt||0)||null;
 let persistenceQueue = Promise.resolve();
 let persistenceFailure = null;
 let storageKind = 'temporary';
@@ -88,12 +93,14 @@ const hash = v => crypto.createHash('sha256').update(v).digest('hex');
 const token = (n = 24) => crypto.randomBytes(n).toString('base64url');
 const now = () => Date.now();
 // Only a verified, server-side purchase may set premiumUntil. Never trust premium=true from a browser.
-// Actual Play Billing purchase verification is NOT configured in this web prototype.
+// Google Play receipts are verified by the backend; client flags cannot grant access.
 // Entitlements are server-owned. Subscription verification will set plan + expiry.
 const premiumPlan = user => {
  if(isAdmin(user)||user?.premiumGiftLifetime===true)return 'family';
- if(Number(user?.premiumUntil||0)<=now())return 'free';
- return user?.premiumPlan==='family'?'family':'personal';
+ const receipt=paidReceipt(user);
+ const legacy=Number(user?.premiumUntil||0)>now()?(user.premiumPlan==='family'?'family':'personal'):'free';
+ if(receipt?.plan==='family'||legacy==='family')return 'family';
+ return receipt?.plan||legacy;
 };
 const premiumActive = user => premiumPlan(user)!=='free';
 const familyActive = user => premiumPlan(user)==='family';
@@ -176,7 +183,7 @@ function stateFor(id) {
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
     startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -305,7 +312,7 @@ function auditLogin(req,user){
 app.get('/api/health', (_, res) => {
   res.set('Cache-Control','no-store');
   res.json({ok:true,persistentStorage:storageKind==='postgres',
-    firebaseConfigured:fcmReady,billingReady:false});
+    firebaseConfigured:fcmReady,billingReady:billingReady()});
 });
 // Live tiles requested only by logged-in users. A modest in-memory cache protects the community tile service.
 // For a public production launch replace this best-effort upstream with a contracted map provider.
@@ -362,7 +369,7 @@ app.post('/api/logout', requireAuth, (req,res) => {
 });
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
-const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
+const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
 app.post('/api/settings/device',requireAuth,limit,(req,res)=>{
  const device=deviceForRequest(req);
  req.user.lastDevice=device;save();notifyAdminUsers();res.json({ok:true});
@@ -585,7 +592,7 @@ app.get('/api/diagnostics/self',requireAuth,(req,res)=>{
     liveLocationSharing:!!req.user.sharing,
     authorizedGpsContacts:gpsRecipientsFor(req.user).length,
     sosRecipients:(req.user.sosRecipients||[]).filter(id=>sharedCircle(id,req.user.id)).length,
-    premiumActive:premiumActive(req.user),billingReady:false,
+    premiumActive:premiumActive(req.user),billingReady:billingReady(),
     gpsBackgroundServiceVerified:false,
     notificationDeliveryVerified:false
   });
@@ -684,7 +691,50 @@ function overdueCheck(){
  for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){c.status='late';c.lateAt=t;changed=true;void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);for(const x of c.recipients)pushState(x);}
  if(changed)save();
 }
-app.get('/api/premium/status',requireAuth,(req,res)=>res.json({active:premiumActive(req.user),plan:premiumPlan(req.user),features:planFeatures(req.user),billingReady:false,plans:[{id:'zyro_premium_monthly',monthlyEUR:3.99},{id:'zyro_family_monthly',monthlyEUR:6.99}],message:'Gli acquisti Google Play non sono ancora collegati. Non effettuare pagamenti.'}));
+app.get('/api/premium/status',requireAuth,(req,res)=>res.json({active:premiumActive(req.user),plan:premiumPlan(req.user),features:planFeatures(req.user),billingReady:billingReady(),expiresAt:premiumExpiry(req.user)}));
+app.get('/api/billing/bootstrap',requireAuth,(req,res)=>{
+ res.set('Cache-Control','no-store');
+ if(!billingReady())return res.status(503).json({error:'Gli acquisti non sono ancora disponibili.'});
+ res.json({accountId:accountId(req.user.id),packageName:PACKAGE,active:premiumActive(req.user),plan:premiumPlan(req.user),expiresAt:premiumExpiry(req.user)});
+});
+app.post('/api/billing/verify',requireAuth,(req,res,next)=>{
+ const k='billing:'+req.user.id,c=rateCounters.get(k)||{n:0,until:now()+600000};
+ if(c.until<now()){c.n=0;c.until=now()+600000;}
+ c.n++;rateCounters.set(k,c);
+ if(c.n>40)return res.status(429).json({error:'Attendi qualche minuto prima di ripristinare di nuovo.'});
+ next();
+},async(req,res)=>{
+ res.set('Cache-Control','no-store');
+ if(!billingReady())return res.status(503).json({error:'Gli acquisti non sono ancora disponibili.'});
+ try{
+  const result=await playBilling.verify(req.user.id,req.body?.purchaseToken);
+  res.json({...result,active:premiumActive(req.user),plan:premiumPlan(req.user),expiresAt:premiumExpiry(req.user)});
+ }catch{res.status(422).json({error:'Acquisto non verificato. Controlla di usare lo stesso account ZYRO 360 dell’acquisto e riprova con Ripristina acquisti.'});}
+});
+app.post('/api/billing/google-notifications',async(req,res)=>{
+ if(!billingReady())return res.sendStatus(503);
+ try{await playBilling.google.verifyPush(req.get('Authorization'),process.env.GOOGLE_PLAY_RTDN_AUDIENCE,process.env.GOOGLE_PLAY_RTDN_EMAIL);}catch{return res.sendStatus(401);}
+ let event;
+ try{event=JSON.parse(Buffer.from(req.body?.message?.data||'','base64').toString('utf8'));}catch{return res.sendStatus(400);}
+ if(event.packageName!==PACKAGE)return res.sendStatus(400);
+ if(event.testNotification)return res.sendStatus(204);
+ const receipt=event.subscriptionNotification;
+ if(!receipt)return res.sendStatus(204);
+ const purchaseToken=receipt.purchaseToken;
+ if(typeof purchaseToken!=='string'||purchaseToken.length>4096)return res.sendStatus(400);
+ try{
+  const owner=await playBilling.repo.get(hash(purchaseToken));
+  if(owner)await playBilling.verify(owner.userId,purchaseToken);
+  else {
+   const verified=await playBilling.google.get(purchaseToken);
+   const external=verified.externalAccountIdentifiers?.obfuscatedExternalAccountId;
+   const user=external&&Object.values(db.users).find(u=>accountId(u.id)===external);
+   if(user)await playBilling.verify(user.id,purchaseToken);
+  }
+  res.sendStatus(204);
+ }catch{res.sendStatus(503);}
+});
+
 app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients);
@@ -1039,8 +1089,24 @@ setInterval(()=>{
   for(const u of Object.values(db.users)){if(u.lastDevice?.at<t-30*86400e3){delete u.lastDevice;changed=true;}if(u.registrationDevice && u.createdAt<t-30*86400e3){delete u.registrationDevice;changed=true;}}
   if (changed) save();
 },3600000).unref();
+async function initializeBilling(){
+ if(process.env.GOOGLE_PLAY_BILLING_ENABLED!=='true')return;
+ if(!pgPool)throw Error('Gli acquisti Google Play richiedono DATABASE_URL persistente.');
+ let credentials;
+ try{credentials=JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON||'{}');}
+ catch{throw Error('Configurazione del service account Google Play non valida.');}
+ if(!credentials.client_email||!credentials.private_key)throw Error('Configura il service account Google Play sul server.');
+ const cipher=createTokenCipher(process.env.GOOGLE_PLAY_TOKEN_KEY);
+ const instance=new PlayBilling({repo:new PlayRepository(pgPool),google:new GooglePlayApi(credentials),cipher,onChange:id=>refreshRelated(id)});
+ await instance.init();
+ // Check that credentials can obtain a token before exposing purchase buttons.
+ await instance.google.accessToken();
+ playBilling=instance;
+ await playBilling.sweep();
+ setInterval(()=>{void playBilling.sweep().catch(()=>{});},60000).unref();
+}
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  initializeStorage().then(()=>{
+  initializeStorage().then(initializeBilling).then(()=>{
     server.listen(PORT,'0.0.0.0',()=>console.log(`Zyro 360: http://localhost:${PORT} (${storageKind})`));
   }).catch(err=>{
     console.error('[ZYRO storage] AVVIO BLOCCATO:',err.message);
@@ -1050,6 +1116,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
 
 
 
