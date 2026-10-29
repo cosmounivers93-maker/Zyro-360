@@ -1,0 +1,153 @@
+/* ZYRO 360 V28 — contrasto Cerchie e scrolling Impostazioni
+   Correzioni mirate ai due screenshot Android segnalati dopo V27.
+   Mantiene grafica, servizi Android, SOS, GPS, audio e permessi invariati. */
+
+/* Dark mode circle member pills: old CSS changed text to almost-white
+   while preserving a near-white background, yielding white-on-white. */
+html[data-theme="dark"] #circlesView .circle-members .member-pill,
+html[data-theme="dark"] .circles-clean-page .circle-members .member-pill{
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  min-height:34px;
+  padding:7px 12px;
+  color:#ecfffa!important;
+  background:#1b4559!important;
+  border:1px solid rgba(93,217,203,.42)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07);
+  font-size:12px;
+  font-weight:700;
+  line-height:1.4;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  -webkit-text-fill-color:#ecfffa!important;
+}
+html[data-theme="dark"] #circlesView .circle-top small{
+  color:#b7cfdb!important;
+}
+html[data-theme="dark"] #circlesView .circle-top strong{
+  color:#f1ffff!important;
+}
+html[data-theme="dark"] #circlesView .circle-card .status-chip:not(.alert){
+  color:#116b63!important;
+  background:#e3faf3!important;
+  border-color:rgba(154,229,209,.68)!important;
+}
+/* Light variant retains enough contrast as well. */
+html[data-theme="light"] #circlesView .member-pill{
+  color:#234f5c!important;
+  background:#e9f7f4!important;
+  border:1px solid #b5dfd6!important;
+  -webkit-text-fill-color:#234f5c!important;
+}
+
+/* The V16.2 floating drawer was blurred at 18px, while a translucent
+   fullscreen backdrop was blurred as well. During touch scrolling this can
+   force expensive re-compositing on Android System WebView. The V28 drawer is
+   visually similar but renders from a stable, essentially opaque surface. */
+#profileSettingsBackdrop.zyro-settings-backdrop,
+#profileSettingsBackdrop.zyro-settings-backdrop.is-open{
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  background:rgba(2,13,26,.69)!important;
+  transition:opacity .14s ease!important;
+}
+#profileSettingsDrawer.zyro-settings-drawer,
+html[data-theme="dark"] #profileSettingsDrawer.zyro-settings-drawer{
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  background:#0e2739!important;
+  color:#eafffb!important;
+  border-color:rgba(111,199,198,.29)!important;
+  box-shadow:0 13px 34px rgba(2,14,27,.35)!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain!important;
+  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;
+  scroll-behavior:auto!important;
+  scrollbar-width:thin;
+  scrollbar-color:rgba(122,215,207,.48) transparent;
+  contain:layout style;
+  isolation:isolate;
+}
+html[data-theme="light"] #profileSettingsDrawer.zyro-settings-drawer{
+  background:#f4fcfc!important;
+  color:#15374a!important;
+  border-color:#c8e4e4!important;
+}
+#profileSettingsDrawer.zyro-settings-drawer.is-open{
+  /* No scale transform on a live scrolling compositor layer. */
+  transform:translate3d(-50%,0,0)!important;
+  opacity:1!important;
+  transition:opacity .16s ease,visibility 0s!important;
+}
+#profileSettingsDrawer.zyro-settings-drawer:not(.is-open){
+  transform:translate3d(-50%,12px,0)!important;
+  transition:opacity .15s ease,visibility 0s linear .15s!important;
+}
+#profileSettingsDrawer .zyro-drawer-menu{
+  min-height:0;
+  overscroll-behavior:contain;
+}
+#profileSettingsDrawer .zyro-drawer-menu>button{
+  box-shadow:none!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+  transition:background-color .13s ease,border-color .13s ease!important;
+}
+html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-menu>button{
+  background:#173b4d!important;
+  border:1px solid #345c69!important;
+  color:#f1fffe!important;
+}
+html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-menu>button small{
+  color:#bad5df!important;
+}
+html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-menu>button>b{
+  color:#60e5cf!important;
+}
+html[data-theme="light"] #profileSettingsDrawer .zyro-drawer-menu>button{
+  background:#eaf7f7!important;
+  border:1px solid #c5e0e1!important;
+  color:#153747!important;
+}
+html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-top{
+  border-bottom:1px solid #3b6571!important;
+}
+#profileSettingsDrawer .zyro-settings-detail,
+#profileSettingsDrawer .zyro-settings-pane{
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+#profileSettingsDrawer :where(.panel,.zyro-v15-panel,
+  .zyro-appearance-panel,.how-it-works,.zyro-access-card,
+  .zyro-sos-mic-choice){
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+/* Avoid multiple offscreen heavy shadows repeatedly repainted during scroll,
+   while keeping enough depth to distinguish each card. */
+#profileSettingsDrawer :where(.panel,.zyro-v15-panel,
+  .zyro-appearance-panel,.how-it-works,.zyro-access-card,
+  .zyro-permission-panel,.zyro-sos-mic-choice){
+  box-shadow:0 2px 7px rgba(3,21,36,.14)!important;
+}
+/* Preserve full contrast in dark nested settings without touching SOS flags. */
+html[data-theme="dark"] #profileSettingsDrawer :where(
+  .zyro-settings-pane,.zyro-sos-mic-choice,.zyro-access-card){
+  color:#eafffa;
+}
+@media(max-width:420px){
+  #profileSettingsDrawer.zyro-settings-drawer{
+    width:min(440px,calc(100vw - 30px))!important;
+    max-width:calc(100vw - 30px)!important;
+    padding-inline:13px!important;
+  }
+}
+@media(prefers-reduced-motion:reduce){
+  #profileSettingsBackdrop.zyro-settings-backdrop,
+  #profileSettingsDrawer.zyro-settings-drawer{
+    transition:none!important;
+  }
+}
