@@ -1,3 +1,5 @@
+function hasFamilyPlan(){return current?.me?.features?.sosAudio===true;}
+function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione è inclusa in ZYRO Family.');}}
 function updateMarkupIfChanged(node,html){
  if(node._zyroMarkup===html)return;
  node._zyroMarkup=html;node.innerHTML=html;
@@ -182,7 +184,7 @@ function setState(data){
   const prev = current;
   current=data;
   // Revoking explicit opt-in stops ongoing live audio locally as well.
-  if(data.me.sosAudioConsent!==true && localStream)stopAudio();
+  if((data.me.sosAudioConsent!==true || data.me.features?.sosAudio!==true) && localStream)stopAudio();
   if(window.ZyroAndroidSafetySupported && window.ZyroNativeSafety?.pick===true && !theftTriggered)
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
@@ -718,7 +720,7 @@ function acquireSOSEmergencyAudio(){
 }
 async function startSOS(){
  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS Premium non attivo: nessun allarme è stato inviato. In emergenza chiama il 112.',true);return;}
- const optedIn=current.me.sosAudioConsent===true;
+ const optedIn=hasFamilyPlan()&&current.me.sosAudioConsent===true;
  sosAudioError='';
  const preparedAudio=optedIn?acquireSOSEmergencyAudio():null;
  let serverStarted=false;
@@ -814,7 +816,7 @@ async function testZyroNativeMicrophone(){
    '. Controlla chiamate e altre app che usano l’audio.');
 }
 async function startAudio(preparedAudio){
- if(localStream||micBusy || !current?.me?.sos || current?.me?.sosAudioConsent!==true){
+ if(!hasFamilyPlan()||localStream||micBusy || !current?.me?.sos || current?.me?.sosAudioConsent!==true){
    if(preparedAudio)void preparedAudio.then(r=>r.stream?.getTracks().forEach(t=>t.stop()));
    return;
  }
@@ -1420,6 +1422,7 @@ async function armPick(){
     updateGeo(null,current?.me?.sharing||!!current?.me?.sos||mapTracking);
     renderPickControls();toast('Pick Pocket disattivata.');return;
   }
+  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Pick Pocket è incluso in ZYRO Premium e Family.');}
   if($('pickNotify').checked && !pickSelected.size)throw Error('Seleziona almeno un familiare o un amico da avvisare.');
   if(isZyroNativeAvailable()){
     const confirmed=confirm('Attiva Pick Pocket: il monitoraggio continuerà a schermo bloccato tramite una notifica Android. Movimenti bruschi possono creare falsi allarmi. Vuoi attivarlo?');
@@ -1479,7 +1482,7 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.creatorPremium?'Account creatore verificato: tutte le funzioni Premium sono incluse gratuitamente. Nessun abbonamento richiesto.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`Premium attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Abbonamento Premium non attivo. Acquisti Play Store non ancora configurati: non è possibile inviare SOS Premium.';
+ $('premiumStatus').textContent=me.creatorPremium?'Account creatore verificato: tutte le funzioni Premium sono incluse gratuitamente. Nessun abbonamento richiesto.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Premium'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Nessun abbonamento attivo. Scegli Premium o Family. Gli acquisti saranno disponibili dopo il collegamento a Google Play.';
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
   const root=$(container);const members=uniqueContacts();const signature=members.map(x=>x.id).join(',');
@@ -1497,6 +1500,7 @@ function renderV15(){if(!current)return;
  updateMarkupIfChanged($('checkinContactsStatus'),checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join(''));
 }
 async function v15JourneyStart(){
+ requireFamilyPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
  const auto=$('journeyAuto').checked;
  if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
@@ -1504,7 +1508,7 @@ async function v15JourneyStart(){
  await refresh();toast(result.ok?'Accompagnami attivo. I contatti scelti vedono il percorso se hai attivato la posizione.':'Percorso non avviato.');
 }
 async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere il percorso?'))return;await post('/api/journey/end',{arrived});journeyTarget=null;$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato.');}
-async function v15CheckinStart(){if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
+async function v15CheckinStart(){requireFamilyPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
 // ZYRO V16: one right-side settings drawer for every account. Existing controls
@@ -1785,7 +1789,7 @@ function closeProfileSettings(){
 }
 function renderInvitedPeople(){
  const root=$('savedInvitees');if(!root || !current)return;
- const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.gpsRecipients,current.me.sosRecipients,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.invitedByMe])])]);
+ const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.premiumPlan,current.me.gpsRecipients,current.me.sosRecipients,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.invitedByMe])])]);
  if(root._zyroSig===sig&&root.children.length)return;
  root._zyroSig=sig;
  const byId=new Map();
@@ -1808,11 +1812,11 @@ function renderInvitedPeople(){
  micExplanation.textContent='Se attivo, premendo SOS il microfono può trasmettere audio in diretta esclusivamente ai destinatari selezionati che toccano «Ascolta». Se la connessione diretta fallisce, l’audio può transitare temporaneamente sul server per arrivare al destinatario: non viene registrato né conservato, ma questo percorso non è crittografato end-to-end. Puoi disattivare questa funzione in qualsiasi momento.';
  micCopy.append(micTitle,micExplanation);
  const micInput=document.createElement('input');micInput.type='checkbox';micInput.id='sosAudioConsent';
- micInput.checked=current.me.sosAudioConsent===true;
+ micInput.checked=hasFamilyPlan()&&current.me.sosAudioConsent===true;micInput.disabled=!hasFamilyPlan();
  micInput.setAttribute('aria-label','Consenti audio in diretta automatico durante SOS');
  micLabel.append(micCopy,micInput);
  const micHint=document.createElement('p');micHint.className='zyro-sos-mic-note';
- micHint.textContent='Scegli prima di usare SOS. Android richiede il permesso microfono. L’audio può interrompersi con lo schermo spento; lo stato sarà indicato nella Home.';
+ micHint.textContent='Incluso in ZYRO Family. Scegli prima di usare SOS. Android richiede il permesso microfono. L’audio può interrompersi con lo schermo spento; lo stato sarà indicato nella Home.';
  const micTest=document.createElement('button');micTest.type='button';micTest.id='zyroTestMic';
  micTest.className='zyro-sos-mic-test';micTest.textContent='Verifica microfono';micTest.disabled=!micInput.checked;
  const micNative=document.createElement('button');micNative.type='button';
@@ -1938,6 +1942,7 @@ async function init(){
   $('savedInvitees').addEventListener('change',e=>{
     if(e.target.id==='sosAudioConsent'){
       const input=e.target, enabled=input.checked;
+      if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede ZYRO Family.',true);return;}
       input.disabled=true;
       // Launch the permission check in this tap; never store or send test audio.
       const probe=enabled?testSOSMicrophone().then(()=>null,error=>sosMicErrorMessage(error)):null;
@@ -2109,3 +2114,4 @@ init();
 
 // Resume visual map updates when the app returns to the foreground.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeView==='home'){stableMap?.resize();renderHeadingOnly();}});
+
