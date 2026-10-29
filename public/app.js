@@ -168,6 +168,8 @@ function setState(data){
   if(!data?.me)return;
   const prev = current;
   current=data;
+  if(window.ZyroAndroidSafetySupported && window.ZyroNativeSafety?.pick===true && !theftTriggered)
+    pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
   renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
@@ -470,6 +472,23 @@ async function sendPushTest(){
   }finally{button.disabled=false;}
 }
 function showView(view){if(view!=='settings')closeProfileSettings();if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='settings' && current?.me?.isAdmin && !adminLoaded)void action(adminLoad);if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
+// Native Android V21 runs GPS and sensors independently of the paused WebView.
+// The owner always activates it via an explicit first-party on-screen action.
+function nativeBackgroundSync(options={}){
+ if(!window.ZyroAndroidSafetySupported)return false; // pre-V21 APK fallback
+ const sharing=options.sharing===undefined
+   ?Boolean(current?.me?.sharing || current?.me?.sos):!!options.sharing;
+ const pick=options.pick===undefined?!!(pickArmed && !theftTriggered):!!options.pick;
+ const recipients=$('pickNotify')?.checked?[...pickSelected]:[];
+ const sensitivity=$('pickSensitivity')?.value==='high'?'high':'normal';
+ const result=window.prompt('ZYRO360_BG_SYNC',
+   JSON.stringify({sharing,pick,recipients,sensitivity}));
+ if(result==='zyro-native')return true;
+ if(result==='zyro-needs-location')
+   throw Error('Per attivare il servizio Android in background, consenti la posizione e riprova.');
+ if(result==='zyro-needs-login')throw Error('Accedi all’account prima di attivare la protezione.');
+ throw Error('Monitoraggio Android non avviato. Controlla i permessi e riprova.');
+}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();geolocationError='';renderMap();return;}
   if(watchId!==null)return;
@@ -488,7 +507,8 @@ function updateGeo(oldOn,newOn){
       heading:Number.isFinite(headingMotion.display)?headingMotion.display:null};
     aimHeading();geolocationError='';
     const canShare=!!current?.me?.sharing || !!current?.me?.sos;
-    if(canShare && Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
+    if(canShare && !(window.ZyroNativeSafety?.running && window.ZyroNativeSafety?.sharing)
+        && Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
     renderHome();
   },err=>{geolocationError=`GPS: ${err.message||'permesso negato'}`;renderHome();toast(geolocationError,true);},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
 }
@@ -502,6 +522,10 @@ async function startSOS(){
  }catch{/* SOS can still start without a fix. */}}
  const result=await post('/api/sos/start',{location:lastCoords?{lat:lastCoords.lat,lon:lastCoords.lon,accuracy:lastCoords.accuracy}:null});
  await refresh();mapTracking=true;updateGeo(null,true);
+ if(window.ZyroAndroidSafetySupported){
+   try{nativeBackgroundSync({sharing:true});}
+   catch(err){toast('SOS attivo, ma GPS in background non avviato: '+err.message,true);}
+ }
  if(result.serverRecorded){
    const pushCount=Number(result.pushAccepted||0);
    if(!result.pushConfigured)toast('SOS registrato, ma Firebase non risulta configurato su Render. In emergenza chiama il 112.',true);
@@ -522,6 +546,10 @@ async function stopSOS(){
   await post('/api/sos/stop');
   stopAudio();
   await refresh();
+  if(window.ZyroAndroidSafetySupported){
+    try{nativeBackgroundSync({sharing:!!current?.me?.sharing});}
+    catch(err){toast('Controllo servizio GPS: '+err.message,true);}
+  }
   toast('Allarme SOS terminato.');
 }
 async function startAudio(){
@@ -888,7 +916,15 @@ function renderPickControls(){
   $('pickSensitivity').disabled=pickArmed;
   $('pickNotify').disabled=pickArmed;
   $('pickRecipientsList').querySelectorAll('input').forEach(el=>el.disabled=pickArmed);
-  $('pickStatus').textContent=theftTriggered?'🚨 Movimento sospetto rilevato. Inserisci la password nella schermata di allarme.':pickArmed?'🟢 Pick Pocket attiva: tieni ZYRO 360 aperta. La protezione si ferma se il browser sospende i sensori.':'Protezione disattivata. Attivala solo per i test con l’app aperta.';
+  const nativeStatus=window.ZyroNativeSafety;
+  $('pickStatus').textContent=theftTriggered
+    ?'🚨 Movimento sospetto rilevato. Inserisci la password nella schermata di allarme.'
+    :pickArmed && window.ZyroAndroidSafetySupported
+      ?nativeStatus?.running && nativeStatus?.pick
+        ?'🟢 Monitoraggio Android attivo: può continuare con schermo bloccato. La notifica permanente deve restare presente. Possibili falsi allarmi.'
+        :'🟡 Avvio servizio Android richiesto: controlla la notifica di monitoraggio. Se manca, disattiva e riprova.'
+      :pickArmed?'🟢 Pick Pocket attiva solo con app aperta; serve l’APK Android V21 per il background.'
+      :'Protezione disattivata. Attiva solo quando serve: il monitoraggio usa batteria e sensori.';
 }
 async function motionPermission(){
   if(!('DeviceMotionEvent' in window))throw Error('Questo telefono/browser non espone i sensori di movimento.');
@@ -936,8 +972,21 @@ function showTheftOverlay(message){$('theftOverlay').classList.remove('hidden');
 function hideTheftOverlay(){$('theftOverlay').classList.add('hidden');$('theftPassword').value='';}
 async function armPick(){
   if(theftTriggered)return;
-  if(pickArmed){pickArmed=false;window.removeEventListener('devicemotion',motionListener);updateGeo(null,current?.me?.sharing||!!current?.me?.sos||mapTracking);renderPickControls();toast('Pick Pocket disattivata.');return;}
+  if(pickArmed){
+    if(window.ZyroAndroidSafetySupported)nativeBackgroundSync({pick:false});
+    pickArmed=false;window.removeEventListener('devicemotion',motionListener);
+    updateGeo(null,current?.me?.sharing||!!current?.me?.sos||mapTracking);
+    renderPickControls();toast('Pick Pocket disattivata.');return;
+  }
   if($('pickNotify').checked && !pickSelected.size)throw Error('Seleziona almeno un familiare o un amico da avvisare.');
+  if(window.ZyroAndroidSafetySupported){
+    const confirmed=confirm('Pick Pocket sperimentale: il monitoraggio continuerà a schermo bloccato tramite una notifica Android. Movimenti bruschi possono creare falsi allarmi. Vuoi attivarlo?');
+    if(!confirmed)return;
+    nativeBackgroundSync({pick:true});
+    pickArmed=true;armTime=Date.now();renderPickControls();
+    toast('Monitoraggio nativo richiesto. Controlla la notifica permanente di Zyro 360.');
+    return;
+  }
   await motionPermission();
   // Autoplay permission is tied to this user gesture; still not guaranteed by every browser.
   try{const AC=window.AudioContext||window.webkitAudioContext;if(AC){sirenContext ||= new AC();await sirenContext.resume();}}catch{}
@@ -969,7 +1018,9 @@ async function stopTheft(){
   try{
     await post('/api/pickpocket/stop',{password});
     theftTriggered=false;theftIsPending=false;stopSiren();hideTheftOverlay();
-    await refresh();renderPickControls();toast('Allarme antifurto terminato dal proprietario.');
+    await refresh();
+    if(window.ZyroAndroidSafetySupported)nativeBackgroundSync({pick:false});
+    renderPickControls();toast('Allarme antifurto terminato dal proprietario.');
   }finally{$('theftStop').disabled=false;}
 }
 async function previewSiren(){
@@ -1398,6 +1449,12 @@ async function init(){
   window.addEventListener('zyro:fcm-status',()=>{void refreshPermissionStates();});
   window.addEventListener('zyro:android-notification-permission',()=>{void refreshPermissionStates();});
   window.addEventListener('zyro:android-microphone-permission',()=>{void refreshPermissionStates();});
+  window.addEventListener('zyro:android-safety-state',event=>{
+    const status=event.detail||{};
+    if(status.pick && !theftTriggered)pickArmed=true;
+    else if(!status.pick && window.ZyroAndroidSafetySupported)pickArmed=false;
+    renderPickControls();
+  });
   window.addEventListener('zyro:android-location-permission',event=>{
     if(event?.detail?.granted===false)zyroLocationFix=null;
     void refreshPermissionStates();
@@ -1418,6 +1475,10 @@ async function init(){
       const enabled=!current.me.sharing;
       await post('/api/sharing',{enabled});
       await refresh();
+      if(window.ZyroAndroidSafetySupported){
+        try{nativeBackgroundSync();}
+        catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}
+      }
       if(enabled)updateGeo(null,true);
       toast(enabled?'GPS attivo per i contatti autorizzati.':'Condivisione GPS disattivata.');
     });
@@ -1432,7 +1493,7 @@ async function init(){
   $('theftStop').addEventListener('click',()=>action(stopTheft));
   $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/circles',{name:$('circleName').value});$('circleName').value='';await refresh();toast('Cerchia creata! Ora puoi generare un invito.');});});
   $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/invites/join',{code:$('inviteInput').value});$('inviteInput').value='';await refresh();inviteFromLink=null;toast('Ora fai parte della cerchia!');});});
-  $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
+  $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();if(window.ZyroAndroidSafetySupported){try{nativeBackgroundSync();}catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}}toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
   $('journeyRecipients').addEventListener('change',e=>{if(e.target.matches('[data-journey-to]')){e.target.checked?journeySelected.add(e.target.dataset.journeyTo):journeySelected.delete(e.target.dataset.journeyTo);}});
   $('checkinRecipients').addEventListener('change',e=>{if(e.target.matches('[data-checkin-to]')){e.target.checked?checkinSelected.add(e.target.dataset.checkinTo):checkinSelected.delete(e.target.dataset.checkinTo);}});
   $('journeySetTarget').addEventListener('click',()=>{if(!stableMap){toast('Apri prima la Home e carica la mappa.',true);return;}journeyTarget={lat:stableMap.center.lat,lon:stableMap.center.lon};$('journeyAuto').checked=true;$('journeyTargetInfo').textContent=`Meta impostata: ${journeyTarget.lat.toFixed(5)}, ${journeyTarget.lon.toFixed(5)}`;toast('Meta GPS salvata dal centro della mappa.');});
@@ -1463,7 +1524,9 @@ async function init(){
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
+    if(window.ZyroAndroidSafetySupported)nativeBackgroundSync({sharing:false,pick:false});
+    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=16-profilo').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}
   catch(err){
