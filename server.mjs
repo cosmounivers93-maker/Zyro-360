@@ -802,6 +802,7 @@ app.post('/api/sos/stop', requireAuth, (req,res) => {
   if (a?.kind === 'pickpocket') return res.status(403).json({error:'Per interrompere l’antifurto inserisci la password del proprietario.'});
   if (!a) return res.json({ok:true});
   a.active=false; a.hasAudio=false; a.endedAt=now();
+  sosAudioRelaySubscribers.delete(req.user.id);
   if (!req.user.sharing) locations.delete(req.user.id);
   save(); refreshRelated(req.user.id);
   for (const id of alertAudience(a)) for (const ws of connections(id)) sendSocket(ws,{type:'sos-ended',userId:req.user.id});
@@ -845,6 +846,25 @@ server.on('upgrade',(req,socket,head) => {
   wss.handleUpgrade(req,socket,head,ws=>{ws.userId=user.id;wss.emit('connection',ws,req);});
 });
 function relay(id, msg, preferMicrophone=false) { const con=[...connections(id)].filter(x=>x.readyState===WebSocket.OPEN); const pick = preferMicrophone ? con.find(x=>x.microphoneReady) : con[con.length-1]; if (pick) sendSocket(pick,msg); }
+/* V29 · Volatile emergency audio over authenticated WSS when direct WebRTC
+   cannot connect. Raw audio frames are never saved or logged. */
+const sosAudioRelaySubscribers=new Map();
+function authorizedAudioRelay(viewer,owner,alert){
+  return !!alert?.active && alert.kind==='sos' && alert.userId===owner &&
+    owner!==viewer && db.users[owner]?.sosAudioConsent===true &&
+    canSeeAlert(viewer,alert);
+}
+function audioRelayOwnerUpdate(owner){
+  const alert=currentAlert(owner),listeners=sosAudioRelaySubscribers.get(owner);
+  if(listeners)for(const listener of listeners){
+    if(listener.readyState!==WebSocket.OPEN ||
+       !authorizedAudioRelay(listener.userId,owner,alert))listeners.delete(listener);
+  }
+  if(listeners&&!listeners.size)sosAudioRelaySubscribers.delete(owner);
+  const needed=!!sosAudioRelaySubscribers.get(owner)?.size;
+  relay(owner,{type:needed?'audio-relay-start':'audio-relay-stop'},true);
+}
+
 wss.on('connection', ws => {
   if (!sockets.has(ws.userId)) sockets.set(ws.userId,new Set());
   sockets.get(ws.userId).add(ws); ws.alive = true;
@@ -859,7 +879,48 @@ wss.on('connection', ws => {
       const a=currentAlert(self); if (!a) return;
       ws.microphoneReady = m.ready === true && db.users[self]?.sosAudioConsent===true;
       a.hasAudio = a.kind !== 'pickpocket' && db.users[self]?.sosAudioConsent===true
-        && [...connections(self)].some(x => x.microphoneReady); save(); refreshRelated(self);
+        && [...connections(self)].some(x => x.microphoneReady);
+      if(!a.hasAudio){sosAudioRelaySubscribers.delete(self);relay(self,{type:'audio-relay-stop'},true);}
+      save(); refreshRelated(self);
+    }
+
+    if(m.type==='audio-relay-subscribe'){
+      const owner=String(m.to||'').slice(0,120),a=currentAlert(owner);
+      if(!authorizedAudioRelay(self,owner,a)||!a.hasAudio ||
+         ![...connections(owner)].some(c=>c.microphoneReady)){
+        sendSocket(ws,{type:'audio-relay-status',owner,active:false,
+          reason:'Nessun SOS audio disponibile o permesso di ascolto mancante.'});
+        return;
+      }
+      if(!sosAudioRelaySubscribers.has(owner))sosAudioRelaySubscribers.set(owner,new Set());
+      sosAudioRelaySubscribers.get(owner).add(ws);
+      sendSocket(ws,{type:'audio-relay-status',owner,active:true});
+      audioRelayOwnerUpdate(owner);
+      return;
+    }
+    if(m.type==='audio-relay-unsubscribe'){
+      const owner=String(m.to||'').slice(0,120),listeners=sosAudioRelaySubscribers.get(owner);
+      if(listeners?.delete(ws))audioRelayOwnerUpdate(owner);
+      return;
+    }
+    if(m.type==='audio-relay-data'){
+      const a=currentAlert(self),listeners=sosAudioRelaySubscribers.get(self);
+      if(!a||a.kind!=='sos'||db.users[self]?.sosAudioConsent!==true||
+         ws.microphoneReady!==true||!a.hasAudio||!listeners?.size)return;
+      const pcm=m.pcm;
+      if(typeof pcm!=='string'||pcm.length<128||pcm.length>11000||
+         pcm.length%4!==0||!/^[A-Za-z0-9+/]+={0,2}$/.test(pcm))return;
+      const time=Date.now();
+      if(ws._zyroAudioLastAt && time-ws._zyroAudioLastAt<25)return;
+      ws._zyroAudioLastAt=time;
+      const packet={type:'audio-relay-data',from:self,pcm};
+      for(const listener of listeners){
+        if(listener.readyState!==WebSocket.OPEN ||
+           !authorizedAudioRelay(listener.userId,self,a)){listeners.delete(listener);continue;}
+        if(listener.bufferedAmount<96*1024)sendSocket(listener,packet);
+      }
+      if(!listeners.size)audioRelayOwnerUpdate(self);
+      return;
     }
     if (m.type==='listen-request') {
       const owner=String(m.to||''); const a=currentAlert(owner);
@@ -875,7 +936,20 @@ wss.on('connection', ws => {
       relay(target,{type:'rtc',from:self,alertId:a.id,signal});
     }
   });
-  ws.on('close',()=>{const conn=sockets.get(ws.userId);if(conn){conn.delete(ws);if(!conn.size)sockets.delete(ws.userId);}const a=currentAlert(ws.userId);if(a){a.hasAudio=a.kind !== 'pickpocket' && db.users[ws.userId]?.sosAudioConsent===true && [...connections(ws.userId)].some(x=>x.microphoneReady);save();}refreshRelated(ws.userId);});
+  ws.on('close',()=>{
+    const conn=sockets.get(ws.userId);
+    if(conn){conn.delete(ws);if(!conn.size)sockets.delete(ws.userId);}
+    const impacted=[];
+    for(const [owner,listeners] of sosAudioRelaySubscribers)if(listeners.delete(ws))impacted.push(owner);
+    const a=currentAlert(ws.userId);
+    if(a){
+      a.hasAudio=a.kind !== 'pickpocket' && db.users[ws.userId]?.sosAudioConsent===true && [...connections(ws.userId)].some(x=>x.microphoneReady);
+      if(!a.hasAudio)sosAudioRelaySubscribers.delete(ws.userId);
+      save();
+    }
+    for(const owner of impacted)audioRelayOwnerUpdate(owner);
+    refreshRelated(ws.userId);
+  });
 });
 setInterval(()=>{ for (const ws of wss.clients) { if (!ws.alive) {ws.terminate();continue;} ws.alive=false;ws.ping();} },25000).unref();
 setInterval(()=>{
