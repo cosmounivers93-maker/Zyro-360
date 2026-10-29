@@ -446,17 +446,13 @@ function renderHome(){
   renderMap();
 }
 function inviteBox(code){
- const link=location.origin+'/?invite='+encodeURIComponent(code);
- const name=current?.me?.name||'Una persona fidata';
- return `<div class="invite-code-box" data-invite-link="${escapeHtml(link)}" data-invite-name="${escapeHtml(name)}"><small>LINK E CODICE MONOUSO · VALIDI 24 ORE</small><code>${escapeHtml(code)}</code><button type="button" class="copy-code">Copia codice</button><div class="zyro-personal-invite"><span class="zyro-invite-mark" aria-hidden="true">↗</span><div><strong>Invito di ${escapeHtml(name)}</strong><small>Unisciti alla sua cerchia su ZYRO 360</small></div></div><div class="invite-share-actions"><button type="button" class="copy-invite-link">🔗 Copia invito</button><button type="button" class="share-invite-link">↗ Condividi</button></div></div>`;
+ return `<div class="invite-code-box"><small>CODICE MONOUSO · VALIDO 24 ORE</small><code>${escapeHtml(code)}</code><div class="invite-share-actions"><button type="button" class="copy-code">Copia codice</button><button type="button" class="share-invite-code">↗ Condividi codice</button></div></div>`;
 }
-function inviteShareData(box){
- const name=box?.dataset.inviteName||'Una persona fidata';
- const link=box?.dataset.inviteLink;
- if(!link)throw Error('Genera un nuovo invito prima di condividerlo.');
- return {title:`Invito di ${name} · ZYRO 360`,text:`${name} ti invita nella sua cerchia privata su ZYRO 360.`,url:link};
+function inviteCodeFromButton(button){
+ const code=button.closest('.invite-code-box')?.querySelector('code')?.textContent?.trim();
+ if(!code||!/^[A-Fa-f0-9]{18}$/.test(code))throw Error('Genera un nuovo codice prima di condividerlo.');
+ return code;
 }
-
 function renderCircles(){
   if(!current)return;
   const list=$('circlesList');
@@ -476,19 +472,17 @@ function renderCircles(){
   list.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',()=>action(async()=>{if(!confirm('Eliminare definitivamente questa cerchia per tutti i membri?'))return;await post('/api/circles/delete',{circleId:b.dataset.delete});await refresh();toast('Cerchia eliminata.');})));
 }
 function bindCopyCodes(root){
-  root.querySelectorAll('.copy-code').forEach(btn=>btn.addEventListener('click',()=>copyInvite(btn.closest('.invite-code-box')?.querySelector('code')?.textContent,'Codice copiato.')));
-  root.querySelectorAll('.copy-invite-link').forEach(btn=>btn.addEventListener('click',()=>action(async()=>{
-    const data=inviteShareData(btn.closest('.invite-code-box'));
-    await copyInvite(data.text+'\n'+data.url,'Invito copiato. Invialo a una persona fidata.');
-  })));
-  root.querySelectorAll('.share-invite-link').forEach(btn=>btn.addEventListener('click',()=>action(async()=>{
-    const data=inviteShareData(btn.closest('.invite-code-box'));
-    if(navigator.share){
-      try{await navigator.share(data);return;}
-      catch(error){if(error?.name==='AbortError')return;}
-    }
-    await copyInvite(data.text+'\n'+data.url,'Invito copiato. Puoi incollarlo su WhatsApp o Telegram.');
-  })));
+ root.querySelectorAll('.copy-code').forEach(button=>button.addEventListener('click',()=>action(async()=>{
+  await copyInvite(inviteCodeFromButton(button),'Codice copiato.');
+ })));
+ root.querySelectorAll('.share-invite-code').forEach(button=>button.addEventListener('click',()=>action(async()=>{
+  const code=inviteCodeFromButton(button);
+  if(navigator.share){
+   try{await navigator.share({text:code});return;}
+   catch(error){if(error?.name==='AbortError')return;}
+  }
+  await copyInvite(code,'Codice copiato. Incollalo nell’app con cui vuoi condividerlo.');
+ })));
 }
 async function copyInvite(value,message){
  if(typeof value!=='string'||!value){toast('Genera un nuovo invito e riprova.',true);return;}
@@ -2231,4 +2225,5 @@ document.querySelectorAll('[data-billing-open]').forEach(b=>b.addEventListener('
 $('zyroRestorePurchases')?.addEventListener('click',()=>action(openPlayBilling));
 window.addEventListener('zyro:android-ready',renderBillingActions);
 window.addEventListener('focus',()=>{if(current)void action(refresh);});
+
 

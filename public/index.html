@@ -280,15 +280,10 @@ html[data-theme="dark"] #modesView #journeyTargetInfo{color:#a2dfd5!important}
 html[data-theme="dark"] #modesView .zyro-v15-destination small{color:#b7d1d4!important}
 html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;border-top-color:#315361!important;box-shadow:0 -4px 16px #00000025!important}
 </style>
-<style id="zyro-invite-v56">
-#circlesView .zyro-personal-invite{display:grid;grid-template-columns:34px minmax(0,1fr);gap:12px;align-items:center;width:100%;padding:15px;border:1px solid #a4ceca;border-radius:16px;background:#fff;color:#174b52;box-sizing:border-box}
-#circlesView .zyro-invite-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#dff7f0;color:#128978;font-size:23px}
-#circlesView .zyro-personal-invite>div{min-width:0}
-#circlesView .zyro-personal-invite strong{display:block;font-size:15px;line-height:1.4;overflow-wrap:anywhere;letter-spacing:0}
-#circlesView .zyro-personal-invite small{display:block;margin-top:5px;font-size:12px;line-height:1.5;color:#4f7075;letter-spacing:0}
-html[data-theme="dark"] #circlesView .zyro-personal-invite{background:#123241;border-color:#3c6e74;color:#e7faf7}
-html[data-theme="dark"] #circlesView .zyro-personal-invite small{color:#b4d1d2}
-html[data-theme="dark"] #circlesView .zyro-invite-mark{background:#1c4b52;color:#76e4d1}
+<style id="zyro-invite-code-v57">
+#circlesView .invite-code-box code{display:block;max-width:100%;overflow-wrap:anywhere;white-space:normal;line-height:1.5;letter-spacing:.12em;font-size:clamp(16px,4.3vw,20px)}
+#circlesView .invite-code-box .invite-share-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;margin-top:16px}
+#circlesView .invite-share-actions button{min-width:0;width:100%;min-height:44px;padding:12px 8px;white-space:normal;line-height:1.35}
 </style>
 </head>
 <body>
@@ -545,7 +540,7 @@ html[data-theme="dark"] #circlesView .zyro-invite-mark{background:#1c4b52;color:
         <div class="how-heading zyro-heading-v55"><span class="how-icon" aria-hidden="true">?</span><div class="zyro-heading-copy"><p class="eyebrow muted">LA TUA GUIDA</p><h2 id="howTitle">Scopri ZYRO 360</h2></div><p class="zyro-heading-description">Ogni funzione, spiegata passo dopo passo.</p></div>
         <details><summary>Inizia da qui <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea il tuo account, scegli nome e foto dal Profilo e apri «Abilita permessi». Autorizza soltanto le funzioni che vuoi usare: posizione per il GPS, notifiche per gli avvisi, microfono per l’audio SOS e sensori per Pick Pocket. I permessi da soli non avviano la condivisione né il microfono.</p></div></details>
         <details><summary>Home: mappa e posizione <span aria-hidden="true">＋</span></summary><div class="how-content"><p>«Trova la mia posizione» centra la mappa sul telefono. «Attiva posizione» condivide il GPS con le persone autorizzate nelle tue cerchie; puoi interrompere la condivisione in ogni momento. In «Persone invitate» gestisci chi può vedere la posizione e chi riceve i tuoi SOS. La precisione dipende dal segnale GPS e dalle autorizzazioni.</p></div></details>
-        <details><summary>Cerchie: amici e famiglia <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea un gruppo con un nome riconoscibile, poi condividi il codice o il link d’invito con una persona fidata. Per entrare in un gruppo usa il codice ricevuto. Ogni invito dura 24 ore e si usa una volta. L’ingresso nella cerchia non accende il microfono: decidi tu quali informazioni condividere.</p></div></details>
+        <details><summary>Cerchie: amici e famiglia <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea un gruppo con un nome riconoscibile, poi genera un codice d’invito e copialo oppure condividilo con una persona fidata. Per entrare in un gruppo apri Cerchie, incolla il codice ricevuto nel campo «Codice di invito» e premi «Entra». Ogni invito dura 24 ore e si usa una volta. L’ingresso nella cerchia non accende il microfono: decidi tu quali informazioni condividere.</p></div></details>
         <details><summary>Chat riservata <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Apri Chat e scegli una conversazione con un amico o con la famiglia. Puoi inviare messaggi, fotografie e risposte rapide, per esempio «Sono arrivato/a» o «Puoi chiamarmi?». Le conversazioni sono riservate ai partecipanti autorizzati.</p></div></details>
         <details><summary>SOS con posizione e indirizzo <span aria-hidden="true">＋</span></summary><div class="how-content"><p>In Modalità scegli i destinatari SOS e salva la lista. Con Premium o Family, premi «Invia SOS» per avvisarli e condividere la posizione durante l’allarme. La via e il civico vengono mostrati quando disponibili; in alternativa usa il punto sulla mappa. Puoi interrompere l’SOS dalla Home. Verifica sempre di aver scelto almeno un destinatario.</p></div></details>
         <details><summary>Audio SOS: incluso in Family <span aria-hidden="true">＋</span></summary><div class="how-content"><p>L’audio in diretta è disponibile con Family. Scegli di abilitarlo e concedi il permesso microfono: viene trasmesso soltanto durante il tuo SOS e ai destinatari autorizzati. Puoi interromperlo in qualsiasi momento. Controlla nella Home lo stato del microfono; il flusso non viene registrato sul server.</p></div></details>
@@ -621,9 +616,10 @@ html[data-theme="dark"] #circlesView .zyro-invite-mark{background:#1c4b52;color:
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=56.0" defer></script>
+<script src="/app.js?v=57.0" defer></script>
 </body>
 </html>
+
 
 
 
