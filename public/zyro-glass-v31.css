@@ -1,0 +1,115 @@
+/* ZYRO 360 V31 — vetro leggero e angoli sfumati.
+   Solo CSS: nessun cambiamento a SOS, microfono, push, GPS, login o chat.
+   Da caricare DOPO zyro-glass-v30.css. */
+
+/* Barra ZYRO 360 / Collegato: trasparenza vera, senza pannello grigio pieno.
+   Gli angoli SUPERIORI restano squadrati; quelli INFERIORI sono arrotondati. */
+#appScreen > .topbar,
+#appScreen:has(#homeView:not(.hidden)) > .topbar {
+  border-radius: 0 0 26px 26px !important;
+  overflow: hidden;
+  background: linear-gradient(108deg,
+    rgba(13, 42, 60, .59) 0%,
+    rgba(27, 82, 94, .44) 55%,
+    rgba(13, 54, 72, .53) 100%) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.15) !important;
+  backdrop-filter: blur(14px) saturate(1.15) !important;
+  border-left: 1px solid rgba(184, 248, 241, .12);
+  border-right: 1px solid rgba(184, 248, 241, .12);
+  border-bottom: 1px solid rgba(157, 226, 225, .34) !important;
+  box-shadow: 0 7px 18px rgba(12, 45, 61, .12),
+    inset 0 1px 0 rgba(247,255,255,.13) !important;
+}
+#appScreen > .topbar::before { opacity: .47; }
+#appScreen > .topbar .brand,
+#appScreen > .topbar .connection-pill { color: #f8ffff !important; }
+#appScreen > .topbar .connection-pill {
+  background: rgba(19, 84, 93, .19) !important;
+  border-color: rgba(197, 255, 251, .33) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16) !important;
+}
+
+/* Vero fade dell'ALFA negli angoli, non un alone bianco sopra il testo.
+   La sfumatura è applicata solo allo sfondo (::before): i titoli rimangono nitidi.
+   Il centro e i lati centrali mantengono colore e contrasto. */
+#modesView > .mode-heading,
+#chatsView > .chat-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: transparent !important;
+  border-color: rgba(185, 232, 233, .34) !important;
+  box-shadow: 0 13px 28px rgba(19, 60, 76, .11),
+    inset 0 1px 0 rgba(255,255,255,.20) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+#modesView > .mode-heading::before,
+#chatsView > .chat-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    radial-gradient(ellipse at 93% 0%, rgba(61, 225, 205, .35), transparent 56%),
+    radial-gradient(ellipse at 7% 110%, rgba(111, 184, 220, .23), transparent 54%),
+    linear-gradient(124deg,
+      rgba(19, 55, 81, .88) 0%,
+      rgba(19, 82, 99, .80) 63%,
+      rgba(31, 140, 145, .72) 100%);
+  /* Il bordo centrale resta opaco; soltanto gli angoli sfumano. */
+  -webkit-mask-image: radial-gradient(ellipse 72% 90% at 50% 50%,
+    #000 0%, #000 66%, rgba(0,0,0,.96) 72%, transparent 101%);
+  mask-image: radial-gradient(ellipse 72% 90% at 50% 50%,
+    #000 0%, #000 66%, rgba(0,0,0,.96) 72%, transparent 101%);
+}
+/* L'illustrazione chat continua a stare sopra il vetro e rimane cliccabile il resto. */
+#chatsView > .chat-hero .chat-hero-copy,
+#chatsView > .chat-hero .chat-hero-graphic,
+#modesView > .mode-heading > :not(.mode-heading-emblem) {
+  position: relative;
+  z-index: 2;
+}
+#modesView > .mode-heading .mode-heading-emblem { z-index: 1; }
+
+/* Tema scuro: vetro fumé, angoli sfumati sullo sfondo scuro, testi luminosi. */
+html[data-theme="dark"] #appScreen > .topbar,
+html[data-theme="dark"] #appScreen:has(#homeView:not(.hidden)) > .topbar {
+  background: linear-gradient(108deg,
+    rgba(5, 23, 41, .69),
+    rgba(13, 54, 67, .55) 58%,
+    rgba(5, 29, 47, .64)) !important;
+  border-bottom-color: rgba(99, 214, 213, .31) !important;
+  box-shadow: 0 7px 20px rgba(1, 10, 18, .29),
+    inset 0 1px 0 rgba(231,255,255,.11) !important;
+}
+html[data-theme="dark"] #modesView > .mode-heading,
+html[data-theme="dark"] #chatsView > .chat-hero {
+  border-color: rgba(87, 180, 181, .28) !important;
+  box-shadow: 0 13px 27px rgba(0, 8, 21, .19),
+    inset 0 1px 0 rgba(204,255,255,.12) !important;
+}
+html[data-theme="dark"] #modesView > .mode-heading::before,
+html[data-theme="dark"] #chatsView > .chat-hero::before {
+  background:
+    radial-gradient(ellipse at 95% 0%, rgba(40, 190, 170, .20), transparent 56%),
+    radial-gradient(ellipse at 6% 108%, rgba(22, 110, 152, .22), transparent 54%),
+    linear-gradient(124deg,
+      rgba(8, 26, 46, .88),
+      rgba(10, 56, 72, .81) 63%,
+      rgba(14, 75, 82, .72));
+}
+
+/* I banner hanno ancora contenuti leggibili negli angoli più vicini al bordo. */
+#modesView > .mode-heading h1,
+#chatsView > .chat-hero h1 { color: #f8ffff !important; }
+#modesView > .mode-heading > p:last-child,
+#chatsView > .chat-hero p:not(.chat-eyebrow) { color: #e5f6fa !important; }
+
+/* Niente nuovi effetti di sfocatura sulle mappe o sugli input del microfono. */
+@media (prefers-reduced-transparency: reduce) {
+  #appScreen > .topbar { background: rgba(17, 49, 66, .92) !important; }
+  html[data-theme="dark"] #appScreen > .topbar { background: rgba(9, 29, 44, .94) !important; }
+}
