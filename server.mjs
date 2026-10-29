@@ -126,6 +126,15 @@ function loginUser(res, id) { const sid = token(32); db.sessions[hash(sid)] = { 
 function memberIds(circleId) { return db.memberships.filter(m => m.circleId === circleId).map(m => m.userId); }
 function userCircles(id) { return db.memberships.filter(m => m.userId === id).map(m => db.circles[m.circleId]).filter(Boolean); }
 function sharedCircle(a, b) { return a === b || userCircles(a).some(c => memberIds(c.id).includes(b)); }
+// For legacy profiles, preserve previous all-circle-sharing until their owner
+// explicitly customizes contact access. New profiles start with an empty list.
+function gpsRecipientsFor(owner) {
+  if (Array.isArray(owner.gpsRecipients)) return owner.gpsRecipients.filter(id => id!==owner.id && sharedCircle(owner.id,id));
+  return [...activeRecipients(owner.id)].filter(id=>id!==owner.id);
+}
+function mayViewSharedGps(owner, viewerId) {
+  return !!owner?.sharing && gpsRecipientsFor(owner).includes(viewerId);
+}
 function connections(id) { return sockets.get(id) || new Set(); }
 function online(id) { return connections(id).size > 0; }
 function currentAlert(id) { return Object.values(db.alerts).find(a => a.userId === id && a.active) || null; }
@@ -147,17 +156,18 @@ function stateFor(id) {
     members: memberIds(c.id).filter(x => db.users[x]).map(x => {
       const u = db.users[x]; const alert = currentAlert(x);
       const visibleAlert = alert && canSeeAlert(id,alert) ? alert : null;
-      const shared = Boolean(u.sharing || (visibleAlert?.kind === 'pickpocket' && visibleAlert.recipients?.includes(id)));
-      const location = (shared || (visibleAlert?.kind==='sos' && visibleAlert.recipients?.includes(id))) && locations.has(x) ? locations.get(x) : null;
+      const emergencyShare = !!(visibleAlert?.recipients?.includes(id));
+      const shared = Boolean(mayViewSharedGps(u,id) || (visibleAlert?.kind === 'pickpocket' && emergencyShare));
+      const location = (shared || emergencyShare) && locations.has(x) ? locations.get(x) : null;
       const membership = db.memberships.find(m => m.circleId === c.id && m.userId === x);
       return { ...publicUser(u), invitedByMe: membership?.invitedBy === id, joinedAt:membership?.joinedAt||null, online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio, kind: alert.kind || 'sos' } : null };
     })
   }));
   const alerts = Object.values(db.alerts).filter(a => a.active && canSeeAlert(id, a)).map(a => ({
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
-    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (db.users[a.userId]?.sharing || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
+    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -267,7 +277,7 @@ app.post('/api/register', limit, (req, res) => {
   if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || password.length < 10 || password.length > 128) return res.status(400).json({error:'Inserisci nome, email valida e una password di almeno 10 caratteri.'});
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({error:'Email già registrata.'});
   const id = token(12), salt = token(16);
-  db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], sosRecipients: [], avatar: null };
+  db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], avatar: null };
   auditLogin(req, db.users[id]); loginUser(res, id); res.json({ ok:true });
 });
 app.post('/api/login', limit, (req, res) => {
@@ -612,6 +622,26 @@ app.post('/api/push/test', requireAuth, limit, async (req,res) => {
       :'Nessun servizio ha accettato la notifica. Controlla le autorizzazioni.'});
 });
 
+// Contact access is controlled ONLY by the signed-in profile owner.
+// It never enables GPS/microphone on another person's device.
+app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
+  const otherId=String(req.body?.userId||'');
+  if(!otherId || otherId===req.user.id || !db.users[otherId] || !sharedCircle(req.user.id,otherId))
+    return res.status(403).json({error:'Puoi modificare solo i contatti della tua cerchia.'});
+  if(typeof req.body.shareGps!=='boolean' || typeof req.body.receiveSos!=='boolean')
+    return res.status(400).json({error:'Seleziona le autorizzazioni GPS e SOS.'});
+  // Changing recipients mid-alert would silently leave old listeners connected.
+  if(currentAlert(req.user.id)?.kind==='sos')
+    return res.status(409).json({error:'Termina prima il tuo SOS per modificare i destinatari.'});
+  const gps=new Set(gpsRecipientsFor(req.user).filter(id=>sharedCircle(req.user.id,id))),
+        sos=new Set((req.user.sosRecipients||[]).filter(id=>sharedCircle(req.user.id,id)));
+  req.body.shareGps?gps.add(otherId):gps.delete(otherId);
+  req.body.receiveSos?sos.add(otherId):sos.delete(otherId);
+  req.user.gpsRecipients=[...gps].slice(0,120);
+  req.user.sosRecipients=[...sos].slice(0,60);
+  save();refreshRelated(req.user.id);
+  res.json({ok:true,gpsRecipients:req.user.gpsRecipients,sosRecipients:req.user.sosRecipients});
+});
 app.post('/api/settings/sos-recipients', requireAuth, limit, (req,res)=> {
   const ids=req.body.recipients;
   if(!Array.isArray(ids) || ids.length>60 || ids.some(id=>typeof id!=='string' || id.length>100)) return res.status(400).json({error:'Destinatari non validi.'});

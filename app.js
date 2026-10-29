@@ -524,12 +524,32 @@ async function stopSOS(){
 }
 async function startAudio(){
   if(localStream || micBusy || !current?.me?.sos)return;
-  if(!navigator.mediaDevices?.getUserMedia)throw Error('Serve HTTPS e un browser con accesso al microfono.');
+  const consent=await zyroOwnerDialog({
+    title:'Consenti accesso al microfono',
+    description:'Vuoi attivare il microfono per il tuo SOS? L’audio potrà essere ascoltato solo dai destinatari SOS da te selezionati quando lo richiedono. Puoi interromperlo in qualsiasi momento.',
+    submitLabel:'Consenti e attiva'
+  });
+  if(!consent)return;
+  if(!navigator.mediaDevices?.getUserMedia)throw Error('Il microfono non è supportato sul dispositivo. Aggiorna Zyro 360 e Android System WebView.');
   micBusy=true;
   try{
-    localStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});
+    // Start with the least restrictive supported constraints. Some Android
+    // devices refuse noise-processing requests despite working microphones.
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+    if(!current?.me?.sos){stream.getTracks().forEach(t=>t.stop());return;}
+    localStream=stream;
     localStream.getAudioTracks().forEach(t=>t.addEventListener('ended',()=>{if(localStream)stopAudio();}));
-    wsSend({type:'audio-ready',ready:true});toast('Microfono attivo e condivisibile con la tua cerchia.');renderHome();
+    wsSend({type:'audio-ready',ready:true});
+    toast('Microfono attivo. Solo i destinatari SOS possono richiedere l’ascolto.');
+    renderHome();
+  }catch(error){
+    if(error?.name==='NotAllowedError'||error?.name==='PermissionDeniedError'||error?.name==='SecurityError')
+      throw Error('Accesso microfono negato. Apri Impostazioni Android → Zyro 360 → Autorizzazioni e abilita il microfono, poi riprova.');
+    if(error?.name==='NotReadableError'||/Could not start audio source/i.test(error?.message||''))
+      throw Error('Android non riesce ad aprire il microfono. Chiudi altre app che lo usano, verifica il controllo privacy del microfono e riprova.');
+    if(error?.name==='NotFoundError'||error?.name==='DevicesNotFoundError')
+      throw Error('Nessun microfono disponibile su questo dispositivo.');
+    throw Error('Microfono non disponibile. Controlla autorizzazioni e impostazioni Android e riprova.');
   }finally{micBusy=false;}
 }
 function stopAudio(){if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}for(const p of peers.values())p.close();peers.clear();pendingIce.clear();wsSend({type:'audio-ready',ready:false});renderHome();}
@@ -996,7 +1016,11 @@ let activeSettingsPane=null;
 let profileMenuLastFocus=null;
 function setupProfileSettings(){
  const host=$('zyroSettingsPanels');
+ const permissionPanel=document.createElement('section');
+ permissionPanel.className='zyro-permission-panel';
+ permissionPanel.innerHTML='<p>Per ricevere avvisi SOS, usare la mappa e, se lo scegli, trasmettere audio, Zyro 360 ha bisogno dei permessi del dispositivo. Ogni permesso è facoltativo e puoi gestirlo qui in ogni momento.</p><div id="zyroNativePermissionMount"><p>Su Android usa i pulsanti per notifiche e posizione. Il microfono viene richiesto solo durante un SOS, ogni volta che scegli di attivarlo.</p></div>';
  const candidates={
+  permissions:permissionPanel,
   appearance:document.querySelector('#settingsView .zyro-appearance-panel'),
   help:$('zyroHelp'), premium:$('premiumPanel'),
   emergency:[...document.querySelectorAll('#settingsView .panel')].find(x=>x.querySelector('h2')?.textContent.trim()==='Numeri di emergenza'),
@@ -1005,12 +1029,12 @@ function setupProfileSettings(){
   reports:document.querySelector('#settingsView .zyro-report-panel'),
   logout:$('logoutButton')?.closest('.panel')
  };
- const titles={appearance:"Aspetto dell'app",help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',logout:'Esci dall’account'};
+ const titles={appearance:"Aspetto dell'app",help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',permissions:'Abilita permessi',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',logout:'Esci dall’account'};
  for(const [key,title] of Object.entries(titles)){
    const pane=document.createElement('section');pane.className='zyro-settings-pane';pane.dataset.pane=key;pane.hidden=true;
    if(key==='invitees'){
       const info=document.createElement('p');info.className='setting-description';
-      info.textContent='Queste persone hanno accettato un invito e sono membri delle tue cerchie. I collegamenti restano associati al tuo account nel database, finché qualcuno lascia o elimina la cerchia.';
+      info.textContent='Scegli con precisione quali persone della tua cerchia possono vedere la tua posizione o ricevere un tuo SOS e richiedere l’audio quando lo attivi. Le loro autorizzazioni telefoniche restano sotto il loro controllo.';
       pane.append(info);
       const list=document.createElement('div');list.id='savedInvitees';list.className='zyro-saved-invitees';pane.append(list);
    } else if(candidates[key])pane.append(candidates[key]);
@@ -1077,18 +1101,76 @@ function renderInvitedPeople(){
    }
  }
  root.replaceChildren();
- if(!byId.size){const p=document.createElement('p');p.className='zyro-invitees-empty';p.textContent='Nessuna persona collegata. Genera un invito in Cerchie e condividilo con chi vuoi aggiungere.';root.append(p);return;}
+ if(!byId.size){
+   const p=document.createElement('p');p.className='zyro-invitees-empty';
+   p.textContent='Nessuna persona collegata. Invita amici e familiari dalla sezione Cerchie.';
+   root.append(p);return;
+ }
+ const gpsInfo=document.createElement('div');gpsInfo.className='zyro-invitees-intro';
+ const description=document.createElement('p');
+ description.textContent='Sei tu a scegliere chi può vedere la TUA posizione e chi riceve i TUOI avvisi SOS. Nessun contatto potrà attivare da remoto il tuo microfono o GPS.';
+ const gpsButton=document.createElement('button');gpsButton.type='button';gpsButton.id='zyroInviteesGpsGlobal';
+ gpsButton.className='btn btn-outline btn-wide';
+ gpsButton.textContent=current.me.sharing?'Interrompi condivisione GPS':'Attiva condivisione GPS';
+ gpsButton.disabled=!!current.me.sos;
+ const hint=document.createElement('small');hint.textContent=current.me.sharing?'GPS condiviso soltanto con i contatti autorizzati qui sotto, mentre il dispositivo invia la posizione.':'La condivisione è spenta. Per mostrare il GPS devi autorizzare un contatto qui sotto e attivare la posizione.';
+ gpsInfo.append(description,gpsButton,hint);root.append(gpsInfo);
+ const gpsSet=new Set(current.me.gpsRecipients||[]);
+ const sosSet=new Set(current.me.sosRecipients||[]);
  for(const {member,circles} of byId.values()){
-   const card=document.createElement('div');card.className='zyro-invitee-row';
+   const card=document.createElement('article');card.className='zyro-access-card';
+   const top=document.createElement('div');top.className='zyro-access-top';
    const avatar=document.createElement('span');avatar.className='zyro-invitee-avatar';avatar.textContent=initials(member.name);
-   const content=document.createElement('div');
+   const name=document.createElement('div');name.className='zyro-access-name';
    const title=document.createElement('strong');title.textContent=member.name;
-   const meta=document.createElement('small');meta.textContent='Cerchie: '+[...circles].join(', ');
-   content.append(title,meta);
-   const flag=document.createElement('span');flag.className='zyro-invitee-flag';flag.textContent=member.invitedByMe?'Invitato da te':'Collegato';
-   card.append(avatar,content,flag);root.append(card);
+   const meta=document.createElement('small');meta.textContent=[...circles].join(' · ');
+   name.append(title,meta);
+   const flag=document.createElement('span');flag.className='zyro-invitee-flag';
+   flag.textContent=member.invitedByMe?'Invitato da te':'Nella cerchia';
+   top.append(avatar,name,flag);card.append(top);
+   const addToggle=(type,labelText,help,checked)=>{
+     const row=document.createElement('label');row.className='zyro-access-toggle';
+     const info=document.createElement('span');
+     const bold=document.createElement('strong');bold.textContent=labelText;
+     const sub=document.createElement('small');sub.textContent=help;
+     info.append(bold,sub);
+     const input=document.createElement('input');input.type='checkbox';
+     input.dataset.accessUser=member.id;input.dataset.accessType=type;
+     input.checked=checked;
+     input.disabled=!!current.me.sos;
+     input.setAttribute('aria-label',labelText+' per '+member.name);
+     row.append(info,input);card.append(row);
+   };
+   addToggle('gps','Mostra la mia posizione',
+       current.me.sharing?'Può vedere il mio GPS in Home quando è attivo':'Consenti la visione, poi attiva il GPS da qui o in Home',
+       gpsSet.has(member.id));
+   addToggle('sos','Ricevi i miei SOS e audio',
+       'Sarà avvisato in caso di SOS. Il mio microfono si attiva solo con il mio consenso.',sosSet.has(member.id));
+   root.append(card);
+ }
+ if(current.me.sos){
+   const n=document.createElement('p');n.className='setting-description';
+   n.textContent='Per cambiare i contatti, termina prima il SOS attivo.';
+   root.append(n);
  }
 }
+async function changeContactAccess(target){
+ if(!current)return;
+ const id=target.dataset.accessUser, kind=target.dataset.accessType;
+ const gps=new Set(current.me.gpsRecipients||[]), sos=new Set(current.me.sosRecipients||[]);
+ (kind==='gps'?gps:sos)[target.checked?'add':'delete'](id);
+ const response=await post('/api/settings/contact-access',{
+   userId:id,shareGps:gps.has(id),receiveSos:sos.has(id)
+ });
+ current.me.gpsRecipients=response.gpsRecipients;
+ current.me.sosRecipients=response.sosRecipients;
+ sosPending=null;
+ await refresh();
+ if(kind==='gps'&&target.checked&&!current.me.sharing)
+   toast('Contatto autorizzato. Premi «Attiva condivisione GPS» per iniziare a mostrargli la posizione.');
+ else toast('Preferenze del contatto salvate.');
+}
+
 async function copyAccountId(id){
  if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(id);return;}catch{}}
  const control=document.createElement('textarea');control.value=id;control.readOnly=true;control.style.position='fixed';control.style.top='-9999px';document.body.append(control);
@@ -1110,6 +1192,26 @@ async function init(){
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
   setupProfileSettings();
+  $('savedInvitees').addEventListener('change',e=>{
+    if(!e.target.matches('input[data-access-user]'))return;
+    const input=e.target;input.disabled=true;
+    void action(async()=>{
+      try{await changeContactAccess(input);}
+      catch(err){input.checked=!input.checked;throw err;}
+      finally{if(input.isConnected)input.disabled=false;}
+    });
+  });
+  $('savedInvitees').addEventListener('click',e=>{
+    if(e.target.id!=='zyroInviteesGpsGlobal')return;
+    void action(async()=>{
+      if(current?.me?.sos)throw Error('Termina prima il tuo SOS.');
+      const enabled=!current.me.sharing;
+      await post('/api/sharing',{enabled});
+      await refresh();
+      if(enabled)updateGeo(null,true);
+      toast(enabled?'GPS attivo per i contatti autorizzati.':'Condivisione GPS disattivata.');
+    });
+  });
   $('mapZoomIn').addEventListener('click',()=>{if(stableMap)stableMap.zoomTo(Math.min(18,stableMap.getZoom()+1),{duration:250});});
   $('mapZoomOut').addEventListener('click',()=>{if(stableMap)stableMap.zoomTo(Math.max(2,stableMap.getZoom()-1),{duration:250});});
   $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;ownCentered=false;void orientationPermission();updateGeo(null,true);if(lastCoords){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));

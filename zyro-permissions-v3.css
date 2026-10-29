@@ -1,0 +1,58 @@
+/* Zyro 360 v18 — permissions and per-contact sharing preferences. */
+.zyro-permission-panel,
+.zyro-invitees-intro,
+.zyro-access-card{
+  color:inherit;
+  border:1px solid rgba(102,217,208,.25);
+  background:linear-gradient(135deg,rgba(34,77,91,.28),rgba(13,38,58,.20));
+  border-radius:18px;
+  padding:14px;
+  box-shadow:0 10px 32px rgba(0,0,0,.08);
+}
+.zyro-permission-panel{display:grid;gap:13px}
+.zyro-permission-panel>p,
+.zyro-invitees-intro p{font-size:13px;line-height:1.6;margin:0;color:inherit;opacity:.89}
+.zyro-permission-panel #zyroNativePermissionMount{display:grid;gap:10px;min-width:0}
+.zyro-permission-panel #zyroNativePermissionMount>p{font-size:12px;line-height:1.6;margin:0}
+.zyro-permission-panel .zyro-native-permission-sheet{
+  width:100%;max-width:100%;min-width:0;
+  border-radius:16px;padding:14px 11px;
+  background:linear-gradient(145deg,rgba(27,65,83,.84),rgba(12,35,56,.86));
+  box-shadow:none;
+  overflow:visible;max-height:none;
+}
+.zyro-permission-panel .zyro-native-permission-sheet h2{font-size:18px}
+.zyro-permission-panel .zyro-native-permission-sheet p{font-size:12px}
+.zyro-permission-panel .zyro-native-permission-list{gap:10px}
+.zyro-permission-panel .zyro-native-permission-row{padding:11px}
+.zyro-permission-panel .zyro-native-permission-symbol{width:35px;height:35px}
+.zyro-invitees-intro{display:grid;gap:10px;margin-bottom:13px}
+.zyro-invitees-intro button{min-height:42px}
+.zyro-invitees-intro small{display:block;line-height:1.5;opacity:.78;font-size:11px}
+.zyro-access-card{display:grid;gap:10px;margin:0 0 12px}
+.zyro-access-top{display:flex;align-items:center;gap:10px;min-width:0}
+.zyro-access-name{display:grid;gap:3px;flex:1;min-width:0}
+.zyro-access-name strong{font-size:14px;line-height:1.2;overflow-wrap:anywhere}
+.zyro-access-name small{font-size:11px;opacity:.75;overflow-wrap:anywhere}
+.zyro-access-top .zyro-invitee-flag{font-size:10px;max-width:85px;text-align:right}
+.zyro-access-toggle{
+ display:flex;align-items:center;justify-content:space-between;gap:9px;
+ border:1px solid rgba(105,208,210,.17);
+ background:rgba(69,148,169,.08);
+ border-radius:13px;padding:11px;
+}
+.zyro-access-toggle>span{display:grid;gap:5px;min-width:0;flex:1}
+.zyro-access-toggle strong{font-size:12px;line-height:1.4}
+.zyro-access-toggle small{font-size:11px;line-height:1.45;opacity:.78}
+.zyro-access-toggle input[type="checkbox"]{
+ width:22px;height:22px;min-width:22px;accent-color:#62ddc6;
+ cursor:pointer;margin:0;
+}
+.zyro-access-toggle input:disabled{opacity:.55}
+[data-zyro-theme="light"] .zyro-permission-panel .zyro-native-permission-sheet{
+ color:#ecfffc;
+}
+@media(max-width:390px){
+ .zyro-permission-panel,.zyro-invitees-intro,.zyro-access-card{padding:11px}
+ .zyro-access-top .zyro-invitee-flag{font-size:9px}
+}
