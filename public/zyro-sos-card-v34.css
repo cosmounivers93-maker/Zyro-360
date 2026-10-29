@@ -1,0 +1,165 @@
+/* ZYRO 360 · V34 — scheda SOS compatta, coerente con la grafica V30.
+   SOLO CSS. Mantiene il comportamento sicuro del pulsante di ascolto V33.
+   Caricare DOPO zyro-sos-home-v33.css. */
+
+/* La scheda ora rimane sopra i tre pulsanti della Home, senza coprire
+   l'intestazione, la parte centrale della mappa o il segnaposto SOS. */
+#homeView .geo-immersive #homeSOSListen.zyro-home-sos-listen {
+  top: auto !important;
+  bottom: calc(73px + 96px + 14px + env(safe-area-inset-bottom, 0px)) !important;
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%);
+  width: min(440px, calc(100% - 26px)) !important;
+  max-width: 440px !important;
+  max-height: min(34dvh, 240px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  padding: 14px 15px 13px !important;
+  gap: 11px;
+  border-radius: 22px !important;
+  border: 1px solid rgba(87, 189, 178, .46) !important;
+  background: linear-gradient(138deg,
+    rgba(255, 255, 255, .93) 0%,
+    rgba(237, 249, 251, .88) 67%,
+    rgba(246, 250, 252, .91) 100%) !important;
+  color: #163349 !important;
+  box-shadow: 0 12px 28px rgba(18, 55, 74, .15),
+    inset 0 1px 0 rgba(255, 255, 255, .92) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.10) !important;
+  backdrop-filter: blur(14px) saturate(1.10) !important;
+}
+#homeView .geo-immersive #homeSOSListen.zyro-home-sos-listen::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, #35bda9, #6bc9c9 53%, #e58ca2);
+  opacity: .85;
+  pointer-events: none;
+}
+#homeView .geo-immersive #homeSOSListen.zyro-home-sos-listen::after {
+  content: "";
+  position: absolute;
+  top: 19px;
+  right: 17px;
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgba(255, 255, 255, .95);
+  border-radius: 50%;
+  background: #1cad9b;
+  box-shadow: 0 0 0 3px rgba(34, 182, 165, .13);
+  pointer-events: none;
+}
+#homeView #homeSOSListen .zyro-home-sos-text {
+  min-width: 0;
+  padding-right: 15px;
+  gap: 5px;
+}
+#homeView #homeSOSListen .zyro-home-sos-text b {
+  color: #153549 !important;
+  font-size: clamp(13px, 3.7vw, 15px);
+  font-weight: 750;
+  line-height: 1.32;
+  letter-spacing: -.15px;
+}
+#homeView #homeSOSListen .zyro-home-sos-text small {
+  color: #547183 !important;
+  font-size: clamp(11px, 3.2vw, 12px);
+  line-height: 1.42;
+}
+#homeView #homeSOSListen .zyro-home-sos-actions {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+#homeView #homeSOSListen .zyro-home-sos-actions button {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: clamp(11px, 3vw, 12.5px);
+  font-weight: 750;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  touch-action: manipulation;
+}
+#homeView #homeSOSListen .zyro-home-listen-button {
+  flex: 1 1 auto;
+  background: linear-gradient(130deg, #c5335d, #ac284f) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 8px rgba(156, 39, 79, .14) !important;
+}
+#homeView #homeSOSListen .zyro-home-listen-button:disabled {
+  background: #e4e9eb !important;
+  color: #60717d !important;
+  box-shadow: none !important;
+  border-color: #d4e0e4;
+  opacity: 1;
+  cursor: default;
+}
+#homeView #homeSOSListen .zyro-home-sos-details {
+  flex: 0 0 auto;
+  background: rgba(236, 244, 246, .97) !important;
+  border-color: rgba(138, 174, 183, .38) !important;
+  color: #21465b !important;
+}
+
+/* Tema scuro: stesso layout, vetro blu notte e testi leggibili. */
+html[data-theme="dark"] #homeView .geo-immersive #homeSOSListen.zyro-home-sos-listen {
+  background: linear-gradient(128deg,
+    rgba(11, 32, 50, .94),
+    rgba(21, 52, 66, .91) 68%,
+    rgba(17, 36, 55, .95)) !important;
+  border-color: rgba(93, 204, 193, .47) !important;
+  color: #f2fbff !important;
+  box-shadow: 0 13px 31px rgba(0, 9, 23, .43),
+    inset 0 1px 0 rgba(198, 246, 245, .13) !important;
+}
+html[data-theme="dark"] #homeView #homeSOSListen .zyro-home-sos-text b {
+  color: #f5ffff !important;
+}
+html[data-theme="dark"] #homeView #homeSOSListen .zyro-home-sos-text small {
+  color: #c3dbe6 !important;
+}
+html[data-theme="dark"] #homeView #homeSOSListen .zyro-home-listen-button {
+  background: linear-gradient(128deg, #be325b, #a6264e) !important;
+  color: #fff !important;
+}
+html[data-theme="dark"] #homeView #homeSOSListen .zyro-home-listen-button:disabled {
+  background: #2b4253 !important;
+  color: #c4d7dd !important;
+  border-color: #52717b !important;
+}
+html[data-theme="dark"] #homeView #homeSOSListen .zyro-home-sos-details {
+  background: rgba(34, 66, 83, .86) !important;
+  color: #e4f9ff !important;
+  border-color: rgba(117, 183, 190, .33) !important;
+}
+
+/* Piccoli smartphone: i comandi restano accessibili e il lettore non
+   copre i tre pulsanti sottostanti. */
+@media (max-width: 350px) {
+  #homeView .geo-immersive #homeSOSListen.zyro-home-sos-listen {
+    width: calc(100% - 16px) !important;
+    padding: 12px 11px 11px !important;
+    bottom: calc(73px + 99px + 10px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+  #homeView #homeSOSListen .zyro-home-sos-actions { gap: 5px; }
+  #homeView #homeSOSListen .zyro-home-sos-actions button { padding: 9px 6px; }
+}
+@media (max-height: 660px) {
+  #homeView .geo-immersive #homeSOSListen.zyro-home-sos-listen {
+    bottom: calc(73px + 87px + 8px + env(safe-area-inset-bottom, 0px)) !important;
+    max-height: min(36dvh, 180px);
+    padding: 10px 12px !important;
+    gap: 6px;
+  }
+}
