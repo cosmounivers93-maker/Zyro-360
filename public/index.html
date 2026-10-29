@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/zyro-settings-final-v19.css?v=19.1">
   <link rel="stylesheet" href="/zyro-emergency-v22.css?v=22.0">
   <link rel="stylesheet" href="/zyro-native-monitor-v23.css?v=23.0">
+  <link rel="stylesheet" href="/zyro-sos-auto-audio-v25.css?v=25.0">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -80,7 +81,7 @@
         <div class="zyro-sos-status" id="sosCard" role="status" aria-live="polite">
           <div class="zyro-sos-status-header"><span class="pulse-dot"></span><strong id="sosTitle">SOS attivo</strong></div>
           <p id="sosDescription">Avviso inviato ai contatti selezionati</p>
-          <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> SOS IN CORSO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div><a class="zyro-sos-quick-call" href="tel:112">Chiama 112 in emergenza reale</a></div>
+          <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> SOS IN CORSO</span><p id="sosAudioState" class="zyro-sos-audio-state" role="status" aria-live="polite">Audio SOS: non attivo</p><div class="sos-actions"><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div><a class="zyro-sos-quick-call" href="tel:112">Chiama 112 in emergenza reale</a></div>
           <div id="sosInactiveNote" class="hidden">La condivisione GPS è indipendente dall'SOS.</div>
         </div>
       </section>
@@ -161,7 +162,7 @@
         <div class="zyro-v15-heading"><span class="zyro-v15-symbol">✦</span><div><p class="eyebrow muted">ABBONAMENTI</p><h2>SOS Premium</h2><p>Notifica ai destinatari scelti, posizione GPS in diretta, strada se disponibile e ascolto audio con consenso.</p></div></div>
         <div class="zyro-v15-plans"><div><b>ZYRO Premium</b><strong>3,99 € <small>/mese</small></strong></div><div><b>ZYRO Family</b><strong>6,99 € <small>/mese</small></strong></div></div>
         <p id="premiumStatus" class="zyro-v15-status" role="status">Verifica abbonamento…</p>
-        <label class="zyro-v15-mic"><input id="sosAudioConsent" type="checkbox"> <span><b>Chiedi di attivare il microfono quando premi SOS</b><small>Il browser chiederà l'autorizzazione. Audio in diretta, non registrato dal server; serve l'app aperta e il consenso.</small></span></label>
+
         <p class="zyro-v15-note">Per gli utenti, le funzioni Premium richiedono un diritto di accesso verificato dal server. Il creatore autorizzato ha accesso incluso gratuitamente. Gli acquisti Play Store non sono ancora attivi e non vengono elaborati pagamenti in questa versione.</p>
         <button id="premiumDetails" type="button" class="zyro-v15-secondary">Informazioni su Premium</button>
         <a class="zyro-v15-emergency" href="tel:112">Emergenza reale? Chiama il 112 — sempre disponibile</a>
@@ -326,6 +327,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=24.0" defer></script>
+<script src="/app.js?v=25.0" defer></script>
 </body>
 </html>

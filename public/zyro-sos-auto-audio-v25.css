@@ -1,0 +1,86 @@
+/* ZYRO 360 V25 · opt-in automatic SOS audio
+   Scoped to SOS panel and owner-only invited-people settings. */
+#sosCard .sos-actions{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr)!important;
+  width:100%;
+  gap:0!important;
+}
+#sosCard #stopSOS{
+  min-height:46px!important;
+  background:linear-gradient(110deg,rgba(126,43,77,.46),rgba(78,31,65,.49))!important;
+  border:1px solid rgba(255,139,162,.52)!important;
+  color:#fff!important;
+  font-size:12px!important;
+}
+#sosCard .zyro-sos-audio-state{
+  margin:3px 0 9px!important;
+  padding:9px 11px!important;
+  border:1px solid rgba(124,197,202,.22);
+  border-radius:11px;
+  color:#c8e2eb!important;
+  background:rgba(71,121,138,.14);
+  font-size:11px!important;
+  line-height:1.45!important;
+}
+#sosCard .zyro-sos-audio-state[data-status="on"]{
+  color:#a5ffe4!important;
+  background:rgba(45,168,140,.17);
+  border-color:rgba(112,232,185,.37);
+}
+#sosCard .zyro-sos-audio-state[data-status="error"]{
+  color:#ffcad3!important;
+  background:rgba(171,47,72,.15);
+  border-color:rgba(246,124,148,.33);
+}
+.zyro-saved-invitees .zyro-sos-mic-choice{
+  margin:0 0 15px;
+  padding:15px;
+  border-radius:17px;
+  background:linear-gradient(142deg,rgba(28,104,116,.12),rgba(80,178,163,.09));
+  border:1px solid rgba(64,171,171,.34);
+  box-shadow:inset 0 1px rgba(255,255,255,.08);
+}
+.zyro-saved-invitees .zyro-sos-mic-toggle{
+  display:flex;align-items:center;justify-content:space-between;gap:15px;
+  padding:0!important;margin:0!important;
+  background:transparent!important;border:0!important;
+}
+.zyro-saved-invitees .zyro-sos-mic-toggle span{min-width:0;flex:1}
+.zyro-saved-invitees .zyro-sos-mic-toggle strong{
+  display:block;font-size:13px;line-height:1.45;
+}
+.zyro-saved-invitees .zyro-sos-mic-toggle small{
+  display:block;font-size:11px;line-height:1.6;
+  margin-top:5px;opacity:.86;
+}
+.zyro-saved-invitees .zyro-sos-mic-toggle input[type="checkbox"]{
+  flex-shrink:0;width:22px;height:22px;accent-color:#2ac8ad;
+}
+.zyro-saved-invitees .zyro-sos-mic-note{
+  font-size:10px;line-height:1.55;margin:11px 0;
+  color:var(--z-panel-muted,#5c7481);
+}
+.zyro-saved-invitees .zyro-sos-mic-test{
+  min-height:43px;width:100%;padding:9px 13px;
+  border:1px solid rgba(57,171,165,.42);
+  background:rgba(77,197,179,.11);
+  color:var(--z-panel-fg,#194557);
+  border-radius:12px;font-size:12px;font-weight:800;
+  cursor:pointer;
+}
+.zyro-saved-invitees .zyro-sos-mic-test:disabled{opacity:.45;cursor:not-allowed}
+.zyro-saved-invitees .zyro-sos-mic-test:focus-visible,
+.zyro-saved-invitees .zyro-sos-mic-toggle input:focus-visible{
+  outline:2px solid #25d8b9;outline-offset:3px;
+}
+html[data-theme="dark"] .zyro-saved-invitees .zyro-sos-mic-choice{
+  background:linear-gradient(142deg,rgba(21,70,92,.65),rgba(17,55,72,.55));
+  border-color:rgba(120,210,199,.27);
+}
+html[data-theme="dark"] .zyro-saved-invitees .zyro-sos-mic-test{color:#cffef3}
+@media(max-width:410px){
+ .zyro-saved-invitees .zyro-sos-mic-choice{padding:12px}
+ .zyro-saved-invitees .zyro-sos-mic-toggle{gap:10px}
+ .zyro-saved-invitees .zyro-sos-mic-toggle strong{font-size:12px}
+}

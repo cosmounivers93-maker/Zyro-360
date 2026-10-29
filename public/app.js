@@ -10,6 +10,7 @@ let lastCoords = null;
 let sentAt = 0;
 let localStream = null;
 let micBusy = false;
+let sosAudioError = '';
 let activeView = 'home';
 let authMode = 'login';
 let toastTimer;
@@ -168,6 +169,8 @@ function setState(data){
   if(!data?.me)return;
   const prev = current;
   current=data;
+  // Revoking explicit opt-in stops ongoing live audio locally as well.
+  if(data.me.sosAudioConsent!==true && localStream)stopAudio();
   if(window.ZyroAndroidSafetySupported && window.ZyroNativeSafety?.pick===true && !theftTriggered)
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
@@ -316,12 +319,20 @@ function renderHome(){
   $('myLocationText').textContent= sos?'SOS attivo. Posizione condivisa solo se già autorizzata.':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
   $('sosCard').classList.toggle('is-active',!!me.sos);
   $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS attivo sul server (consegna non garantita)':'Hai bisogno di aiuto?';
-  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'Le persone selezionate vedono l’allarme. Premi «Attiva microfono» se vuoi trasmettere audio.':'Nessun contatto nella tua cerchia: il tuo SOS non raggiunge nessuno. In emergenza chiama il 112.'):'SOS Premium richiede un abbonamento attivo. In caso di pericolo reale chiama il 112.';
+  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'SOS registrato. I destinatari selezionati possono visualizzare l’allarme; la consegna non è garantita.':'Nessun contatto nella tua cerchia: il SOS non raggiunge nessuno. Chiama il 112 in emergenza.'):'SOS Premium richiede un abbonamento attivo. In caso di pericolo reale chiama il 112.';
   $('sosButton').disabled=!!me.sos;
   $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Apri SOS Premium');
   $('sosActiveActions').classList.toggle('hidden',!sos);
   $('sosInactiveNote').classList.toggle('hidden',!!me.sos);
-  $('audioButton').textContent=localStream?'🔇 Disattiva microfono':'🎙 Attiva microfono';
+  const micState=$('sosAudioState');
+  if(micState){
+    const consent=me.sosAudioConsent===true;
+    micState.dataset.status=!consent?'off':localStream?'on':sosAudioError?'error':'pending';
+    micState.textContent=!consent?'Audio ambientale disattivato nelle impostazioni.'
+      :localStream?'🎙 Audio SOS in diretta attivo · ascolto consentito solo ai destinatari scelti.'
+      :sosAudioError?'⚠ Audio non disponibile: '+sosAudioError
+      :'Audio autorizzato · avvio microfono in corso…';
+  }
   $('contactsList').innerHTML=contacts.length?contacts.map((u,i)=>{
     const status=u.sos?(u.sos.kind==='pickpocket'?'🚨 POSSIBILE FURTO':'🆘 SOS ATTIVO'):u.online?(u.sharing?'Posizione attiva':'Online'):'Offline';
     const loc=u.location, time=loc?when(loc.updatedAt):(u.sharing?'Posizione in attesa':'Posizione non condivisa');
@@ -624,28 +635,59 @@ function updateGeo(oldOn,newOn){
   },err=>{geolocationError=`GPS: ${err.message||'permesso negato'}`;renderHome();toast(geolocationError,true);},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
 }
 async function refresh(){if(!current)return;const data=await api('/api/state');setState(data);}
+// The user opted-in in Profilo > Persone invitate. Begin requesting
+// microphone access in the physical SOS button gesture (before GPS/network
+// awaits), but publish a stream ONLY after the server accepts SOS.
+function acquireSOSEmergencyAudio(){
+ if(!navigator.mediaDevices?.getUserMedia)
+   return Promise.resolve({error:Error('Accesso microfono non supportato da Android System WebView.')});
+ try{
+   return navigator.mediaDevices.getUserMedia({audio:true,video:false})
+     .then(stream=>({stream}),error=>({error}));
+ }catch(error){return Promise.resolve({error});}
+}
 async function startSOS(){
  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS Premium non attivo: nessun allarme è stato inviato. In emergenza chiama il 112.',true);return;}
- // Try to include a fresh GPS fix, without indefinitely delaying a request for help.
- if(!lastCoords && navigator.geolocation){try{
-   const pos=await Promise.race([new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,maximumAge:10000,timeout:2400})),new Promise((_,reject)=>setTimeout(()=>reject(Error('GPS non disponibile')),2600))]);
-   lastCoords={lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy,heading:null};
- }catch{/* SOS can still start without a fix. */}}
- const result=await post('/api/sos/start',{location:lastCoords?{lat:lastCoords.lat,lon:lastCoords.lon,accuracy:lastCoords.accuracy}:null});
- await refresh();mapTracking=true;updateGeo(null,true);
- if(isZyroNativeAvailable()){
-   try{await nativeBackgroundSync({sharing:true});}
-   catch(err){toast('SOS attivo, ma GPS in background non avviato: '+err.message,true);}
+ const optedIn=current.me.sosAudioConsent===true;
+ sosAudioError='';
+ const preparedAudio=optedIn?acquireSOSEmergencyAudio():null;
+ let serverStarted=false;
+ try{
+   // Request a fresh GPS fix, but never delay an SOS indefinitely.
+   if(!lastCoords && navigator.geolocation)try{
+     const pos=await Promise.race([new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,maximumAge:10000,timeout:2400})),new Promise((_,reject)=>setTimeout(()=>reject(Error('GPS non disponibile')),2600))]);
+     lastCoords={lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy,heading:null};
+   }catch{/* GPS may be unavailable; SOS should still continue. */}
+   const result=await post('/api/sos/start',{location:lastCoords?{lat:lastCoords.lat,lon:lastCoords.lon,accuracy:lastCoords.accuracy}:null});
+   serverStarted=true;
+   await refresh();mapTracking=true;updateGeo(null,true);
+   if(preparedAudio){
+     try{await startAudio(preparedAudio);}
+     catch(error){
+       sosAudioError=sosMicErrorMessage(error);
+       renderHome();
+       toast('SOS attivo, ma microfono non disponibile: '+sosAudioError,true);
+     }
+   }
+   if(isZyroNativeAvailable()){
+     try{await nativeBackgroundSync({sharing:true});}
+     catch(err){toast('SOS attivo, ma GPS in background non avviato: '+err.message,true);}
+   }
+   if(result.serverRecorded){
+     const pushCount=Number(result.pushAccepted||0);
+     if(!result.pushConfigured)toast('SOS registrato, ma Firebase non risulta configurato su Render. In emergenza chiama il 112.',true);
+     else if(Number(result.recipientCount||0)===0)toast('SOS attivo, ma non hai selezionato destinatari. Apri Persone invitate.',true);
+     else if(Number(result.pushAttempted||0)===0)toast('SOS sulla mappa, ma nessun telefono dei destinatari risulta registrato alle notifiche.',true);
+     else if(!pushCount)toast('SOS registrato, ma Firebase non ha accettato l’invio.',true);
+     else toast('SOS attivato. '+pushCount+' invii accettati dal provider; ricezione non garantita.');
+   }
+ }catch(error){
+   // No microphone should remain active if an SOS was not recorded.
+   if(!serverStarted && preparedAudio)void preparedAudio.then(result=>{
+     if(result.stream)result.stream.getTracks().forEach(track=>track.stop());
+   });
+   throw error;
  }
- if(result.serverRecorded){
-   const pushCount=Number(result.pushAccepted||0);
-   if(!result.pushConfigured)toast('SOS registrato, ma Firebase non risulta configurato su Render. In emergenza chiama il 112.',true);
-   else if(Number(result.recipientCount||0)===0)toast('SOS attivo, ma non hai selezionato destinatari. Apri Persone invitate.',true);
-   else if(Number(result.pushAttempted||0)===0)toast('SOS sulla mappa, ma nessun telefono dei destinatari risulta registrato alle notifiche. Chiedi di aprire Abilita permessi.',true);
-   else if(!pushCount)toast('SOS registrato, ma Firebase non ha accettato l’invio. Il destinatario deve verificare Firebase in Abilita permessi.',true);
-   else toast(`SOS attivato. ${pushCount} invii accettati dal provider; ricezione non garantita.`);
- }
- if($('sosAudioConsent').checked){try{await startAudio();toast('Microfono attivo: i contatti possono richiedere ascolto in diretta.');}catch(err){toast('Allarme attivo, ma microfono non disponibile: '+err.message,true);}}
 }
 async function stopSOS(){
   const confirmed=await zyroOwnerDialog({
@@ -663,35 +705,50 @@ async function stopSOS(){
   }
   toast('Allarme SOS terminato.');
 }
-async function startAudio(){
-  if(localStream || micBusy || !current?.me?.sos)return;
-  const consent=await zyroOwnerDialog({
-    title:'Consenti accesso al microfono',
-    description:'Vuoi attivare il microfono per il tuo SOS? L’audio potrà essere ascoltato solo dai destinatari SOS da te selezionati quando lo richiedono. Puoi interromperlo in qualsiasi momento.',
-    submitLabel:'Consenti e attiva'
-  });
-  if(!consent)return;
-  if(!navigator.mediaDevices?.getUserMedia)throw Error('Il microfono non è supportato sul dispositivo. Aggiorna Zyro 360 e Android System WebView.');
-  micBusy=true;
-  try{
-    // Start with the least restrictive supported constraints. Some Android
-    // devices refuse noise-processing requests despite working microphones.
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-    if(!current?.me?.sos){stream.getTracks().forEach(t=>t.stop());return;}
-    localStream=stream;
-    localStream.getAudioTracks().forEach(t=>t.addEventListener('ended',()=>{if(localStream)stopAudio();}));
-    wsSend({type:'audio-ready',ready:true});
-    toast('Microfono attivo. Solo i destinatari SOS possono richiedere l’ascolto.');
-    renderHome();
-  }catch(error){
-    if(error?.name==='NotAllowedError'||error?.name==='PermissionDeniedError'||error?.name==='SecurityError')
-      throw Error('Accesso microfono negato. Apri Impostazioni Android → Zyro 360 → Autorizzazioni e abilita il microfono, poi riprova.');
-    if(error?.name==='NotReadableError'||/Could not start audio source/i.test(error?.message||''))
-      throw Error('Android non riesce ad aprire il microfono. Chiudi altre app che lo usano, verifica il controllo privacy del microfono e riprova.');
-    if(error?.name==='NotFoundError'||error?.name==='DevicesNotFoundError')
-      throw Error('Nessun microfono disponibile su questo dispositivo.');
-    throw Error('Microfono non disponibile. Controlla autorizzazioni e impostazioni Android e riprova.');
-  }finally{micBusy=false;}
+function sosMicErrorMessage(error){
+ if(['NotAllowedError','PermissionDeniedError','SecurityError'].includes(error?.name))
+   return 'Permesso microfono negato. Apri Impostazioni Android → App → Zyro 360 → Autorizzazioni → Microfono.';
+ if(error?.name==='NotReadableError'||/Could not start audio source/i.test(error?.message||''))
+   return 'Android non riesce ad aprire il microfono. Controlla la privacy del microfono e chiudi le altre app che lo utilizzano.';
+ if(['NotFoundError','DevicesNotFoundError'].includes(error?.name))
+   return 'Nessun microfono rilevato su questo dispositivo.';
+ return error?.message||'Verifica il permesso microfono e Android System WebView.';
+}
+async function testSOSMicrophone(){
+ if(!navigator.mediaDevices?.getUserMedia)throw Error('Microfono non disponibile in questo ambiente.');
+ // This is a TEST requested from the settings page. No recording is stored
+ // or streamed; all tracks are closed immediately.
+ const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+ stream.getTracks().forEach(track=>track.stop());
+ return true;
+}
+async function startAudio(preparedAudio){
+ if(localStream||micBusy || !current?.me?.sos || current?.me?.sosAudioConsent!==true){
+   if(preparedAudio)void preparedAudio.then(r=>r.stream?.getTracks().forEach(t=>t.stop()));
+   return;
+ }
+ micBusy=true;
+ try{
+   // No second consent dialog: the user explicitly enabled this feature in
+   // Persone invitate. Android still requests OS microphone permission.
+   const acquired=preparedAudio?await preparedAudio:await acquireSOSEmergencyAudio();
+   if(acquired.error)throw acquired.error;
+   const stream=acquired.stream;
+   if(!stream)throw Error('Nessun flusso audio disponibile.');
+   if(!current?.me?.sos || current.me.sosAudioConsent!==true){
+     stream.getTracks().forEach(track=>track.stop());return;
+   }
+   localStream=stream;
+   sosAudioError='';
+   localStream.getAudioTracks().forEach(track=>track.addEventListener('ended',()=>{
+     if(localStream && localStream.getAudioTracks().includes(track)){
+       sosAudioError='Android ha interrotto il microfono.';
+       stopAudio();
+     }
+   }));
+   wsSend({type:'audio-ready',ready:true});
+   renderHome();
+ }finally{micBusy=false;}
 }
 function stopAudio(){if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}for(const p of peers.values())p.close();peers.clear();pendingIce.clear();wsSend({type:'audio-ready',ready:false});renderHome();}
 function makePeer(remoteId,send){
@@ -1464,6 +1521,25 @@ function renderInvitedPeople(){
    }
  }
  root.replaceChildren();
+ // Only place that controls emergency microphone opt-in:
+ // Profilo > Persone invitate, alongside per-contact GPS/SOS permissions.
+ const micBox=document.createElement('section');
+ micBox.className='zyro-sos-mic-choice';
+ const micLabel=document.createElement('label');micLabel.className='zyro-access-toggle zyro-sos-mic-toggle';
+ const micCopy=document.createElement('span');
+ const micTitle=document.createElement('strong');micTitle.textContent='Consenti cosa succede intorno a me';
+ const micExplanation=document.createElement('small');
+ micExplanation.textContent='Se attivo, quando premi SOS l’app tenta di accendere automaticamente il microfono. Solo i destinatari SOS selezionati possono richiedere l’ascolto audio in diretta. Nessuna registrazione viene salvata sul server.';
+ micCopy.append(micTitle,micExplanation);
+ const micInput=document.createElement('input');micInput.type='checkbox';micInput.id='sosAudioConsent';
+ micInput.checked=current.me.sosAudioConsent===true;
+ micInput.setAttribute('aria-label','Consenti audio in diretta automatico durante SOS');
+ micLabel.append(micCopy,micInput);
+ const micHint=document.createElement('p');micHint.className='zyro-sos-mic-note';
+ micHint.textContent='Scegli prima di usare SOS. Android richiede il permesso microfono. L’audio può interrompersi con lo schermo spento; lo stato sarà indicato nella Home.';
+ const micTest=document.createElement('button');micTest.type='button';micTest.id='zyroTestMic';
+ micTest.className='zyro-sos-mic-test';micTest.textContent='Verifica microfono';micTest.disabled=!micInput.checked;
+ micBox.append(micLabel,micHint,micTest);root.append(micBox);
  if(!byId.size){
    const p=document.createElement('p');p.className='zyro-invitees-empty';
    p.textContent='Nessuna persona collegata. Invita amici e familiari dalla sezione Cerchie.';
@@ -1578,12 +1654,45 @@ async function init(){
     void refreshPermissionStates();
   });
   $('savedInvitees').addEventListener('change',e=>{
+    if(e.target.id==='sosAudioConsent'){
+      const input=e.target, enabled=input.checked;
+      input.disabled=true;
+      // Launch the permission check in this tap; never store or send test audio.
+      const probe=enabled?testSOSMicrophone().then(()=>null,error=>sosMicErrorMessage(error)):null;
+      void action(async()=>{
+        try{
+          await post('/api/settings/sos-audio',{enabled});
+          if(!enabled && localStream)stopAudio();
+          sosAudioError='';
+          await refresh();
+          const issue=probe?await probe:null;
+          if(issue)toast('Preferenza salvata, ma il microfono non è pronto: '+issue,true);
+          else toast(enabled?'Ascolto SOS automatico consentito. Si attiverà quando premi SOS.':'Ascolto ambientale SOS disattivato.');
+        }catch(err){
+          if(input.isConnected){input.checked=!enabled;input.disabled=false;}
+          throw err;
+        }
+      });
+      return;
+    }
     if(!e.target.matches('input[data-access-user]'))return;
     const input=e.target;input.disabled=true;
     void action(async()=>{
       try{await changeContactAccess(input);}
       catch(err){input.checked=!input.checked;throw err;}
       finally{if(input.isConnected)input.disabled=false;}
+    });
+  });
+  $('savedInvitees').addEventListener('click',e=>{
+    if(e.target.id!=='zyroTestMic')return;
+    const button=e.target;button.disabled=true;
+    void action(async()=>{
+      try{
+        await testSOSMicrophone();
+        toast('Microfono Android verificato ✓. Nessun audio è stato trasmesso.');
+      }catch(err){
+        toast('Microfono non disponibile: '+sosMicErrorMessage(err),true);
+      }finally{if(button.isConnected)button.disabled=false;}
     });
   });
   $('savedInvitees').addEventListener('click',e=>{
@@ -1633,7 +1742,7 @@ async function init(){
   $('premiumDetails').addEventListener('click',()=>toast('Pagamenti Google Play da integrare nell’app Android: al momento non si può acquistare Premium. Non viene inviato alcun SOS a pagamento.'));
   $('sosButton').addEventListener('click',()=>action(startSOS));
   $('stopSOS').addEventListener('click',()=>action(stopSOS));
-  $('audioButton').addEventListener('click',()=>action(async()=>{if(localStream){stopAudio();toast('Microfono disattivato. Il tuo SOS rimane attivo.');}else await startAudio();}));
+
   $('sosRecipientList').addEventListener('change',()=>{sosPending=[...$('sosRecipientList').querySelectorAll('[data-sos-to]:checked')].map(x=>x.dataset.sosTo);});
   $('saveSOSRecipients').addEventListener('click',()=>action(async()=>{const recipients=[...$('sosRecipientList').querySelectorAll('[data-sos-to]:checked')].map(x=>x.dataset.sosTo);await post('/api/settings/sos-recipients',{recipients});sosPending=null;await refresh();toast('Destinatari SOS salvati.');}));
   for(const id of ['avatarCamera','avatarGallery'])$(id).addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(()=>saveAvatar(file));e.target.value='';});
