@@ -353,7 +353,7 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
           <p id="pushTestStatus" class="setting-description" role="status" aria-live="polite">Richiede due account collegati in una cerchia e le notifiche abilitate sul telefono destinatario.</p>
         </div>
       </div>
-      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. Durante un SOS, i destinatari che hai selezionato possono ricevere la posizione. Se il servizio di indirizzi SOS è attivo, le coordinate vengono inviate al fornitore di geocodifica per ricavare via, eventuale numero civico e città; l'indirizzo può essere approssimativo o mancante. In assenza di indirizzo viene indicata la posizione GPS quando disponibile. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento. Per la sicurezza degli account, al login ZYRO 360 registra l’indirizzo IP alla registrazione e all’ultimo accesso per un massimo di 30 giorni; soltanto l’amministratore può consultarlo per verificare segnalazioni e abusi.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. Durante un SOS, i destinatari che hai selezionato possono ricevere la posizione. Se il servizio di indirizzi SOS è attivo, le coordinate vengono inviate al fornitore di geocodifica per ricavare via, eventuale numero civico e città; l'indirizzo può essere approssimativo o mancante. In assenza di indirizzo viene indicata la posizione GPS quando disponibile. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento. Per la sicurezza degli account, al login ZYRO 360 registra l’indirizzo IP e i dati essenziali del dispositivo (sistema, marca e modello quando disponibili) alla registrazione e all’accesso per un massimo di 30 giorni; soltanto l’amministratore può consultare questi dati per verificare segnalazioni e abusi.</p></div>
       <div class="panel"><div class="panel-title"><span class="panel-icon warm">☏</span><div><h2>Numeri di emergenza</h2><p>In Italia e nell'UE il numero unico è 112</p></div></div><a href="tel:112" class="btn btn-outline btn-wide">Chiama il 112</a></div>
       <section class="panel zyro-report-panel" aria-label="Segnala un uso scorretto">
         <div class="panel-title"><span class="panel-icon">🛡</span><div><h2>Segnala un abuso</h2><p>Puoi segnalare un membro della tua cerchia per un comportamento scorretto. La segnalazione è riservata all’amministratore.</p></div></div>
@@ -367,7 +367,7 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
         <div class="zyro-admin-toolbar"><button id="adminLoad" class="btn btn-dark" type="button">Aggiorna elenco</button></div>
         <p id="adminStatus" class="setting-description" role="status">Caricamento gestione riservata…</p>
         <section id="adminReportsSection" aria-label="Segnalazioni ricevute"><div id="adminReports" class="zyro-admin-reports"></div></section>
-        <section id="adminUsersSection" aria-label="Utenti registrati" hidden><input id="adminFilter" type="search" aria-label="Cerca un account" placeholder="Cerca nome, email, ID o IP"><div id="adminUsers" class="zyro-admin-users"></div></section>
+        <section id="adminUsersSection" aria-label="Utenti registrati" hidden><input id="adminFilter" type="search" aria-label="Cerca un account" placeholder="Cerca nome, email, ID, IP o modello"><div id="adminUsers" class="zyro-admin-users"></div></section>
         <details class="zyro-admin-logs"><summary>Registro attività amministrative</summary><div id="adminAudit"></div></details>
         <p class="setting-description">IP di registrazione e ultimo accesso conservati al massimo 30 giorni. Un IP condiviso non prova che due account appartengano alla stessa persona.</p>
       </section>
@@ -447,9 +447,10 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=46.0" defer></script>
+<script src="/app.js?v=48.0" defer></script>
 </body>
 </html>
+
 
 
 

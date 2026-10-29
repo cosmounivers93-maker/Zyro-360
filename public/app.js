@@ -5,6 +5,23 @@ function updateMarkupIfChanged(node,html){
  node._zyroMarkup=html;node.innerHTML=html;
 }
 'use strict';
+function currentDeviceInfo(){
+ const d=window.ZyroDeviceInfo;
+ return d?.source==='android-app'?d:{source:'browser'};
+}
+let deviceSyncKey='';
+async function syncDeviceInfo(){
+ if(!current?.me?.id)return;
+ const id=current.me.id,device=currentDeviceInfo(),key=id+JSON.stringify(device);
+ if(key===deviceSyncKey)return;deviceSyncKey=key;
+ try{await post('/api/settings/device',{device});}catch{if(deviceSyncKey===key)deviceSyncKey='';}
+}
+function adminDeviceLabel(d){
+ if(!d)return 'Non ancora rilevato';
+ const phone=[d.manufacturer,d.model].filter(Boolean).join(' ');
+ return [phone||'Marca e modello non disponibili',[d.platform,d.osVersion].filter(Boolean).join(' ')].join(' · ');
+}
+window.addEventListener('zyro:android-ready',()=>{void syncDeviceInfo();});
 const $ = id => document.getElementById(id);
 let current = null;
 let adminUsersCache = [];
@@ -184,6 +201,7 @@ function setState(data){
   if(!data?.me)return;
   const prev = current;
   current=data;
+  void syncDeviceInfo();
   // Revoking explicit opt-in stops ongoing live audio locally as well.
   if((data.me.sosAudioConsent!==true || data.me.features?.sosAudio!==true) && localStream)stopAudio();
   if(window.ZyroAndroidSafetySupported && window.ZyroNativeSafety?.pick===true && !theftTriggered)
@@ -229,10 +247,10 @@ async function submitReport(){
 function fmtAdminDate(n){return n?new Date(n).toLocaleString('it-IT'):'Non disponibile';}
 function renderAdminUsers(){
  const term=$('adminFilter').value.trim().toLowerCase();
- const users=adminUsersCache.filter(u=>[u.name,u.email,u.id,u.lastLoginIp,u.registrationIp].some(v=>String(v||'').toLowerCase().includes(term)));
+ const users=adminUsersCache.filter(u=>[u.name,u.email,u.id,u.lastLoginIp,u.registrationIp,u.lastDevice?.manufacturer,u.lastDevice?.model].some(v=>String(v||'').toLowerCase().includes(term)));
  $('adminUsers').innerHTML=users.length?users.map(u=>`<article class="zyro-admin-user">
  <div class="zyro-admin-user-title"><b>${escapeHtml(u.name)}</b><span class="zyro-admin-chip ${u.bannedAt?'is-banned':u.premiumGiftLifetime?'is-gift':''}">${u.bannedAt?'Sospeso':u.premiumGiftLifetime?'Premium a vita':u.premiumActive?'Premium attivo':'Standard'}</span></div>
- <p>${escapeHtml(u.email)}</p><div class="zyro-admin-meta"><small>ID</small><code>${escapeHtml(u.id)}</code><small>IP alla registrazione</small><code>${escapeHtml(u.registrationIp||'Non disponibile')}</code><small>Registrato il</small><span>${escapeHtml(fmtAdminDate(u.createdAt))}</span><small>Ultimo IP rilevato</small><code>${escapeHtml(u.lastLoginIp||'Non disponibile')}</code><small>Ultimo accesso</small><span>${escapeHtml(fmtAdminDate(u.lastLoginAt))}</span></div>
+ <p>${escapeHtml(u.email)}</p><div class="zyro-admin-meta"><small>ID</small><code>${escapeHtml(u.id)}</code><small>IP alla registrazione</small><code>${escapeHtml(u.registrationIp||'Non disponibile')}</code><small>Registrato il</small><span>${escapeHtml(fmtAdminDate(u.createdAt))}</span><small>Ultimo IP rilevato</small><code>${escapeHtml(u.lastLoginIp||'Non disponibile')}</code><small>Dispositivo alla registrazione</small><span>${escapeHtml(adminDeviceLabel(u.registrationDevice))}</span><small>Ultimo dispositivo</small><span>${escapeHtml(adminDeviceLabel(u.lastDevice))}</span><small>Rilevato il</small><span>${escapeHtml(fmtAdminDate(u.lastDevice?.at))}</span><small>Origine dati</small><span>${u.lastDevice?.source==='android-app'?'App Android · dati del sistema dichiarati dall’app':'Browser · informazioni limitate'}</span><small>Ultimo accesso</small><span>${escapeHtml(fmtAdminDate(u.lastLoginAt))}</span></div>
  ${u.sameIpBannedAccounts?.length?`<p class="zyro-admin-ip-match">IP condiviso con ${u.sameIpBannedAccounts.length} account sospesi. Verifica gli account: una rete condivisa non dimostra la stessa identità.</p><small>ID: ${u.sameIpBannedAccounts.map(escapeHtml).join(', ')}</small>`:''}
  ${u.id===current.me.id?'<small>Account proprietario — non sospendibile.</small>':`<div class="zyro-admin-actions"><button type="button" data-admin-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button><button type="button" data-admin-gift="${escapeHtml(u.id)}">${u.premiumGiftLifetime?'Revoca regalo Premium':'Regala Premium a vita'}</button></div>`}
  </article>`).join(''):'<p class="setting-description">Nessun account corrispondente alla ricerca.</p>';
@@ -260,7 +278,7 @@ async function adminLoad(){
  $('adminReports').innerHTML=reports.length?reports.map(r=>{
   const u=r.user,reporter=r.reporter;
   return `<article class="zyro-admin-report"><div class="zyro-admin-report-top"><b>${escapeHtml(u?.name||'Account non disponibile')}</b><span>${r.status==='open'?'Da esaminare':'Esaminata'}</span></div>
-  <dl class="zyro-admin-report-data"><dt>Email</dt><dd>${escapeHtml(u?.email||'Non disponibile')}</dd><dt>ID utente</dt><dd>${escapeHtml(r.userId)}</dd><dt>IP registrazione</dt><dd>${escapeHtml(u?.registrationIp||'Non disponibile')}</dd><dt>Ultimo IP rilevato</dt><dd>${escapeHtml(u?.lastLoginIp||'Non disponibile')}</dd><dt>Ultimo accesso</dt><dd>${escapeHtml(fmtAdminDate(u?.lastLoginAt))}</dd><dt>Ricevuta il</dt><dd>${escapeHtml(fmtAdminDate(r.at))}</dd></dl>
+  <dl class="zyro-admin-report-data"><dt>Email</dt><dd>${escapeHtml(u?.email||'Non disponibile')}</dd><dt>ID utente</dt><dd>${escapeHtml(r.userId)}</dd><dt>IP registrazione</dt><dd>${escapeHtml(u?.registrationIp||'Non disponibile')}</dd><dt>Ultimo IP rilevato</dt><dd>${escapeHtml(u?.lastLoginIp||'Non disponibile')}</dd><dt>Ultimo accesso</dt><dd>${escapeHtml(fmtAdminDate(u?.lastLoginAt))}</dd><dt>Dispositivo utente</dt><dd>${escapeHtml(adminDeviceLabel(u?.lastDevice))}</dd><dt>Ricevuta il</dt><dd>${escapeHtml(fmtAdminDate(r.at))}</dd></dl>
   <p class="zyro-admin-report-label">Messaggio della segnalazione</p><blockquote class="zyro-admin-message">${escapeHtml(r.reason)}</blockquote>
   <small>Inviata da ${escapeHtml(reporter?.name||r.reporterId)} · ID ${escapeHtml(r.reporterId)}</small>
   <div class="zyro-admin-actions">${r.status==='open'?`<button type="button" data-admin-review="${escapeHtml(r.id)}">Segna come esaminata</button>`:''}${u && u.id!==current.me.id?`<button type="button" data-report-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button>`:''}</div></article>`;
@@ -1940,7 +1958,7 @@ async function init(){
   if(inviteFromLink && /^[A-Fa-f0-9]{18}$/.test(inviteFromLink)){history.replaceState(null,'',location.pathname);$('inviteInput').value=inviteFromLink.toUpperCase();}else inviteFromLink=null;
   document.querySelectorAll('.auth-tab').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
   $('authForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{
-    const payload={email:$('email').value.trim(),password:$('password').value};if(authMode==='register')payload.name=$('name').value.trim();
+    const payload={email:$('email').value.trim(),password:$('password').value,device:currentDeviceInfo()};if(authMode==='register')payload.name=$('name').value.trim();
     $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();closeProfileSettings();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else{showView('home');toast('Benvenuto in Zyro 360!');}}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
@@ -2085,7 +2103,7 @@ async function init(){
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
-    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=16-profilo').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}
   catch(err){
@@ -2143,6 +2161,7 @@ init();
 
 // Resume visual map updates when the app returns to the foreground.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeView==='home'){stableMap?.resize();renderHeadingOnly();}});
+
 
 
 
