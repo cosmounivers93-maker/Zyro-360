@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="/zyro-gradient-admin-v171.css?v=17.1">
   <link rel="stylesheet" href="/zyro-permissions-v3.css?v=18.0">
   <link rel="stylesheet" href="/zyro-settings-final-v19.css?v=19.1">
+  <link rel="stylesheet" href="/zyro-emergency-v22.css?v=22.0">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -78,7 +79,7 @@
         <div class="zyro-sos-status" id="sosCard" role="status" aria-live="polite">
           <div class="zyro-sos-status-header"><span class="pulse-dot"></span><strong id="sosTitle">SOS attivo</strong></div>
           <p id="sosDescription">Avviso inviato ai contatti selezionati</p>
-          <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> ALLARME ATTIVO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div></div>
+          <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> SOS IN CORSO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div><a class="zyro-sos-quick-call" href="tel:112">Chiama 112 in emergenza reale</a></div>
           <div id="sosInactiveNote" class="hidden">La condivisione GPS è indipendente dall'SOS.</div>
         </div>
       </section>
@@ -286,8 +287,31 @@
     <button class="nav-item" data-view="settings" type="button"><span class="nav-icon">⚙</span><span>Profilo</span></button>
   </nav>
 </div>
-<div id="theftOverlay" class="theft-overlay hidden" role="alertdialog" aria-labelledby="theftTitle" aria-modal="true">
-  <div class="theft-content"><div class="theft-symbol">🚨</div><h1 id="theftTitle">ALLARME ANTIFURTO</h1><p id="theftMessage">Movimento sospetto rilevato. Sirena attiva.</p><p id="theftNetwork">Stiamo provando ad avvisare i contatti scelti.</p><label class="field"><span>Password del proprietario</span><input id="theftPassword" type="password" autocomplete="current-password" placeholder="Password del tuo account ZYRO 360"></label><button id="theftStop" class="btn btn-primary btn-wide" type="button">Ferma sirena e allarme</button><p class="theft-subnote">Protezione interna all'app, non blocco Android. Per un pericolo reale chiama il 112.</p><a href="tel:112" class="theft-call">Chiama 112</a></div>
+<div id="theftOverlay" class="theft-overlay hidden" role="alertdialog" aria-labelledby="theftTitle" aria-describedby="theftMessage" aria-modal="true">
+  <div class="theft-content" role="document">
+    <div class="zyro-alert-brand" aria-hidden="true"><span class="zyro-alert-brand-logo">✦</span><span>ZYRO <b>360</b></span><span class="zyro-alert-brand-mode">PICK POCKET</span></div>
+    <div class="theft-hero">
+      <div class="theft-symbol" aria-hidden="true">
+        <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M24 4 41 11v12c0 11-7 18-17 22C14 41 7 34 7 23V11L24 4Z"/>
+          <path d="M24 14v12"/><circle cx="24" cy="33" r="1.5" fill="currentColor" stroke="none"/>
+        </svg>
+      </div>
+      <span class="zyro-alert-chip">Segnalazione di sicurezza</span>
+      <h1 id="theftTitle">Allarme antifurto attivo</h1>
+      <p id="theftMessage">Movimento sospetto rilevato. Potrebbe trattarsi di un falso allarme.</p>
+    </div>
+    <section class="zyro-alert-state" aria-label="Stato della segnalazione">
+      <div class="zyro-alert-state-label">Stato della protezione</div>
+      <p id="theftNetwork" role="status" aria-live="polite">Verifica dell'invio ai contatti selezionati…</p>
+    </section>
+    <div class="zyro-alert-auth">
+      <label class="field"><span>Password del proprietario</span><input id="theftPassword" type="password" autocomplete="current-password" placeholder="Inserisci la password del tuo account"></label>
+      <button id="theftStop" class="btn btn-primary btn-wide" type="button">Disattiva sirena e allarme</button>
+    </div>
+    <a href="tel:112" class="theft-call" aria-label="Chiama il numero unico di emergenza 112">Chiama il 112</a>
+    <p class="theft-subnote">Possibili falsi allarmi. Non blocca Android. In caso di emergenza reale chiama il 112.</p>
+  </div>
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>

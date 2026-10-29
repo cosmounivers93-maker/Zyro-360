@@ -1,0 +1,322 @@
+/* ZYRO 360 V22 · EMERGENCY VISUAL EDITION
+   Presentation only. No change to safety APIs, permissions, alarms, billing,
+   location, Firebase, server, web actions or phone settings.
+   Scoped to #theftOverlay, #sosCard and the SOS recipient panel. */
+:root {
+  --zyro-alert-navy:#091a2c;
+  --zyro-alert-navy-mid:#112b41;
+  --zyro-alert-aqua:#6ff4dd;
+  --zyro-alert-red:#ff657e;
+}
+
+/* ANTIFURTO — full-screen brand environment, not a red error page */
+#theftOverlay.theft-overlay{
+  position:fixed!important;
+  inset:0!important;
+  z-index:1000!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:calc(env(safe-area-inset-top,0px) + 18px) 18px
+    calc(env(safe-area-inset-bottom,0px) + 18px)!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain;
+  background:
+    radial-gradient(ellipse at 82% 7%,rgba(255,78,108,.19),transparent 40%),
+    radial-gradient(ellipse at 5% 84%,rgba(39,210,199,.15),transparent 47%),
+    linear-gradient(151deg,#061728 0%,#10293f 50%,#071a2c 100%)!important;
+  color:#ecfaff!important;
+}
+#theftOverlay.hidden{display:none!important}
+#theftOverlay .theft-content{
+  width:min(452px,100%)!important;
+  max-width:100%!important;
+  max-height:calc(100dvh - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px) - 36px);
+  min-height:0;
+  margin:auto!important;
+  padding:clamp(19px,4vw,27px)!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+  text-align:left!important;
+  border-radius:27px!important;
+  background:linear-gradient(152deg,rgba(29,66,83,.89),rgba(9,30,49,.95))!important;
+  border:1px solid rgba(145,227,226,.28);
+  -webkit-backdrop-filter:blur(16px) saturate(1.15);
+  backdrop-filter:blur(16px) saturate(1.15);
+  box-shadow:0 24px 70px rgba(0,7,18,.50),
+    inset 0 1px rgba(221,255,255,.16);
+  scrollbar-width:thin;
+  scrollbar-color:rgba(131,222,219,.38) transparent;
+}
+#theftOverlay .zyro-alert-brand{
+  display:flex;align-items:center;gap:9px;
+  color:#e7ffff;font-size:13px;font-weight:800;letter-spacing:.16em;
+  margin-bottom:21px;
+}
+#theftOverlay .zyro-alert-brand-logo{
+  display:grid;place-items:center;
+  width:34px;height:34px;border-radius:12px;
+  color:#91ffe7;font-size:21px;
+  background:rgba(66,220,203,.13);
+  border:1px solid rgba(117,241,220,.28);
+  box-shadow:0 0 22px rgba(51,227,198,.11);
+}
+#theftOverlay .zyro-alert-brand b{color:#78f4df}
+#theftOverlay .zyro-alert-brand-mode{
+  margin-left:auto;font-size:9px;letter-spacing:.08em;
+  padding:7px 9px;border-radius:999px;
+  color:#a9e7e1;background:rgba(78,179,184,.11);
+  border:1px solid rgba(110,212,207,.22);
+}
+#theftOverlay .theft-hero{text-align:center}
+#theftOverlay .theft-symbol{
+  margin:0 auto 13px!important;
+  display:grid;place-items:center;
+  width:87px;height:87px;
+  border-radius:26px;
+  border:1px solid rgba(255,132,147,.40);
+  background:
+    radial-gradient(circle at 35% 26%,rgba(255,133,149,.26),transparent 61%),
+    linear-gradient(140deg,rgba(143,36,70,.44),rgba(76,29,65,.22));
+  box-shadow:0 0 0 8px rgba(252,93,122,.045),0 0 38px rgba(242,64,104,.13);
+  animation:zyroAlertGlow 2.4s ease-in-out infinite alternate!important;
+}
+#theftOverlay .theft-symbol svg{width:43px;height:43px;stroke:#ff9dab;stroke-width:1.65}
+#theftOverlay .zyro-alert-chip{
+  display:inline-flex;align-items:center;gap:7px;
+  color:#ffbdc8;font-size:10px;font-weight:850;letter-spacing:.11em;
+  text-transform:uppercase;
+}
+#theftOverlay .zyro-alert-chip:before{
+  content:"";width:7px;height:7px;border-radius:50%;
+  background:#ff7088;box-shadow:0 0 0 4px rgba(255,87,117,.13);
+}
+#theftOverlay #theftTitle{
+  font-size:clamp(23px,6vw,29px)!important;
+  font-weight:850!important;
+  line-height:1.13!important;
+  letter-spacing:-.045em!important;
+  color:#fff!important;
+  margin:11px auto 10px!important;
+  max-width:330px;
+}
+#theftOverlay #theftMessage{
+  font-size:13px!important;
+  line-height:1.55!important;
+  color:#c2dae4!important;
+  margin:0 auto 18px!important;
+  max-width:350px;
+}
+#theftOverlay .zyro-alert-state{
+  background:rgba(28,69,86,.51);
+  border:1px solid rgba(123,198,206,.27);
+  border-radius:18px;padding:15px 16px;
+  margin:0 0 17px;
+  box-shadow:inset 0 1px rgba(221,252,254,.055);
+}
+#theftOverlay .zyro-alert-state-label{
+  display:flex;align-items:center;gap:7px;
+  color:#a6fff1;font-size:11px;font-weight:800;letter-spacing:.045em;
+}
+#theftOverlay .zyro-alert-state-label:before{
+  content:"";width:8px;height:8px;border-radius:50%;background:#65e8d3;
+}
+#theftOverlay #theftNetwork{
+  margin:8px 0 0!important;
+  color:#e9faff!important;
+  font-size:12px!important;
+  line-height:1.5!important;
+  overflow-wrap:anywhere;
+}
+#theftOverlay .zyro-alert-auth{
+  border-top:1px solid rgba(131,218,218,.16);
+  padding-top:16px;
+}
+#theftOverlay .theft-content .field{
+  margin:0 0 11px!important;
+  display:grid;gap:7px;
+  text-align:left!important;
+}
+#theftOverlay .theft-content .field span{
+  color:#d7ebf2!important;
+  font-size:12px;font-weight:750;
+}
+#theftOverlay #theftPassword{
+  display:block;width:100%;
+  min-height:51px!important;
+  padding:12px 15px!important;
+  border-radius:13px!important;
+  background:rgba(232,252,255,.96)!important;
+  border:1px solid rgba(147,234,231,.66)!important;
+  color:#153447!important;font-size:14px!important;
+  box-shadow:0 2px 15px rgba(0,7,22,.14);
+}
+#theftOverlay #theftPassword:focus{
+  outline:2px solid #6bf4d9!important;
+  outline-offset:2px;
+}
+#theftOverlay #theftStop{
+  display:flex;align-items:center;justify-content:center;
+  min-height:52px!important;
+  padding:12px 16px!important;
+  width:100%;
+  border-radius:14px!important;
+  background:linear-gradient(110deg,#ff9eab,#ff6e85)!important;
+  color:#451529!important;
+  font-size:14px!important;font-weight:850!important;
+  box-shadow:0 7px 18px rgba(255,86,116,.14);
+}
+#theftOverlay #theftStop:disabled{opacity:.58}
+#theftOverlay .theft-call{
+  display:flex;align-items:center;justify-content:center;
+  min-height:47px;
+  padding:10px 15px;
+  border:1px solid rgba(136,233,218,.35);
+  border-radius:14px;
+  background:rgba(48,126,132,.17);
+  color:#d9fff8!important;
+  font-size:13px!important;font-weight:800!important;
+  text-decoration:none!important;
+  margin:10px 0 0;
+}
+#theftOverlay .theft-subnote{
+  color:#a9c4d2!important;
+  margin:12px 0 0!important;
+  font-size:11px!important;line-height:1.5!important;
+  text-align:center;
+}
+#theftOverlay :is(button,a,input):focus-visible{
+  outline:2px solid #7afbe2;outline-offset:3px;
+}
+@keyframes zyroAlertGlow{
+  from{box-shadow:0 0 0 7px rgba(252,93,122,.04),0 0 28px rgba(242,64,104,.13)}
+  to{box-shadow:0 0 0 11px rgba(252,93,122,.055),0 0 44px rgba(242,64,104,.19)}
+}
+
+/* SOS LIVE — separate from Pick Pocket. Compact frosted action panel below map. */
+#sosCard.zyro-sos-status.is-active{
+  display:block!important;
+  padding:12px 14px 13px!important;
+  border:1px solid rgba(255,121,143,.39)!important;
+  border-top:1px solid rgba(255,121,143,.51)!important;
+  border-radius:16px!important;
+  margin:5px 10px 8px!important;
+  flex-shrink:0!important;
+  background:
+    radial-gradient(circle at 94% 8%,rgba(255,92,128,.14),transparent 45%),
+    linear-gradient(120deg,rgba(21,50,70,.97),rgba(13,32,51,.98))!important;
+  box-shadow:0 12px 27px rgba(0,10,25,.22),inset 0 1px rgba(195,251,245,.13)!important;
+  color:#f5ffff!important;
+}
+#sosCard .zyro-sos-status-header{
+  display:flex!important;align-items:center!important;gap:9px!important;
+  line-height:1.25;font-size:14px!important;
+  color:#fff;
+}
+#sosCard .zyro-sos-status-header strong{
+  font-size:13px!important;letter-spacing:-.015em;
+}
+#sosCard .zyro-sos-status-header .pulse-dot{
+  background:#ff728a!important;
+  box-shadow:0 0 0 4px rgba(255,108,135,.13);
+}
+#sosCard #sosDescription{
+  font-size:11px!important;line-height:1.48!important;
+  margin:6px 0 9px!important;color:#bed5e1!important;
+}
+#sosCard #sosActiveActions:not(.hidden){
+  display:flex!important;
+  flex-direction:column!important;
+  gap:9px!important;align-items:stretch!important;
+}
+#sosCard .sos-live{
+  font-size:10px!important;font-weight:850!important;
+  color:#ffb6c3!important;letter-spacing:.07em!important;
+}
+#sosCard .sos-actions{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  gap:9px!important;margin:0!important;
+}
+#sosCard .light-button{
+  width:100%;min-width:0;
+  min-height:43px!important;
+  padding:9px 10px!important;
+  border-radius:12px!important;
+  font-size:11px!important;line-height:1.25!important;
+  border:1px solid rgba(110,246,217,.5)!important;
+  color:#073d3b!important;
+  background:linear-gradient(120deg,#7cf0db,#53dbca)!important;
+  font-weight:850!important;
+}
+#sosCard .light-button.outline{
+  border-color:rgba(255,137,160,.52)!important;
+  background:rgba(151,54,77,.25)!important;color:#fff0f2!important;
+}
+#sosCard .zyro-sos-quick-call{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-height:34px;
+  border-radius:10px;
+  margin-top:9px;
+  font-size:11px;font-weight:800;
+  text-decoration:none;
+  color:#d6fff6;
+  background:rgba(96,183,182,.09);
+  border:1px solid rgba(107,200,205,.18);
+}
+#sosCard .zyro-sos-quick-call:focus-visible{
+  outline:2px solid #78f3de;outline-offset:2px;
+}
+
+/* SOS recipients and Premium explanation – editorial polish only. */
+#modesView .sos-recipient-panel{
+  border-radius:22px!important;
+  border:1px solid rgba(94,189,192,.34)!important;
+  box-shadow:0 14px 30px rgba(5,31,47,.09);
+}
+#modesView .sos-recipient-panel .panel-title>.panel-icon{
+  border-radius:15px!important;
+  background:linear-gradient(135deg,#173f54,#285a67)!important;
+  color:#abfff0!important;
+}
+#modesView .sos-recipient-panel .sos-section{
+  border-radius:17px!important;
+}
+#modesView .sos-recipient-panel #saveSOSRecipients{
+  border-radius:14px!important;
+  min-height:47px!important;
+  font-weight:800!important;
+}
+html[data-theme="dark"] #modesView .sos-recipient-panel{
+  border-color:rgba(111,222,210,.24)!important;
+  background:linear-gradient(143deg,rgba(16,47,63,.93),rgba(13,36,55,.94))!important;
+}
+html[data-theme="dark"] #modesView .sos-recipient-panel .sos-section{
+  background:rgba(32,75,92,.45)!important;
+  border-color:rgba(123,208,211,.23)!important;
+}
+@media(max-width:420px){
+  #theftOverlay.theft-overlay{
+    padding:calc(env(safe-area-inset-top,0px) + 12px) 13px
+      calc(env(safe-area-inset-bottom,0px) + 12px)!important;
+  }
+  #theftOverlay .theft-content{padding:18px!important;border-radius:23px!important}
+  #theftOverlay .zyro-alert-brand{margin-bottom:15px}
+  #theftOverlay .theft-symbol{width:74px;height:74px;border-radius:23px}
+  #theftOverlay .theft-symbol svg{width:39px;height:39px}
+  #theftOverlay #theftMessage{margin-bottom:14px!important}
+  #theftOverlay .zyro-alert-state{padding:12px 13px;margin-bottom:14px}
+  #sosCard.zyro-sos-status.is-active{margin:4px 7px 7px!important;padding:10px 11px!important}
+}
+@media(max-height:730px){
+  #theftOverlay .theft-content{max-height:calc(100dvh - 28px)}
+  #theftOverlay .zyro-alert-brand{margin-bottom:12px}
+  #theftOverlay #theftTitle{font-size:23px!important}
+  #theftOverlay .theft-symbol{width:65px;height:65px;margin-bottom:9px!important}
+  #theftOverlay .theft-symbol svg{width:34px;height:34px}
+  #theftOverlay .zyro-alert-state{margin-bottom:11px}
+}
+@media(prefers-reduced-motion:reduce){
+  #theftOverlay .theft-symbol{animation:none!important}
+}
