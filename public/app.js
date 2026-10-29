@@ -1417,7 +1417,7 @@ function renderPickControls(){
     ?'🚨 Movimento sospetto rilevato. Inserisci la password nella schermata di allarme.'
     :pickArmed && isZyroNativeAvailable()
       ?nativeStatus?.running && nativeStatus?.pick
-        ?'Protezione attiva. Monitoraggio Android in esecuzione.'
+        ?'Protezione attiva anche in background e a schermo spento. Monitoraggio Android in esecuzione.'
         :'Attivazione non confermata. Controlla le autorizzazioni e le impostazioni batteria.'
       :pickArmed?'Protezione attiva con l’app aperta. Il monitoraggio può interrompersi quando l’app è in background.'
       :'Protezione disattivata. Attiva solo quando serve: il monitoraggio usa batteria e sensori.';
@@ -1487,7 +1487,7 @@ async function armPick(){
   }
   // Safety mode must never claim armed protection from browser-only sensors.
   // Native FGS is required: browser motion events stop when Android suspends it.
-  throw Error('Pick Pocket in background richiede l’APK Android Zyro 360 V24. Apri l’app installata dalla sua icona, non il sito nel browser.');
+  throw Error('Pick Pocket in background richiede l’app Android Zyro 360. Apri l’app installata dalla sua icona, non il sito nel browser.');
   // Autoplay permission is tied to this user gesture; still not guaranteed by every browser.
   try{const AC=window.AudioContext||window.webkitAudioContext;if(AC){sirenContext ||= new AC();await sirenContext.resume();}}catch{}
   void orientationPermission();
@@ -1593,7 +1593,7 @@ function setupProfileSettings(){
    <button type="button" class="zyro-permission-action" data-zyro-permission="microphone">Verifica microfono</button>
   </section>
   <section class="zyro-permission-card" aria-label="Sensori Pick Pocket">
-   <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">🛡️</span><div class="zyro-permission-head"><h4>Sensori Pick Pocket</h4><p>Controlla se il telefono può rilevare movimenti sospetti con l’app aperta.</p></div></div>
+   <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">🛡️</span><div class="zyro-permission-head"><h4>Sensori Pick Pocket</h4><p>Nell’app Android Pick Pocket rileva movimenti sospetti anche in background e a schermo spento, con il servizio di protezione attivo e i permessi necessari. Controlla che le impostazioni batteria consentano il funzionamento in background.</p></div></div>
    <p id="zyroSensorState" class="zyro-permission-state" data-state="pending" role="status">Autorizza i sensori per attivare la funzione.</p>
    <button type="button" class="zyro-permission-action" data-zyro-permission="sensors">Verifica sensori</button>
   </section>
@@ -1801,7 +1801,7 @@ async function handleZyroPermission(type){
        if(finished)return;
        if(e.accelerationIncludingGravity || e.acceleration){
          finished=true;
-         permissionState('zyroSensorState','Sensori disponibili ✓ — Pick Pocket funziona con l’app aperta.','on');
+         permissionState('zyroSensorState',isZyroNativeAvailable()?'Sensori disponibili ✓ — nell’app Android Pick Pocket funziona anche in background e a schermo spento, con la protezione attiva.':'Sensori disponibili ✓ — per Pick Pocket in background e a schermo spento usa l’app Android.','on');
          window.removeEventListener('devicemotion',onMotion);
          clearTimeout(timer);
          resolve();
