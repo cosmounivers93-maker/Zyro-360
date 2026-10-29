@@ -1,0 +1,199 @@
+/* ZYRO 360 — V30 Glass UI (solo grafica, compatibile con V29 SOS).
+   Quattro superfici: barra superiore, Modalità, Chat, Profilo.
+   Nessun evento, input o comportamento applicativo viene cambiato.
+   I temi dell'app si riconoscono da html[data-theme="light"|"dark"]. */
+
+/* Il vetro della barra superiore funziona su tutte le schermate. Su Home
+   mantiene la precedente sovrapposizione alla mappa (v17.0). */
+#appScreen > .topbar {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(111deg,
+      rgba(12, 35, 59, .82) 0%,
+      rgba(20, 67, 84, .69) 55%,
+      rgba(13, 49, 69, .78) 100%) !important;
+  -webkit-backdrop-filter: blur(12px) saturate(1.27);
+  backdrop-filter: blur(12px) saturate(1.27);
+  border-bottom: 1px solid rgba(153, 247, 237, .44) !important;
+  box-shadow: 0 9px 23px rgba(14, 48, 69, .16),
+    inset 0 1px 0 rgba(255, 255, 255, .22) !important;
+  color: #f7ffff;
+}
+#appScreen > .topbar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 11% -60%, rgba(189, 255, 250, .18), transparent 50%),
+    radial-gradient(ellipse at 87% 140%, rgba(40, 235, 213, .20), transparent 49%);
+}
+#appScreen > .topbar::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 5%;
+  right: 5%;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(210, 255, 255, .63), transparent);
+}
+#appScreen > .topbar > .brand,
+#appScreen > .topbar > .connection-pill {
+  position: relative;
+  z-index: 1;
+  color: #f7ffff;
+}
+#appScreen > .topbar .brand-emblem {
+  border: 1px solid rgba(150, 255, 238, .57);
+  background: linear-gradient(140deg, rgba(211, 255, 253, .19), rgba(20, 138, 145, .15));
+  box-shadow: inset 0 1px 0 rgba(250,255,255,.21), 0 4px 15px rgba(26, 212, 192, .12);
+}
+#appScreen > .topbar .connection-pill {
+  background: linear-gradient(125deg, rgba(236,255,255,.13), rgba(136,245,227,.06)) !important;
+  border: 1px solid rgba(172, 250, 236, .38) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(1.16);
+  backdrop-filter: blur(8px) saturate(1.16);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.20), 0 4px 13px rgba(0,34,56,.12) !important;
+}
+
+/* Modalità 360°: carta di vetro, titolo e testo leggibili, nessun cambio layout. */
+#modesView > .mode-heading {
+  margin: 0 0 23px !important;
+  width: 100%;
+  max-width: 100%;
+  border-radius: 27px;
+  border: 1px solid rgba(205, 255, 252, .65);
+  background:
+    radial-gradient(ellipse at 93% 2%, rgba(60, 246, 219, .47), transparent 49%),
+    radial-gradient(ellipse at 7% 115%, rgba(123, 202, 248, .39), transparent 49%),
+    linear-gradient(123deg, rgba(18, 49, 75, .87), rgba(23, 76, 98, .76) 62%, rgba(28, 142, 149, .65)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.30);
+  backdrop-filter: blur(20px) saturate(1.30);
+  box-shadow: 0 17px 33px rgba(24, 74, 93, .19),
+    inset 0 1px 1px rgba(255,255,255,.45),
+    inset 0 -1px 0 rgba(206,255,255,.19) !important;
+  color: #f8ffff;
+}
+#modesView > .mode-heading h1 { color: #f8ffff !important; }
+#modesView > .mode-heading h1 span { color: #5ff7d9; }
+#modesView > .mode-heading .eyebrow { color: #98f1e4; }
+#modesView > .mode-heading > p:last-child { color: #e5f9fb; }
+#modesView > .mode-heading .mode-heading-emblem { color:#9cfef2; opacity:.24; }
+
+/* Chat: corregge margini negativi della versione originale, non esce a sinistra. */
+#chatsView > .chat-hero {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0;
+  margin: 0 auto 15px !important;
+  padding: 26px clamp(17px, 5vw, 27px) 28px;
+  border-radius: 27px;
+  border: 1px solid rgba(207,255,251,.70);
+  background:
+    radial-gradient(ellipse at 94% 10%, rgba(49, 239, 216, .42), transparent 52%),
+    radial-gradient(ellipse at 8% 105%, rgba(119, 212, 245, .25), transparent 48%),
+    linear-gradient(125deg, rgba(15, 47, 75, .87), rgba(18, 81, 100, .72) 67%, rgba(36, 145, 151, .62)) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.32);
+  backdrop-filter: blur(20px) saturate(1.32);
+  box-shadow: 0 16px 34px rgba(24, 68, 91, .20),
+    inset 0 1px 1px rgba(255,255,255,.45) !important;
+  color:#fff;
+}
+#chatsView > .chat-hero h1 { color:#fff; }
+#chatsView > .chat-hero h1 em { color:#60f4db; }
+#chatsView > .chat-hero p:not(.chat-eyebrow) { color:#e0f2f5; }
+#chatsView > .chat-hero .chat-eyebrow { color:#a2f5e9; }
+#chatsView > .chat-hub {
+  width:100%;
+  max-width:100%;
+  margin: 0 auto 16px !important;
+}
+
+/* Profilo: vetro più chiaro in modalità chiara, con contrasto scuro. */
+#settingsView > .profile-identity-card {
+  border: 1px solid rgba(245, 255, 255, .84);
+  border-radius: 27px;
+  background:
+    radial-gradient(ellipse at 85% -16%, rgba(74, 245, 222, .37), transparent 56%),
+    radial-gradient(ellipse at 7% 105%, rgba(86, 220, 201, .28), transparent 58%),
+    linear-gradient(116deg, rgba(223,245,250,.81), rgba(150,217,225,.64) 60%, rgba(209,250,243,.72)) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.25);
+  backdrop-filter: blur(22px) saturate(1.25);
+  box-shadow: 0 15px 34px rgba(39, 119, 128, .16),
+    inset 0 1px 2px rgba(255,255,255,.76),
+    inset 0 -1px 0 rgba(251,255,255,.32) !important;
+  color: #113c50;
+}
+#settingsView .profile-identity-card .profile-id-caption { color:#166c71; }
+#settingsView .profile-identity-card .profile-id-copy strong { color:#123b4b; }
+#settingsView .profile-identity-card .profile-id-copy p { color:#436879; }
+#settingsView .profile-identity-card .zyro-profile-access-label {
+  color:#135f62;
+  background:rgba(212,255,249,.46);
+  border:1px solid rgba(51, 163, 156, .37);
+}
+#settingsView .profile-identity-card .profile-orbit {
+  border-color:rgba(255,255,255,.43);
+  box-shadow:0 0 0 33px rgba(255,255,255,.08), 0 0 0 66px rgba(255,255,255,.07);
+}
+
+/* Dark mode: vetro più profondo, scritte bianche con contrasto sufficiente. */
+html[data-theme="dark"] #appScreen > .topbar {
+  background:linear-gradient(110deg,
+    rgba(6,22,40,.81), rgba(8,48,65,.76) 55%, rgba(6,26,49,.84)) !important;
+  border-bottom-color:rgba(79,219,208,.43) !important;
+  box-shadow:0 9px 25px rgba(0,7,19,.31), inset 0 1px 0 rgba(187,255,250,.12) !important;
+}
+html[data-theme="dark"] #modesView > .mode-heading {
+  background:
+    radial-gradient(ellipse at 90% 0%, rgba(38,196,184,.29), transparent 57%),
+    radial-gradient(ellipse at 0% 108%, rgba(23,122,177,.26), transparent 55%),
+    linear-gradient(122deg, rgba(7,24,44,.87), rgba(8,55,72,.77), rgba(12,69,79,.69)) !important;
+  border-color:rgba(98,232,217,.51);
+  box-shadow:0 16px 35px rgba(0,8,19,.37), inset 0 1px 0 rgba(200,255,254,.22) !important;
+}
+html[data-theme="dark"] #chatsView > .chat-hero {
+  background:
+    radial-gradient(ellipse at 96% 6%, rgba(34,213,196,.32),transparent 54%),
+    radial-gradient(ellipse at 7% 112%, rgba(38,131,166,.26),transparent 50%),
+    linear-gradient(125deg, rgba(7,24,45,.89), rgba(8,57,78,.76), rgba(14,80,89,.72)) !important;
+  border-color:rgba(100,232,219,.48);
+  box-shadow:0 16px 35px rgba(0,8,19,.37), inset 0 1px 0 rgba(206,255,255,.20) !important;
+}
+html[data-theme="dark"] #settingsView > .profile-identity-card {
+  background:
+    radial-gradient(ellipse at 95% 0%, rgba(40,190,184,.27),transparent 58%),
+    radial-gradient(ellipse at 0% 100%, rgba(32,109,164,.25),transparent 55%),
+    linear-gradient(125deg,rgba(11,32,54,.88),rgba(11,67,79,.76),rgba(9,49,67,.83)) !important;
+  border-color:rgba(110,232,222,.49);
+  box-shadow:0 14px 34px rgba(0,8,19,.35),inset 0 1px 0 rgba(202,255,255,.23) !important;
+  color:#f1fffe;
+}
+html[data-theme="dark"] #settingsView .profile-identity-card .profile-id-caption { color:#90f1df; }
+html[data-theme="dark"] #settingsView .profile-identity-card .profile-id-copy strong { color:#f5ffff; }
+html[data-theme="dark"] #settingsView .profile-identity-card .profile-id-copy p { color:#c6e8ef; }
+html[data-theme="dark"] #settingsView .profile-identity-card .zyro-profile-access-label {
+  color:#dcfff7; background:rgba(40,195,174,.19); border-color:rgba(114,242,217,.48);
+}
+
+/* Small screens: no negative margins; preserve all buttons and IDs. */
+@media (max-width: 390px) {
+  #modesView > .mode-heading {padding:24px 14px;}
+  #chatsView > .chat-hero {padding:24px 16px;}
+  #chatsView > .chat-hero .chat-hero-graphic {right:5px;}
+}
+@media (max-width: 340px) {
+  #chatsView > .chat-hero h1 {font-size:clamp(28px, 10vw, 36px);}
+  #settingsView > .profile-identity-card {gap:10px;}
+}
+
+@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))) {
+  #appScreen > .topbar {background:linear-gradient(110deg,#183a52,#175364) !important;}
+  html[data-theme="dark"] #appScreen > .topbar {background:linear-gradient(110deg,#0b2034,#113c4e) !important;}
+  #modesView > .mode-heading {background:linear-gradient(110deg,#18354c,#176575) !important;}
+  #chatsView > .chat-hero {background:linear-gradient(110deg,#153149,#156477) !important;}
+  #settingsView > .profile-identity-card {background:linear-gradient(110deg,#daf4f4,#a8dddf) !important;}
+  html[data-theme="dark"] #settingsView > .profile-identity-card {background:linear-gradient(110deg,#112c43,#185365) !important;}
+}
