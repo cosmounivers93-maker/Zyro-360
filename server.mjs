@@ -328,7 +328,7 @@ app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)))
 const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?(u.registrationIp||null):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?(u.lastLoginIp||null):null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
 app.get('/api/admin/users',requireAuth,requireAdmin,(req,res)=>{
  res.set('Cache-Control','no-store');
- res.json({users:Object.values(db.users).map(adminUser).map(u=>{const ips=[u.registrationIp,u.lastLoginIp].filter(Boolean);const matches=Object.values(db.users).filter(v=>v.id!==u.id && v.bannedAt && [v.createdAt>now()-30*86400e3?v.registrationIp:null,v.lastLoginAt>now()-30*86400e3?v.lastLoginIp:null].some(ip=>ip&&ips.includes(ip)));return {...u,sameIpBannedAccounts:matches.map(v=>v.id)};}).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)),reports:db.userReports.slice(-100).reverse(),audit:db.adminAudit.slice(-50).reverse()});
+ res.json({users:Object.values(db.users).map(adminUser).map(u=>{const ips=[u.registrationIp,u.lastLoginIp].filter(Boolean);const matches=Object.values(db.users).filter(v=>v.id!==u.id && v.bannedAt && [v.createdAt>now()-30*86400e3?v.registrationIp:null,v.lastLoginAt>now()-30*86400e3?v.lastLoginIp:null].some(ip=>ip&&ips.includes(ip)));return {...u,sameIpBannedAccounts:matches.map(v=>v.id)};}).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)),reports:db.userReports.slice(-100).reverse().map(r=>({...r,user:db.users[r.userId]?adminUser(db.users[r.userId]):null,reporter:db.users[r.reporterId]?adminUser(db.users[r.reporterId]):null})),audit:db.adminAudit.slice(-50).reverse()});
 });
 // Reports are accepted only for another user actually sharing a circle with the reporter.
 app.post('/api/report',requireAuth,limit,(req,res)=>{
@@ -996,5 +996,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
 
 
