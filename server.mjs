@@ -167,7 +167,7 @@ function stateFor(id) {
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
     startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), sosAudioConsent:me.sosAudioConsent===true, gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -281,7 +281,7 @@ app.post('/api/register', limit, (req, res) => {
   if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || password.length < 10 || password.length > 128) return res.status(400).json({error:'Inserisci nome, email valida e una password di almeno 10 caratteri.'});
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({error:'Email già registrata.'});
   const id = token(12), salt = token(16);
-  db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], avatar: null };
+  db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], sosAudioConsent: false, avatar: null };
   auditLogin(req, db.users[id]); loginUser(res, id); res.json({ ok:true });
 });
 app.post('/api/login', limit, (req, res) => {
@@ -695,6 +695,21 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
   save();refreshRelated(req.user.id);
   res.json({ok:true,gpsRecipients:req.user.gpsRecipients,sosRecipients:req.user.sosRecipients});
 });
+// Per-account opt-in: the SOS audio microphone is OFF by default and can only
+// be enabled by the authenticated owner from the invitees/permissions screen.
+app.post('/api/settings/sos-audio',requireAuth,limit,(req,res)=>{
+  const enabled=req.body?.enabled;
+  if(typeof enabled!=='boolean')return res.status(400).json({error:'Impostazione audio non valida.'});
+  req.user.sosAudioConsent=enabled;
+  if(!enabled){
+    // Immediately prevent new listening requests and signalling when revoked.
+    const alert=currentAlert(req.user.id);
+    if(alert?.kind==='sos'){alert.hasAudio=false;}
+    for(const connection of connections(req.user.id))connection.microphoneReady=false;
+  }
+  save();refreshRelated(req.user.id);
+  res.json({ok:true,enabled:req.user.sosAudioConsent});
+});
 app.post('/api/settings/sos-recipients', requireAuth, limit, (req,res)=> {
   const ids=req.body.recipients;
   if(!Array.isArray(ids) || ids.length>60 || ids.some(id=>typeof id!=='string' || id.length>100)) return res.status(400).json({error:'Destinatari non validi.'});
@@ -842,23 +857,25 @@ wss.on('connection', ws => {
     if(db.users[self]?.bannedAt){ws.close(1008,'Account sospeso');return;}
     if (m.type==='audio-ready') {
       const a=currentAlert(self); if (!a) return;
-      ws.microphoneReady = m.ready === true;
-      a.hasAudio = a.kind !== 'pickpocket' && [...connections(self)].some(x => x.microphoneReady); save(); refreshRelated(self);
+      ws.microphoneReady = m.ready === true && db.users[self]?.sosAudioConsent===true;
+      a.hasAudio = a.kind !== 'pickpocket' && db.users[self]?.sosAudioConsent===true
+        && [...connections(self)].some(x => x.microphoneReady); save(); refreshRelated(self);
     }
     if (m.type==='listen-request') {
       const owner=String(m.to||''); const a=currentAlert(owner);
-      if (!a || a.kind==='pickpocket' || !a.hasAudio || !canSeeAlert(self,a) || owner===self) return;
+      if (!a || a.kind==='pickpocket' || !a.hasAudio || db.users[owner]?.sosAudioConsent!==true || !canSeeAlert(self,a) || owner===self) return;
       relay(owner,{type:'listen-request',from:self,alertId:a.id},true);
     }
     if (m.type==='rtc') {
       const target=String(m.to||''); const a=currentAlert(self) || currentAlert(target);
-      if (!a || a.kind==='pickpocket' || !canSeeAlert(self,a) || !canSeeAlert(target,a) || ![self,target].includes(a.userId) || self===target) return;
+      if (!a || a.kind==='pickpocket' || db.users[a.userId]?.sosAudioConsent!==true ||
+          !canSeeAlert(self,a) || !canSeeAlert(target,a) || ![self,target].includes(a.userId) || self===target) return;
       const signal=m.signal;
       if (!signal || typeof signal!=='object' || !['offer','answer','candidate'].includes(signal.kind) || JSON.stringify(signal).length>24000) return;
       relay(target,{type:'rtc',from:self,alertId:a.id,signal});
     }
   });
-  ws.on('close',()=>{const conn=sockets.get(ws.userId);if(conn){conn.delete(ws);if(!conn.size)sockets.delete(ws.userId);}const a=currentAlert(ws.userId);if(a){a.hasAudio=a.kind !== 'pickpocket' && [...connections(ws.userId)].some(x=>x.microphoneReady);save();}refreshRelated(ws.userId);});
+  ws.on('close',()=>{const conn=sockets.get(ws.userId);if(conn){conn.delete(ws);if(!conn.size)sockets.delete(ws.userId);}const a=currentAlert(ws.userId);if(a){a.hasAudio=a.kind !== 'pickpocket' && db.users[ws.userId]?.sosAudioConsent===true && [...connections(ws.userId)].some(x=>x.microphoneReady);save();}refreshRelated(ws.userId);});
 });
 setInterval(()=>{ for (const ws of wss.clients) { if (!ws.alive) {ws.terminate();continue;} ws.alive=false;ws.ping();} },25000).unref();
 setInterval(()=>{
