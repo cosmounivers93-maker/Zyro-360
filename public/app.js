@@ -202,6 +202,7 @@ function setState(data){
   if(!data?.me)return;
   const prev = current;
   current=data;
+  if(data.billingReady&&window.ZyroBillingSupported&&prev?.me?.id!==data.me.id)void zyroNativeRequest('billing-sync').catch(()=>{});
   void syncDeviceInfo();
   // Revoking explicit opt-in stops ongoing live audio locally as well.
   if((data.me.sosAudioConsent!==true || data.me.features?.sosAudio!==true) && localStream)stopAudio();
@@ -1535,8 +1536,9 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di Family.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Premium'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Nessun piano attivo. Gli acquisti saranno disponibili prossimamente; per ora non viene effettuato alcun addebito.';
+ $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di Family.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Premium'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):(current.billingReady?'Scegli il tuo piano nell’app Android. Prezzo e rinnovo vengono confermati da Google Play.':'Nessun piano attivo. Ti avviseremo qui quando gli abbonamenti saranno disponibili.');
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
+ renderBillingActions();
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
   const root=$(container);const members=uniqueContacts();const signature=members.map(x=>x.id).join(',');
   if(root.dataset.members!==signature){root.dataset.members=signature;root.innerHTML=v15ContactsHtml(selected,tag);}
@@ -2179,3 +2181,23 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeV
 
 
 
+
+
+function renderBillingActions(){
+ const android=window.ZyroBillingSupported===true&&hasZyroNativeBridge();
+ const ready=!!current?.billingReady;
+ document.querySelectorAll('[data-billing-open]').forEach(b=>{
+  b.disabled=!(android&&ready);
+  b.textContent=!ready?'Abbonamenti non ancora disponibili':android?(current.me.premiumActive?'Gestisci abbonamento':'Scegli con Google Play'):'Acquista dall’app Android aggiornata';
+ });
+ const restore=$('zyroRestorePurchases');if(restore)restore.hidden=!(android&&ready);
+}
+async function openPlayBilling(){
+ if(!current?.billingReady)throw Error('Gli acquisti non sono ancora disponibili.');
+ if(window.ZyroBillingSupported!==true)throw Error('Per gli acquisti installa la versione Android aggiornata.');
+ await zyroNativeRequest('billing');
+}
+document.querySelectorAll('[data-billing-open]').forEach(b=>b.addEventListener('click',()=>action(openPlayBilling)));
+$('zyroRestorePurchases')?.addEventListener('click',()=>action(openPlayBilling));
+window.addEventListener('zyro:android-ready',renderBillingActions);
+window.addEventListener('focus',()=>{if(current)void action(refresh);});
