@@ -1105,6 +1105,10 @@ function showProfileSettingsMenu(){
 function permissionState(id,value,state='pending'){
  const node=$(id);if(node){node.textContent=value;node.dataset.state=state;}
 }
+// WebView's navigator.permissions.query('geolocation') may say "prompt"
+// despite Android having granted location. Keep native permission and a
+// real GPS fix as separate signals; never overwrite verified success.
+let zyroLocationFix=null;
 function isNativeZyro(){
  return window.ZyroAndroidPush?.platform==='android';
 }
@@ -1134,12 +1138,43 @@ async function refreshPermissionStates(){
    permissionState('zyroMicState','Autorizzazione microfono da verificare','pending');
    document.querySelector('[data-zyro-permission="reconnect"]')?.setAttribute('hidden','');
  }
- if(navigator.permissions?.query){
+ if(hasNative){
+   const allowed=window.ZyroAndroidLocationEnabled;
+   const precise=window.ZyroAndroidLocationFineEnabled===true;
+   const gpsButton=document.querySelector('[data-zyro-permission="location"]');
+   if(allowed===true){
+     permissionState('zyroGpsState',
+       zyroLocationFix
+         ? 'GPS autorizzato ✓ · Posizione verificata ✓ (circa '+Math.round(zyroLocationFix.accuracy)+' m).'
+         : 'GPS Android autorizzato ✓'+(precise?' · Posizione precisa':' · Posizione approssimativa')+'. Premi per verificare il rilevamento.',
+       'on');
+     if(gpsButton)gpsButton.textContent='Verifica posizione GPS';
+   }else if(allowed===false){
+     zyroLocationFix=null;
+     permissionState('zyroGpsState','Permesso posizione non concesso. Tocca per autorizzarlo su Android.','off');
+     if(gpsButton)gpsButton.textContent='Abilita posizione';
+   }else{
+     // The updated web app may load inside an older APK before its native
+     // permission bridge is installed. Never trap users on "in corso".
+     permissionState('zyroGpsState',
+       zyroLocationFix
+         ?'GPS verificato ✓ · Posizione rilevata e non condivisa automaticamente.'
+         :'Tocca «Verifica posizione» per controllare GPS e autorizzazione Android.',
+       zyroLocationFix?'on':'pending');
+   }
+ }else if(navigator.permissions?.query){
    try{
      const location=await navigator.permissions.query({name:'geolocation'});
-     permissionState('zyroGpsState',location.state==='granted'?'Posizione autorizzata ✓':location.state==='denied'?'Posizione negata: apri le impostazioni Android':'Posizione: autorizzazione da richiedere',location.state==='granted'?'on':location.state==='denied'?'off':'pending');
-     location.onchange=()=>void refreshPermissionStates();
-   }catch{permissionState('zyroGpsState','Usa il pulsante per verificare la posizione.','pending');}
+     const granted=location.state==='granted'||Boolean(zyroLocationFix);
+     permissionState('zyroGpsState',granted
+       ?zyroLocationFix?'GPS verificato ✓ · Posizione rilevata.':'Posizione autorizzata ✓'
+       :location.state==='denied'?'Posizione negata: modifica le autorizzazioni del browser.':'Posizione da autorizzare.',
+       granted?'on':location.state==='denied'?'off':'pending');
+   }catch{
+     permissionState('zyroGpsState',zyroLocationFix?'GPS verificato ✓':'Tocca Verifica posizione per controllare il permesso.',zyroLocationFix?'on':'pending');
+   }
+ }else{
+   permissionState('zyroGpsState',zyroLocationFix?'GPS verificato ✓':'Tocca Verifica posizione per controllare il permesso.',zyroLocationFix?'on':'pending');
  }
 }
 async function handleZyroPermission(type){
@@ -1157,9 +1192,21 @@ async function handleZyroPermission(type){
    toast('Verifica della registrazione Firebase richiesta.');
  }else if(type==='location'){
    if(!navigator.geolocation)throw Error('GPS non disponibile su questo dispositivo.');
-   await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:false,timeout:12000,maximumAge:15000}))
-     .catch(e=>{throw Error(e?.code===1?'Permesso GPS negato. Riattivalo nelle impostazioni di Android.':'Posizione non disponibile. Controlla GPS e connessione.');});
-   permissionState('zyroGpsState','Posizione autorizzata ✓ — non condivisa automaticamente.','on');
+   const button=document.querySelector('[data-zyro-permission="location"]');
+   if(button){button.disabled=true;button.textContent='Controllo GPS in corso…';}
+   try{
+     const pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(
+       resolve,reject,{enableHighAccuracy:false,timeout:15000,maximumAge:0}));
+     zyroLocationFix={accuracy:Number.isFinite(pos.coords.accuracy)?pos.coords.accuracy:0,at:Date.now()};
+     permissionState('zyroGpsState','Posizione rilevata ✓ · non condivisa automaticamente.','on');
+   }catch(e){
+     zyroLocationFix=null;
+     if(e?.code===1)throw Error('Posizione non autorizzata. Abilitala in Android → Impostazioni → App → Zyro 360 → Autorizzazioni → Posizione.');
+     if(e?.code===3)throw Error('GPS: tempo scaduto. Attiva la posizione del telefono, prova all’aperto e ripeti.');
+     throw Error('Impossibile rilevare la posizione. Controlla il GPS del telefono e riprova.');
+   }finally{
+     if(button){button.disabled=false;button.textContent='Verifica posizione GPS';}
+   }
  }else if(type==='microphone'){
    if(isNativeZyro()){
      const reply=window.prompt('ZYRO360_REQUEST_MIC_PERMISSION_NATIVE','');
@@ -1341,6 +1388,10 @@ async function init(){
   window.addEventListener('zyro:fcm-status',()=>{void refreshPermissionStates();});
   window.addEventListener('zyro:android-notification-permission',()=>{void refreshPermissionStates();});
   window.addEventListener('zyro:android-microphone-permission',()=>{void refreshPermissionStates();});
+  window.addEventListener('zyro:android-location-permission',event=>{
+    if(event?.detail?.granted===false)zyroLocationFix=null;
+    void refreshPermissionStates();
+  });
   $('savedInvitees').addEventListener('change',e=>{
     if(!e.target.matches('input[data-access-user]'))return;
     const input=e.target;input.disabled=true;
