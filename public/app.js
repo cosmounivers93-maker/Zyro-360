@@ -159,10 +159,10 @@ function connectSocket(){
   const proto=location.protocol==='https:'?'wss':'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
   socket=ws;
-  ws.onopen=()=>{ connection(true); if(localStream)ws.send(JSON.stringify({type:'audio-ready',ready:true})); if(listeningTo)retryListenAfterReconnect(); };
+  ws.onopen=()=>{ connection(true);if(current?.me?.isAdmin)scheduleAdminUsersRefresh(); if(localStream)ws.send(JSON.stringify({type:'audio-ready',ready:true})); if(listeningTo)retryListenAfterReconnect(); };
   ws.onmessage=async(event)=>{
     let m;try{m=JSON.parse(event.data);}catch{return;}
-    if(m.type==='state'){setState(m.data);}
+    if(m.type==='state'){setState(m.data);if(current?.me?.isAdmin && !adminLoaded)scheduleAdminUsersRefresh();}
     if(m.type==='listen-request') await action(()=>sendOffer(m.from));
     if(m.type==='rtc') await action(()=>handleRTC(m.from,m.signal));
     if(m.type==='audio-relay-start') await action(startAudioRelaySender);
@@ -170,6 +170,7 @@ function connectSocket(){
     if(m.type==='audio-relay-status') handleAudioRelayStatus(m);
     if(m.type==='audio-relay-data') handleAudioRelayPacket(m);
     if(m.type==='account-banned'){alert(m.notice||'Account sospeso.');location.reload();return;}
+    if(m.type==='admin-users-changed' && current?.me?.isAdmin)scheduleAdminUsersRefresh();
     if(m.type==='admin-new-report' && current?.me?.isAdmin){toast('Nuova segnalazione ricevuta nel Centro amministratore.');void action(adminLoad);}
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
@@ -226,15 +227,18 @@ async function submitReport(){
 function fmtAdminDate(n){return n?new Date(n).toLocaleString('it-IT'):'Non disponibile';}
 function renderAdminUsers(){
  const term=$('adminFilter').value.trim().toLowerCase();
- const users=adminUsersCache.filter(u=>[u.name,u.email,u.id].some(v=>String(v||'').toLowerCase().includes(term)));
+ const users=adminUsersCache.filter(u=>[u.name,u.email,u.id,u.lastLoginIp,u.registrationIp].some(v=>String(v||'').toLowerCase().includes(term)));
  $('adminUsers').innerHTML=users.length?users.map(u=>`<article class="zyro-admin-user">
  <div class="zyro-admin-user-title"><b>${escapeHtml(u.name)}</b><span class="zyro-admin-chip ${u.bannedAt?'is-banned':u.premiumGiftLifetime?'is-gift':''}">${u.bannedAt?'Sospeso':u.premiumGiftLifetime?'Premium a vita':u.premiumActive?'Premium attivo':'Standard'}</span></div>
- <p>${escapeHtml(u.email)}</p><div class="zyro-admin-meta"><small>ID</small><code>${escapeHtml(u.id)}</code><small>Ultimo IP</small><code>${escapeHtml(u.lastLoginIp||'Non disponibile')}</code><small>Ultimo accesso</small><span>${escapeHtml(fmtAdminDate(u.lastLoginAt))}</span></div>
+ <p>${escapeHtml(u.email)}</p><div class="zyro-admin-meta"><small>ID</small><code>${escapeHtml(u.id)}</code><small>IP alla registrazione</small><code>${escapeHtml(u.registrationIp||'Non disponibile')}</code><small>Registrato il</small><span>${escapeHtml(fmtAdminDate(u.createdAt))}</span><small>Ultimo IP rilevato</small><code>${escapeHtml(u.lastLoginIp||'Non disponibile')}</code><small>Ultimo accesso</small><span>${escapeHtml(fmtAdminDate(u.lastLoginAt))}</span></div>
+ ${u.sameIpBannedAccounts?.length?`<p class="zyro-admin-ip-match">IP condiviso con ${u.sameIpBannedAccounts.length} account sospesi. Verifica gli account: una rete condivisa non dimostra la stessa identità.</p><small>ID: ${u.sameIpBannedAccounts.map(escapeHtml).join(', ')}</small>`:''}
  ${u.id===current.me.id?'<small>Account proprietario — non sospendibile.</small>':`<div class="zyro-admin-actions"><button type="button" data-admin-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button><button type="button" data-admin-gift="${escapeHtml(u.id)}">${u.premiumGiftLifetime?'Revoca regalo Premium':'Regala Premium a vita'}</button></div>`}
  </article>`).join(''):'<p class="setting-description">Nessun account corrispondente alla ricerca.</p>';
  $('adminUsers').querySelectorAll('[data-admin-ban]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeBan(b.dataset.adminBan))));
  $('adminUsers').querySelectorAll('[data-admin-gift]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeGift(b.dataset.adminGift))));
 }
+let adminRefreshTimer=null;
+function scheduleAdminUsersRefresh(){if(adminRefreshTimer)return;adminRefreshTimer=setTimeout(()=>{adminRefreshTimer=null;if(current?.me?.isAdmin)void action(adminLoad);},350);}
 async function adminLoad(){
  if(!current?.me?.isAdmin)return;
  $('adminStatus').textContent='Caricamento account e segnalazioni…';
@@ -243,7 +247,7 @@ async function adminLoad(){
  $('adminReports').innerHTML=(data.reports||[]).length?`<h3>Segnalazioni recenti</h3>`+(data.reports||[]).map(r=>`<div class="zyro-admin-report"><b>${escapeHtml(r.reason)}</b><p>ID segnalato: ${escapeHtml(r.userId)} · ID segnalante: ${escapeHtml(r.reporterId)}</p><small>${fmtAdminDate(r.at)} · ${escapeHtml(r.status)}</small>${r.status==='open'?`<button type="button" data-admin-review="${escapeHtml(r.id)}">Segna come esaminata</button>`:''}</div>`).join(''):'';
  $('adminReports').querySelectorAll('[data-admin-review]').forEach(b=>b.addEventListener('click',()=>action(()=>adminReview(b.dataset.adminReview))));
  $('adminAudit').innerHTML=(data.audit||[]).map(a=>`<p><b>${escapeHtml(a.kind)}</b> · ${escapeHtml(a.for||'')} · ${escapeHtml(fmtAdminDate(a.at))}</p>`).join('')||'<p>Nessuna azione registrata.</p>';
- $('adminStatus').textContent=`${adminUsersCache.length} account registrati. Dati visibili esclusivamente al proprietario.`;
+ $('adminStatus').textContent=`${adminUsersCache.length} account registrati. Aggiornamento in tempo reale · dati riservati al proprietario.`;
 }
 /* V17.1: native browser confirm()/prompt() may be cancelled by Android WebView.
    Use accessible DOM dialogs; all privileged actions still require server-side
@@ -2114,5 +2118,6 @@ init();
 
 // Resume visual map updates when the app returns to the foreground.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeView==='home'){stableMap?.resize();renderHeadingOnly();}});
+
 
 
