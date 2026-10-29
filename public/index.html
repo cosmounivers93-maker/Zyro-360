@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v19.1-proporzioni">
+  <meta name="zyro-ui-build" content="v55-allineamenti">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest?v=37">
@@ -215,6 +215,71 @@ html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-top .mini-overline{c
 #premiumPanel button.zyro-plan-soon{width:100%;border:1px solid #48bba970;cursor:pointer;font:inherit;font-size:13px}
 #premiumPanel button.zyro-plan-soon:disabled{cursor:default;opacity:.7}
 </style>
+
+<style id="zyro-alignment-v55">
+/* Use one icon track per actual icon size. Long descriptions get their own row. */
+#modesView{--zyro-copy:#4e6672}
+#modesView .zyro-heading-v55,#profileSettingsDrawer #zyroHelp .zyro-heading-v55{
+ display:grid!important;grid-template-columns:44px minmax(0,1fr)!important;
+ align-items:center!important;column-gap:14px!important;row-gap:12px!important;
+ margin:0 0 20px!important;padding:0!important;text-align:left!important
+}
+#modesView .zyro-heading-v55>.zyro-heading-copy,#profileSettingsDrawer #zyroHelp .zyro-heading-copy{
+ grid-column:2!important;grid-row:1!important;min-width:0!important;text-align:left!important;margin:0!important
+}
+#modesView .zyro-heading-v55>:first-child,#profileSettingsDrawer #zyroHelp .how-icon{
+ grid-column:1!important;grid-row:1!important;align-self:center!important;
+ width:44px!important;height:44px!important;min-width:44px!important;margin:0!important;
+ display:grid!important;place-items:center!important;line-height:1!important
+}
+#modesView .zyro-heading-v55 .zyro-heading-copy h2,#profileSettingsDrawer #zyroHelp .zyro-heading-copy h2{
+ text-align:left!important;margin:5px 0 0!important;line-height:1.3!important;
+ font-size:clamp(19px,4.8vw,23px)!important;letter-spacing:-.3px!important;text-wrap:wrap!important
+}
+#modesView .zyro-heading-v55 .eyebrow,#profileSettingsDrawer #zyroHelp .zyro-heading-copy .eyebrow{
+ text-align:left!important;margin:0!important;font-size:10px!important;letter-spacing:1.3px!important;line-height:1.5!important
+}
+#modesView .zyro-heading-v55>p.zyro-heading-description,#profileSettingsDrawer #zyroHelp .how-heading>p.zyro-heading-description{
+ grid-column:1/-1!important;grid-row:2!important;max-width:none!important;width:100%!important;
+ margin:0!important;text-align:left!important;text-wrap:wrap!important;
+ font-size:14px!important;line-height:1.6!important;color:var(--zyro-copy,#4e6672)!important
+}
+#modesView :is(.pick-section-heading,.sos-section-heading){
+ display:grid!important;grid-template-columns:36px minmax(0,1fr)!important;
+ align-items:start!important;column-gap:12px!important;row-gap:0!important
+}
+#modesView :is(.pick-section-icon,.sos-section-icon){
+ width:36px!important;height:36px!important;min-width:36px!important;max-width:36px!important;
+ margin:0!important;box-sizing:border-box!important;line-height:1!important;font-size:20px!important
+}
+#modesView :is(.pick-section-heading,.sos-section-heading)>div{min-width:0!important;text-align:left!important}
+#modesView :is(.pick-section-heading,.sos-section-heading) strong{margin:0!important;text-align:left!important;line-height:1.4!important}
+#modesView :is(.pick-section-heading,.sos-section-heading) small{margin:4px 0 0!important;text-align:left!important;line-height:1.5!important}
+#modesView .zyro-v15-contacts>.zyro-v15-note{margin:0!important;width:100%!important;line-height:1.55!important}
+#modesView #journeyTargetInfo{color:#315d65!important;opacity:1!important;font-size:13px!important;font-weight:600!important;line-height:1.55!important}
+#modesView .zyro-v15-destination small{color:#4e6672!important;opacity:1!important}
+/* Opaque navigation separates scrolling text from persistent controls. */
+#appScreen>.bottom-nav{
+ background:#f1fafb!important;background-image:none!important;opacity:1!important;
+ backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+ border-top:1px solid #c4e0e1!important;box-shadow:0 -4px 16px #173f4912!important
+}
+/* Reduce the accumulated header/detail spacing without changing drawer scrolling. */
+#profileSettingsDrawer .zyro-drawer-top{padding-bottom:16px!important;margin-bottom:10px!important}
+#profileSettingsDrawer #zyroSettingsDetail{padding:0!important;margin:0!important}
+#profileSettingsDrawer #settingsDrawerBack{
+ display:flex!important;align-items:center!important;min-height:36px!important;
+ padding:6px 0!important;margin:0 0 8px!important;line-height:1.4!important
+}
+#profileSettingsDrawer #settingsDrawerHeading{margin:0 0 14px!important;line-height:1.3!important}
+#profileSettingsDrawer #zyroHelp{--zyro-copy:#4e6672}
+#profileSettingsDrawer #zyroHelp .how-heading>div{max-width:none!important;margin:0!important;text-align:left!important}
+#profileSettingsDrawer #zyroHelp .how-icon{border-radius:13px!important;font-size:24px!important}
+html[data-theme="dark"] #modesView,html[data-theme="dark"] #profileSettingsDrawer #zyroHelp{--zyro-copy:#b7d1d4}
+html[data-theme="dark"] #modesView #journeyTargetInfo{color:#a2dfd5!important}
+html[data-theme="dark"] #modesView .zyro-v15-destination small{color:#b7d1d4!important}
+html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;border-top-color:#315361!important;box-shadow:0 -4px 16px #00000025!important}
+</style>
 </head>
 <body>
 <div id="authScreen" class="auth-shell">
@@ -300,7 +365,7 @@ html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-top .mini-overline{c
       </div>
       <section class="circle-location-status panel"><div class="panel-title"><span class="panel-icon">⌖</span><div><h2>La mia posizione</h2><p id="myLocationText">Condivisione disattivata</p></div></div></section>
       <section class="pick-panel" id="pickPanel">
-        <div class="pick-top"><div class="pick-symbol">🛡</div><div><p class="eyebrow muted">PROTEZIONE ANTIFURTO</p><h2>Modalità Pick Pocket</h2><p>Rileva uno strappo brusco con i sensori del telefono e prova ad avviare una sirena.</p></div></div>
+        <div class="pick-top zyro-heading-v55"><div class="pick-symbol">🛡</div><div class="zyro-heading-copy"><p class="eyebrow muted">PROTEZIONE ANTIFURTO</p><h2>Modalità Pick Pocket</h2></div><p class="zyro-heading-description">Rileva uno strappo brusco con i sensori del telefono e prova ad avviare una sirena.</p></div>
         <div class="pick-settings" id="pickSettings">
           <div class="pick-section" aria-label="Sensibilità antifurto">
             <div class="pick-section-heading"><span class="pick-section-icon" aria-hidden="true">◉</span><div><strong>Rilevamento</strong><small>Regola la risposta ai movimenti improvvisi.</small></div></div>
@@ -332,7 +397,7 @@ html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-top .mini-overline{c
       </section>
 
       <section class="zyro-v15-panel" id="journeyPanel">
-        <div class="zyro-v15-heading"><span class="zyro-v15-symbol">↗</span><div><p class="eyebrow muted">VIAGGIA CON PIÙ TRANQUILLITÀ</p><h2>Accompagnami</h2><p>Condividi il percorso con i contatti scelti e indica quando pensi di arrivare.</p></div></div>
+        <div class="zyro-v15-heading zyro-heading-v55"><span class="zyro-v15-symbol">↗</span><div class="zyro-heading-copy"><p class="eyebrow muted">VIAGGIA CON PIÙ TRANQUILLITÀ</p><h2>Accompagnami</h2></div><p class="zyro-heading-description">Condividi il percorso con i contatti scelti e indica quando pensi di arrivare.</p></div>
         <div id="journeyInactive">
           <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, lavoro, stazione" autocomplete="off"></label>
           <label class="zyro-v15-field">Tempo previsto<select id="journeyMinutes"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e mezza</option><option value="120">2 ore</option><option value="240">4 ore</option></select></label>
@@ -344,7 +409,7 @@ html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-top .mini-overline{c
         <div id="journeyContactsStatus" class="zyro-v15-feed"></div>
       </section>
       <section class="zyro-v15-panel" id="checkinPanel">
-        <div class="zyro-v15-heading"><span class="zyro-v15-symbol">✓</span><div><p class="eyebrow muted">UN CONTROLLO IN PIÙ</p><h2>Check-in intelligente</h2><p>Imposta un orario entro cui confermare che va tutto bene. Se scade, i contatti ricevono una richiesta di verifica, quando le notifiche sono disponibili.</p></div></div>
+        <div class="zyro-v15-heading zyro-heading-v55"><span class="zyro-v15-symbol">✓</span><div class="zyro-heading-copy"><p class="eyebrow muted">UN CONTROLLO IN PIÙ</p><h2>Check-in intelligente</h2></div><p class="zyro-heading-description">Imposta un orario entro cui confermare che va tutto bene. Se scade, i contatti ricevono una richiesta di verifica, quando le notifiche sono disponibili.</p></div>
         <div id="checkinInactive">
           <label class="zyro-v15-field">Quando vuoi confermare?<select id="checkinMinutes"><option value="15">Tra 15 minuti</option><option value="30" selected>Tra 30 minuti</option><option value="60">Tra 1 ora</option><option value="120">Tra 2 ore</option><option value="240">Tra 4 ore</option><option value="480">Tra 8 ore</option></select></label>
           <p class="zyro-v15-subhead">Chi deve essere avvisato in caso di mancata risposta?</p><div id="checkinRecipients" class="zyro-v15-contacts"></div>
@@ -381,7 +446,7 @@ html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-top .mini-overline{c
         <a class="zyro-v15-emergency zyro-plan-emergency" href="tel:112">Emergenza? Chiama il <b>112</b> <span>sempre gratuito ↗</span></a>
       </section>
       <section class="panel sos-recipient-panel" aria-labelledby="sosRecipientTitle">
-        <div class="panel-title"><span class="panel-icon">🆘</span><div><p class="eyebrow muted sos-kicker">AVVISO D'EMERGENZA</p><h2 id="sosRecipientTitle">Destinatari SOS</h2><p>Prepara la lista dei destinatari. L’invio SOS Premium richiede un abbonamento verificato; il GPS può essere condiviso solo con i destinatari durante l’allarme.</p></div></div>
+        <div class="panel-title zyro-heading-v55"><span class="panel-icon">🆘</span><div class="zyro-heading-copy"><p class="eyebrow muted sos-kicker">AVVISO D'EMERGENZA</p><h2 id="sosRecipientTitle">Destinatari SOS</h2></div><p class="zyro-heading-description">Prepara la lista dei destinatari. L’invio SOS Premium richiede un abbonamento verificato; il GPS può essere condiviso solo con i destinatari durante l’allarme.</p></div>
         <div class="sos-section"><div class="sos-section-heading"><span class="sos-section-icon" aria-hidden="true">♧</span><div><strong>Persone da avvisare</strong><small>Solo i contatti che hai scelto riceveranno l'avviso.</small></div></div><div id="sosRecipientList" class="recipient-grid"></div></div>
         <button id="saveSOSRecipients" class="btn btn-dark btn-wide" type="button">Salva destinatari SOS</button>
         <p class="setting-description sos-push-note">Quando premi SOS, il server può usare un fornitore di geocodifica per convertire le coordinate GPS in via, eventuale numero civico e città, soltanto se il servizio è attivato. Il civico potrebbe non essere disponibile o esatto. L’indirizzo e la posizione dell’allarme sono comunicati ai destinatari SOS scelti.</p>
@@ -467,7 +532,7 @@ html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-top .mini-overline{c
       <div class="panel"><div class="panel-title"><span class="panel-icon">🪪</span><div><h2>Il tuo ID account</h2><p>Il codice identificativo del tuo account ZYRO 360.</p></div></div><p id="myAccountId" class="setting-description" style="overflow-wrap:anywhere"></p><button id="copyMyId" type="button" class="btn btn-outline">Copia ID</button></div>
       <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
       <section class="how-it-works" id="zyroHelp" aria-labelledby="howTitle">
-        <div class="how-heading"><span class="how-icon" aria-hidden="true">?</span><div><p class="eyebrow muted">LA TUA GUIDA</p><h2 id="howTitle">Scopri ZYRO 360</h2><p>Ogni funzione, spiegata passo dopo passo.</p></div></div>
+        <div class="how-heading zyro-heading-v55"><span class="how-icon" aria-hidden="true">?</span><div class="zyro-heading-copy"><p class="eyebrow muted">LA TUA GUIDA</p><h2 id="howTitle">Scopri ZYRO 360</h2></div><p class="zyro-heading-description">Ogni funzione, spiegata passo dopo passo.</p></div>
         <details><summary>Inizia da qui <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea il tuo account, scegli nome e foto dal Profilo e apri «Abilita permessi». Autorizza soltanto le funzioni che vuoi usare: posizione per il GPS, notifiche per gli avvisi, microfono per l’audio SOS e sensori per Pick Pocket. I permessi da soli non avviano la condivisione né il microfono.</p></div></details>
         <details><summary>Home: mappa e posizione <span aria-hidden="true">＋</span></summary><div class="how-content"><p>«Trova la mia posizione» centra la mappa sul telefono. «Attiva posizione» condivide il GPS con le persone autorizzate nelle tue cerchie; puoi interrompere la condivisione in ogni momento. In «Persone invitate» gestisci chi può vedere la posizione e chi riceve i tuoi SOS. La precisione dipende dal segnale GPS e dalle autorizzazioni.</p></div></details>
         <details><summary>Cerchie: amici e famiglia <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea un gruppo con un nome riconoscibile, poi condividi il codice o il link d’invito con una persona fidata. Per entrare in un gruppo usa il codice ricevuto. Ogni invito dura 24 ore e si usa una volta. L’ingresso nella cerchia non accende il microfono: decidi tu quali informazioni condividere.</p></div></details>
@@ -549,6 +614,7 @@ html[data-theme="dark"] #profileSettingsDrawer .zyro-drawer-top .mini-overline{c
 <script src="/app.js?v=54.0" defer></script>
 </body>
 </html>
+
 
 
 
