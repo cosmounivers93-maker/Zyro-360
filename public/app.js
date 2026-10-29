@@ -445,11 +445,22 @@ function renderHome(){
   });
   renderMap();
 }
-function inviteBox(code){const link=location.origin+'/?invite='+encodeURIComponent(code);return `<div class="invite-code-box"><small>LINK E CODICE MONOUSO · VALIDI 24 ORE</small><code>${escapeHtml(code)}</code><button type="button" class="copy-code">Copia codice</button><input readonly aria-label="Link invito" value="${escapeHtml(link)}"><div class="invite-share-actions"><button type="button" class="copy-invite-link">🔗 Copia link</button><button type="button" class="share-invite-link">↗ Condividi</button></div></div>`;}
+function inviteBox(code){
+ const link=location.origin+'/?invite='+encodeURIComponent(code);
+ const name=current?.me?.name||'Una persona fidata';
+ return `<div class="invite-code-box" data-invite-link="${escapeHtml(link)}" data-invite-name="${escapeHtml(name)}"><small>LINK E CODICE MONOUSO · VALIDI 24 ORE</small><code>${escapeHtml(code)}</code><button type="button" class="copy-code">Copia codice</button><div class="zyro-personal-invite"><span class="zyro-invite-mark" aria-hidden="true">↗</span><div><strong>Invito di ${escapeHtml(name)}</strong><small>Unisciti alla sua cerchia su ZYRO 360</small></div></div><div class="invite-share-actions"><button type="button" class="copy-invite-link">🔗 Copia invito</button><button type="button" class="share-invite-link">↗ Condividi</button></div></div>`;
+}
+function inviteShareData(box){
+ const name=box?.dataset.inviteName||'Una persona fidata';
+ const link=box?.dataset.inviteLink;
+ if(!link)throw Error('Genera un nuovo invito prima di condividerlo.');
+ return {title:`Invito di ${name} · ZYRO 360`,text:`${name} ti invita nella sua cerchia privata su ZYRO 360.`,url:link};
+}
+
 function renderCircles(){
   if(!current)return;
   const list=$('circlesList');
-  const sig=JSON.stringify([current.me.id,(current.circles||[]).map(c=>[c.id,c.name,c.mine,(c.members||[]).map(m=>[m.id,m.name])]),[...inviteCodes.entries()]]);
+  const sig=JSON.stringify([current.me.id,current.me.name,(current.circles||[]).map(c=>[c.id,c.name,c.mine,(c.members||[]).map(m=>[m.id,m.name])]),[...inviteCodes.entries()]]);
   if(list._zyroSig===sig&&list.children.length)return;
   list._zyroSig=sig;
   list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions"><button type="button" data-chatcircle="${escapeHtml(c.id)}">💬 Chat gruppo</button><button type="button" data-invite="${escapeHtml(c.id)}">✚ Genera codice invito</button>${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
@@ -466,10 +477,29 @@ function renderCircles(){
 }
 function bindCopyCodes(root){
   root.querySelectorAll('.copy-code').forEach(btn=>btn.addEventListener('click',()=>copyInvite(btn.closest('.invite-code-box')?.querySelector('code')?.textContent,'Codice copiato.')));
-  root.querySelectorAll('.copy-invite-link').forEach(btn=>btn.addEventListener('click',()=>copyInvite(btn.closest('.invite-code-box')?.querySelector('input')?.value,'Link copiato. Invialo a una persona fidata.')));
-  root.querySelectorAll('.share-invite-link').forEach(btn=>btn.addEventListener('click',()=>action(async()=>{const link=btn.closest('.invite-code-box')?.querySelector('input')?.value;if(navigator.share)await navigator.share({title:'Invito ZYRO 360',text:'Entra nella mia cerchia privata di ZYRO 360',url:link});else await copyInvite(link,'Link copiato. Puoi incollarlo su WhatsApp o Telegram.');})));
+  root.querySelectorAll('.copy-invite-link').forEach(btn=>btn.addEventListener('click',()=>action(async()=>{
+    const data=inviteShareData(btn.closest('.invite-code-box'));
+    await copyInvite(data.text+'\n'+data.url,'Invito copiato. Invialo a una persona fidata.');
+  })));
+  root.querySelectorAll('.share-invite-link').forEach(btn=>btn.addEventListener('click',()=>action(async()=>{
+    const data=inviteShareData(btn.closest('.invite-code-box'));
+    if(navigator.share){
+      try{await navigator.share(data);return;}
+      catch(error){if(error?.name==='AbortError')return;}
+    }
+    await copyInvite(data.text+'\n'+data.url,'Invito copiato. Puoi incollarlo su WhatsApp o Telegram.');
+  })));
 }
-async function copyInvite(value,message){try{await navigator.clipboard.writeText(value);toast(message);}catch{toast('Tieni premuto sul testo per copiarlo.',true);}}
+async function copyInvite(value,message){
+ if(typeof value!=='string'||!value){toast('Genera un nuovo invito e riprova.',true);return;}
+ try{await navigator.clipboard.writeText(value);toast(message);return;}catch{}
+ const field=document.createElement('textarea'),previous=document.activeElement;
+ field.value=value;field.readOnly=true;field.style.cssText='position:fixed;left:-9999px;top:0;opacity:0';
+ document.body.append(field);field.focus();field.select();field.setSelectionRange(0,value.length);
+ let copied=false;try{copied=document.execCommand('copy');}catch{}
+ field.remove();previous?.focus?.({preventScroll:true});
+ toast(copied?message:'Copia non disponibile. Usa Condividi oppure riprova.',!copied);
+}
 function setAvatar(el,user){const image=user.avatar;if(image?.startsWith('data:image/jpeg;base64,')){el.textContent='';el.style.backgroundImage=`url("${image}")`;el.classList.add('has-photo');}else{el.style.backgroundImage='';el.textContent=initials(user.name);el.classList.remove('has-photo');}}
 function avatarHTML(user){return user.avatar?.startsWith('data:image/jpeg;base64,') ? `<img src="${user.avatar}" alt="" class="avatar-image">` : escapeHtml(initials(user.name));}
 function renderSOSRecipients(){
@@ -2201,3 +2231,4 @@ document.querySelectorAll('[data-billing-open]').forEach(b=>b.addEventListener('
 $('zyroRestorePurchases')?.addEventListener('click',()=>action(openPlayBilling));
 window.addEventListener('zyro:android-ready',renderBillingActions);
 window.addEventListener('focus',()=>{if(current)void action(refresh);});
+
