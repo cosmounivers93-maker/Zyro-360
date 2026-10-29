@@ -1,0 +1,22 @@
+/* V26 · Separate audio diagnostic from SOS transmission controls. */
+.zyro-saved-invitees #zyroMicNativeCheck{
+  margin-top:9px;
+  border-color:rgba(38,149,176,.48);
+  background:linear-gradient(110deg,rgba(44,148,186,.16),rgba(42,190,176,.12));
+}
+.zyro-saved-invitees #zyroMicNativeCheck:before{
+  content:"◉";color:#24bba9;margin-right:7px;
+}
+.zyro-saved-invitees .zyro-mic-diagnostic-result{
+  white-space:pre-line;
+  border-radius:11px;padding:11px 12px;margin:11px 0 0;
+  background:rgba(40,126,143,.11);
+  border:1px solid rgba(50,161,163,.25);
+  color:var(--z-panel-fg,#194557);
+  font-size:11px;line-height:1.55;
+}
+.zyro-saved-invitees .zyro-mic-diagnostic-result[data-status="error"]{
+  border-color:rgba(221,82,116,.45);
+  background:rgba(199,73,101,.12);
+}
+html[data-theme="dark"] .zyro-saved-invitees .zyro-mic-diagnostic-result{color:#e6fff8}

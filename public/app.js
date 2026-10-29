@@ -638,13 +638,27 @@ async function refresh(){if(!current)return;const data=await api('/api/state');s
 // The user opted-in in Profilo > Persone invitate. Begin requesting
 // microphone access in the physical SOS button gesture (before GPS/network
 // awaits), but publish a stream ONLY after the server accepts SOS.
-function acquireSOSEmergencyAudio(){
+async function openZyroMicrophone(){
  if(!navigator.mediaDevices?.getUserMedia)
-   return Promise.resolve({error:Error('Accesso microfono non supportato da Android System WebView.')});
+   throw Error('Il microfono non è supportato da Android System WebView.');
  try{
-   return navigator.mediaDevices.getUserMedia({audio:true,video:false})
-     .then(stream=>({stream}),error=>({error}));
- }catch(error){return Promise.resolve({error});}
+   return await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+ }catch(firstError){
+   // Android WebView can fail to open the default voice-processing route
+   // even when runtime permission is already granted. One alternative route
+   // without optional processing is worth trying; neither path ever stores audio.
+   if(firstError?.name!=='NotReadableError' &&
+      !/Could not start audio source/i.test(firstError?.message||''))throw firstError;
+   try{
+     return await navigator.mediaDevices.getUserMedia({
+       audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},
+       video:false
+     });
+   }catch(secondError){throw secondError;}
+ }
+}
+function acquireSOSEmergencyAudio(){
+ return openZyroMicrophone().then(stream=>({stream}),error=>({error}));
 }
 async function startSOS(){
  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS Premium non attivo: nessun allarme è stato inviato. In emergenza chiama il 112.',true);return;}
@@ -715,12 +729,33 @@ function sosMicErrorMessage(error){
  return error?.message||'Verifica il permesso microfono e Android System WebView.';
 }
 async function testSOSMicrophone(){
- if(!navigator.mediaDevices?.getUserMedia)throw Error('Microfono non disponibile in questo ambiente.');
- // This is a TEST requested from the settings page. No recording is stored
- // or streamed; all tracks are closed immediately.
- const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+ // TEST requested on Settings page, not an SOS stream. Nothing is stored
+ // and the OS microphone is released immediately.
+ const stream=await openZyroMicrophone();
  stream.getTracks().forEach(track=>track.stop());
  return true;
+}
+async function testZyroNativeMicrophone(){
+ if(!hasZyroNativeBridge())
+   throw Error('Per questo test serve la nuova APK Android V26, non il browser.');
+ let response;
+ try{response=await zyroNativeRequest('mic-diagnostic');}
+ catch(error){
+   if(/zyro-unknown-action/i.test(error.message))
+     throw Error('L’APK installata non contiene la diagnostica Android V26. Aggiorna prima la versione Android.');
+   throw error;
+ }
+ const result=response.result||{};
+ if(result.permission!==true)
+   throw Error('Android non concede il permesso microfono.');
+ if(result.microphoneMuted===true)
+   throw Error('L’accesso globale al microfono è disattivato sul telefono.');
+ if(result.passed===true)
+   return '✓ Microfono hardware Android funzionante ('+Number(result.capturedSamples||0)+
+     ' campioni letti). Se il test WebView fallisce ancora, il problema è nel collegamento WebView/WebRTC, non nel permesso.';
+ throw Error('Anche Android nativo non riesce ad aprire il microfono: '+
+   String(result.problem||'sorgente audio non disponibile')+
+   '. Controlla chiamate e altre app che usano l’audio.');
 }
 async function startAudio(preparedAudio){
  if(localStream||micBusy || !current?.me?.sos || current?.me?.sosAudioConsent!==true){
@@ -1539,7 +1574,13 @@ function renderInvitedPeople(){
  micHint.textContent='Scegli prima di usare SOS. Android richiede il permesso microfono. L’audio può interrompersi con lo schermo spento; lo stato sarà indicato nella Home.';
  const micTest=document.createElement('button');micTest.type='button';micTest.id='zyroTestMic';
  micTest.className='zyro-sos-mic-test';micTest.textContent='Verifica microfono';micTest.disabled=!micInput.checked;
- micBox.append(micLabel,micHint,micTest);root.append(micBox);
+ const micNative=document.createElement('button');micNative.type='button';
+ micNative.id='zyroMicNativeCheck';micNative.className='zyro-sos-mic-test';
+ micNative.textContent='Diagnostica microfono Android';micNative.disabled=!micInput.checked;
+ const micResult=document.createElement('p');micResult.id='zyroMicDiagnosticResult';
+ micResult.className='zyro-mic-diagnostic-result';micResult.hidden=true;
+ micResult.setAttribute('role','status');micResult.setAttribute('aria-live','polite');
+ micBox.append(micLabel,micHint,micTest,micNative,micResult);root.append(micBox);
  if(!byId.size){
    const p=document.createElement('p');p.className='zyro-invitees-empty';
    p.textContent='Nessuna persona collegata. Invita amici e familiari dalla sezione Cerchie.';
@@ -1684,14 +1725,21 @@ async function init(){
     });
   });
   $('savedInvitees').addEventListener('click',e=>{
-    if(e.target.id!=='zyroTestMic')return;
-    const button=e.target;button.disabled=true;
+    if(e.target.id!=='zyroTestMic'&&e.target.id!=='zyroMicNativeCheck')return;
+    const button=e.target,native=e.target.id==='zyroMicNativeCheck';
+    button.disabled=true;
     void action(async()=>{
+      const result=$('zyroMicDiagnosticResult');
+      if(result){result.hidden=false;result.dataset.status='pending';result.textContent='Test audio in corso…';}
       try{
-        await testSOSMicrophone();
-        toast('Microfono Android verificato ✓. Nessun audio è stato trasmesso.');
+        const message=native?await testZyroNativeMicrophone()
+          :(await testSOSMicrophone(),'✓ Microfono WebView verificato. Nessun audio salvato o trasmesso.');
+        if(result){result.hidden=false;result.dataset.status='ok';result.textContent=message;}
+        toast(message);
       }catch(err){
-        toast('Microfono non disponibile: '+sosMicErrorMessage(err),true);
+        const message='⚠ '+(native?err.message:sosMicErrorMessage(err));
+        if(result){result.hidden=false;result.dataset.status='error';result.textContent=message;}
+        toast(message,true);
       }finally{if(button.isConnected)button.disabled=false;}
     });
   });
