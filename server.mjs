@@ -362,7 +362,7 @@ app.post('/api/logout', requireAuth, (req,res) => {
 });
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
-const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
+const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
 app.post('/api/settings/device',requireAuth,limit,(req,res)=>{
  const device=deviceForRequest(req);
  req.user.lastDevice=device;save();notifyAdminUsers();res.json({ok:true});
@@ -409,6 +409,17 @@ app.post('/api/admin/premium-gift',requireAuth,requireAdmin,limit,(req,res)=>{
  else {delete u.premiumGiftGrantedAt;delete u.premiumGiftBy;}
  recordAction(enabled?'premium-gift':'premium-revoke',req.user.id,id);
  save();pushState(id);res.json({ok:true,user:adminUser(u)});
+});
+// Archiving only changes the owner's moderation list; accounts and bans remain intact.
+app.post('/api/admin/archive',requireAuth,requireAdmin,limit,(req,res)=>{
+ const {kind,id,archived}=req.body||{};
+ if(!['user','report'].includes(kind)||typeof id!=='string'||typeof archived!=='boolean')return res.status(400).json({error:'Richiesta non valida.'});
+ const item=kind==='user'?db.users[id]:db.userReports.find(r=>r.id===id);
+ if(!item)return res.status(404).json({error:'Elemento non trovato.'});
+ if(archived)item.adminArchivedAt=now();else delete item.adminArchivedAt;
+ if(kind==='report'&&archived&&item.status==='open'){item.status='reviewed';item.reviewedAt=now();item.reviewedBy=req.user.id;}
+ recordAction(archived?'archive-'+kind:'reopen-'+kind,req.user.id,kind==='user'?id:item.userId,kind==='report'?id:'');
+ save();notifyAdminUsers();res.json({ok:true});
 });
 app.post('/api/admin/report-resolve',requireAuth,requireAdmin,limit,(req,res)=>{
  if(!adminPassword(req,res))return;
@@ -1039,6 +1050,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
 
 
 
