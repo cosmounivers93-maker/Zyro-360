@@ -502,10 +502,26 @@ async function startSOS(){
  }catch{/* SOS can still start without a fix. */}}
  const result=await post('/api/sos/start',{location:lastCoords?{lat:lastCoords.lat,lon:lastCoords.lon,accuracy:lastCoords.accuracy}:null});
  await refresh();mapTracking=true;updateGeo(null,true);
- if(result.serverRecorded)toast(result.pushConfigured?`Allarme ricevuto dal server. Push accettate: ${result.pushAccepted||0}; lettura non confermata.`:'Allarme ricevuto dal server, ma le notifiche push non sono configurate.',!result.pushConfigured);
+ if(result.serverRecorded){
+   const pushCount=Number(result.pushAccepted||0);
+   if(!result.pushConfigured)toast('SOS registrato, ma Firebase non risulta configurato su Render. Chiama il 112 in caso di emergenza.',true);
+   else if(!pushCount)toast('SOS attivo sulla mappa, ma nessuna notifica push è stata accettata. Controlla i dispositivi dei destinatari.',true);
+   else toast(`SOS attivato. ${pushCount} invii accettati dal provider; consegna e lettura non confermate.`);
+ }
  if($('sosAudioConsent').checked){try{await startAudio();toast('Microfono attivo: i contatti possono richiedere ascolto in diretta.');}catch(err){toast('Allarme attivo, ma microfono non disponibile: '+err.message,true);}}
 }
-async function stopSOS(){if(!confirm('Confermi di voler terminare l’allarme SOS?'))return;await post('/api/sos/stop');stopAudio();await refresh();toast('SOS terminato.');}
+async function stopSOS(){
+  const confirmed=await zyroOwnerDialog({
+    title:'Termina allarme SOS',
+    description:'Vuoi davvero interrompere la richiesta di aiuto? Le persone selezionate non vedranno più l’allarme attivo.',
+    submitLabel:'Termina SOS'
+  });
+  if(!confirmed)return;
+  await post('/api/sos/stop');
+  stopAudio();
+  await refresh();
+  toast('Allarme SOS terminato.');
+}
 async function startAudio(){
   if(localStream || micBusy || !current?.me?.sos)return;
   if(!navigator.mediaDevices?.getUserMedia)throw Error('Serve HTTPS e un browser con accesso al microfono.');
@@ -1090,7 +1106,7 @@ async function init(){
   document.querySelectorAll('.auth-tab').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
   $('authForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{
     const payload={email:$('email').value.trim(),password:$('password').value};if(authMode==='register')payload.name=$('name').value.trim();
-    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
+    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();closeProfileSettings();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else{showView('home');toast('Benvenuto in Zyro 360!');}}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
   setupProfileSettings();
@@ -1135,9 +1151,9 @@ async function init(){
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=16-profilo').catch(()=>{});
-  try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}
+  try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);
     // 401 indicates a missing/expired session; a returning user signs in
