@@ -1027,7 +1027,8 @@ function setupProfileSettings(){
    <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">🔔</span><div class="zyro-permission-head"><h4>Notifiche</h4><p>Messaggi, richieste SOS e avvisi importanti.</p></div></div>
    <p id="zyroNotifState" class="zyro-permission-state" data-state="pending" role="status">Controllo delle notifiche…</p>
    <button type="button" class="zyro-permission-action" data-zyro-permission="notifications">Verifica notifiche</button>
-   <button type="button" class="zyro-permission-secondary" data-zyro-permission="reconnect">Ricollega il dispositivo a Firebase</button>
+   <button type="button" class="zyro-permission-secondary" data-zyro-permission="reconnect">Riprova collegamento Firebase</button>
+   <button type="button" class="zyro-permission-secondary" data-zyro-permission="testpush">🔔 Invia notifica di prova a questo telefono</button>
   </section>
   <section class="zyro-permission-card" aria-label="Posizione GPS">
    <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">📍</span><div class="zyro-permission-head"><h4>Posizione GPS</h4><p>Trova la tua posizione e condividila solo quando decidi tu.</p></div></div>
@@ -1129,7 +1130,9 @@ async function refreshPermissionStates(){
    const b=document.querySelector('[data-zyro-permission="notifications"]');
    if(b)b.textContent=granted?'Notifiche Android attive ✓':'Abilita notifiche';
    const re=document.querySelector('[data-zyro-permission="reconnect"]');
-   if(re){re.hidden=!granted;re.disabled=!tokenOk;}
+   if(re){re.hidden=!granted || !!status.connected || !!status.registering || !tokenOk;re.disabled=!tokenOk;}
+   const test=document.querySelector('[data-zyro-permission="testpush"]');
+   if(test){test.hidden=!granted;test.disabled=!granted || !status.connected;}
    const mic=window.ZyroAndroidMicrophoneEnabled;
    permissionState('zyroMicState',mic===true?'Permesso microfono concesso ✓':mic===false?'Permesso microfono non concesso':'Verifica il permesso microfono',mic===true?'on':mic===false?'off':'pending');
  }else{
@@ -1137,6 +1140,7 @@ async function refreshPermissionStates(){
    permissionState('zyroNotifState',permission==='granted'?'Notifiche browser autorizzate ✓':'Notifiche browser non ancora attive',permission==='granted'?'on':'off');
    permissionState('zyroMicState','Autorizzazione microfono da verificare','pending');
    document.querySelector('[data-zyro-permission="reconnect"]')?.setAttribute('hidden','');
+   document.querySelector('[data-zyro-permission="testpush"]')?.setAttribute('hidden','');
  }
  if(hasNative){
    const allowed=window.ZyroAndroidLocationEnabled;
@@ -1190,6 +1194,12 @@ async function handleZyroPermission(type){
    if(!isNativeZyro())return;
    window.dispatchEvent(new Event('zyro:force-fcm-register'));
    toast('Verifica della registrazione Firebase richiesta.');
+ }else if(type==='testpush'){
+   if(!isNativeZyro())throw Error('Questa prova è disponibile nell’app Android.');
+   const result=await post('/api/push/android/test-self',{});
+   if(Number(result.accepted||0)>0)
+     toast('Test inviato a Firebase. Controlla la notifica e il suono sul telefono.');
+   else throw Error('La notifica di prova non è stata accettata. Verifica il collegamento Firebase.');
  }else if(type==='location'){
    if(!navigator.geolocation)throw Error('GPS non disponibile su questo dispositivo.');
    const button=document.querySelector('[data-zyro-permission="location"]');
