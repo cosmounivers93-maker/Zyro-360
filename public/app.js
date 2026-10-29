@@ -149,21 +149,25 @@ function connectSocket(){
   const proto=location.protocol==='https:'?'wss':'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
   socket=ws;
-  ws.onopen=()=>{ connection(true); if(localStream)ws.send(JSON.stringify({type:'audio-ready',ready:true})); };
+  ws.onopen=()=>{ connection(true); if(localStream)ws.send(JSON.stringify({type:'audio-ready',ready:true})); if(listeningTo)retryListenAfterReconnect(); };
   ws.onmessage=async(event)=>{
     let m;try{m=JSON.parse(event.data);}catch{return;}
     if(m.type==='state'){setState(m.data);}
     if(m.type==='listen-request') await action(()=>sendOffer(m.from));
     if(m.type==='rtc') await action(()=>handleRTC(m.from,m.signal));
+    if(m.type==='audio-relay-start') await action(startAudioRelaySender);
+    if(m.type==='audio-relay-stop') stopAudioRelaySender();
+    if(m.type==='audio-relay-status') handleAudioRelayStatus(m);
+    if(m.type==='audio-relay-data') handleAudioRelayPacket(m);
     if(m.type==='account-banned'){alert(m.notice||'Account sospeso.');location.reload();return;}
     if(m.type==='admin-new-report' && current?.me?.isAdmin){toast('Nuova segnalazione ricevuta nel Centro amministratore.');void action(adminLoad);}
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
   };
-  ws.onclose=()=>{if(socket!==ws)return;socket=null;connection(false);if(current)wsRetry=setTimeout(connectSocket,3000);};
+  ws.onclose=()=>{if(socket!==ws)return;socket=null;connection(false);stopAudioRelaySender();if(current)wsRetry=setTimeout(connectSocket,3000);};
   ws.onerror=()=>{connection(false);};
 }
-function wsSend(message){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(message));}
+function wsSend(message){if(socket?.readyState!==WebSocket.OPEN)return false;socket.send(JSON.stringify(message));return true;}
 function connection(up){$('connectionText').textContent=up?'Collegato':'Non collegato';$('connectionDot').classList.toggle('connected',up);}
 function setState(data){
   if(!data?.me)return;
@@ -329,7 +333,7 @@ function renderHome(){
     const consent=me.sosAudioConsent===true;
     micState.dataset.status=!consent?'off':localStream?'on':sosAudioError?'error':'pending';
     micState.textContent=!consent?'Audio ambientale disattivato nelle impostazioni.'
-      :localStream?'🎙 Audio SOS in diretta attivo · ascolto consentito solo ai destinatari scelti.'
+      :localStream?'🎙 Microfono acceso · un destinatario autorizzato deve premere «Ascolta» per ricevere l’audio.'
       :sosAudioError?'⚠ Audio non disponibile: '+sosAudioError
       :'Audio autorizzato · avvio microfono in corso…';
   }
@@ -802,24 +806,61 @@ async function startAudio(preparedAudio){
    renderHome();
  }finally{micBusy=false;}
 }
-function stopAudio(){if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}for(const p of peers.values())p.close();peers.clear();pendingIce.clear();wsSend({type:'audio-ready',ready:false});renderHome();}
+function stopAudio(){stopAudioRelaySender();if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}for(const p of peers.values())p.close();peers.clear();pendingIce.clear();wsSend({type:'audio-ready',ready:false});renderHome();}
 function makePeer(remoteId,send){
   let peer=peers.get(remoteId);if(peer)return peer;
   peer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});
   peer.onicecandidate=e=>{if(e.candidate)wsSend({type:'rtc',to:remoteId,signal:{kind:'candidate',candidate:e.candidate.toJSON()}});};
-  peer.onconnectionstatechange=()=>{if(['failed','closed'].includes(peer.connectionState)){peer.close();peers.delete(remoteId);}};
-  peer.ontrack=ev=>{if(listeningTo!==remoteId)return;const audio=$('remoteAudio');audio.srcObject=ev.streams[0]||new MediaStream([ev.track]);$('audioDock').classList.remove('hidden');audio.play().catch(()=>toast('Tocca ▶ nel lettore per ascoltare l’audio.'));};
+  peer.onconnectionstatechange=()=>{
+    if(peer.connectionState==='connected' && listeningTo===remoteId){
+      cancelAudioRelayFallback();
+      closeAudioRelayPlayback(true);
+      const received=peer._zyroIncomingStream;
+      if(received){
+        const audio=$('remoteAudio');audio.srcObject=received;
+        audio.play().catch(()=>toast('Tocca ▶ nel lettore per ascoltare l’audio.'));
+      }
+      setAudioListenState('🎧 Audio in diretta collegato (WebRTC)');
+    }else if(peer.connectionState==='failed' && listeningTo===remoteId){
+      requestAudioRelayFallback(remoteId);
+    }
+    if(['failed','closed'].includes(peer.connectionState)){peer.close();peers.delete(remoteId);}
+  };
+  peer.ontrack=ev=>{
+    if(listeningTo!==remoteId)return;
+    // ontrack fires at SDP negotiation, sometimes before ICE has a network
+    // connection. Keep the fallback timer alive until connectionState=connected.
+    peer._zyroIncomingStream=ev.streams[0]||new MediaStream([ev.track]);
+    $('audioDock').classList.remove('hidden');
+    if(peer.connectionState==='connected'){
+      cancelAudioRelayFallback();
+      closeAudioRelayPlayback(true);
+      const audio=$('remoteAudio');audio.srcObject=peer._zyroIncomingStream;
+      audio.play().catch(()=>toast('Tocca ▶ nel lettore per ascoltare l’audio.'));
+      setAudioListenState('🎧 Audio in diretta collegato (WebRTC)');
+    }else{
+      setAudioListenState('🎧 Traccia rilevata · attendo connessione o alternativa server...');
+    }
+  };
   if(send&&localStream)for(const track of localStream.getTracks())peer.addTrack(track,localStream);
   peers.set(remoteId,peer);return peer;
 }
 async function sendOffer(remoteId){if(!localStream||!current?.me?.sos)return;const prior=peers.get(remoteId);if(prior){prior.close();peers.delete(remoteId);}const p=makePeer(remoteId,true);const offer=await p.createOffer();await p.setLocalDescription(offer);wsSend({type:'rtc',to:remoteId,signal:{kind:'offer',sdp:p.localDescription.toJSON()}});}
 async function listenTo(remoteId){
   if(!current?.alerts.some(a=>a.userId===remoteId&&a.hasAudio)){toast('Microfono non disponibile in questo momento.',true);return;}
-  if(!('RTCPeerConnection' in window)){toast('Questo browser non supporta l’audio live.',true);return;}
+  if(!socket||socket.readyState!==WebSocket.OPEN){toast('Server audio non connesso: riapri l’app e riprova.',true);return;}
   stopListening();listeningTo=remoteId;
   $('audioDock').classList.remove('hidden');
-  toast('Richiesta di ascolto inviata. Se necessario, premi Play.');
-  wsSend({type:'listen-request',to:remoteId});
+  // Prime the fallback AudioContext while the receiver's tap gesture is still
+  // active. Android WebView may otherwise suspend context creation later.
+  try{ensureAudioRelayPlayback();}catch(error){console.warn('Audio playback unavailable:',error?.name||'unknown');}
+  setAudioListenState('🎧 Connessione audio in corso...');
+  // WebRTC is attempted first; the authenticated live relay is the fallback.
+  if('RTCPeerConnection' in window){
+    wsSend({type:'listen-request',to:remoteId});
+    scheduleAudioRelayFallback(remoteId);
+  }else requestAudioRelayFallback(remoteId);
+  toast('Ascolto richiesto. Se il lettore rimane in pausa, premi ▶.');
 }
 async function handleRTC(remoteId,signal){
   if(!signal || !['offer','answer','candidate'].includes(signal.kind))return;
@@ -839,7 +880,146 @@ async function handleRTC(remoteId,signal){
   }
 }
 async function flushIce(remoteId){const p=peers.get(remoteId);for(const item of pendingIce.get(remoteId)||[])await p?.addIceCandidate(new RTCIceCandidate(item)).catch(()=>{});pendingIce.delete(remoteId);}
-function stopListening(){if(listeningTo){const p=peers.get(listeningTo);if(p){p.close();peers.delete(listeningTo);}pendingIce.delete(listeningTo);}listeningTo=null;const a=$('remoteAudio');a.pause();a.srcObject=null;$('audioDock').classList.add('hidden');}
+function stopListening(){cancelAudioRelayFallback();closeAudioRelayPlayback(true);if(listeningTo){const p=peers.get(listeningTo);if(p){p.close();peers.delete(listeningTo);}pendingIce.delete(listeningTo);}listeningTo=null;const a=$('remoteAudio');a.pause();a.srcObject=null;$('audioDock').classList.add('hidden');}
+// V29: End-to-end audio connection feedback and a consent-gated WebSocket PCM
+// fallback. PCM packets are forwarded only to authorized active SOS recipients
+// by the server, in RAM, and are not stored or logged. Audio is NOT E2EE.
+let zyroRelaySender=null,zyroRelayListener=null,zyroRelayTimer=null,zyroRelaySubscribed=false;
+let zyroRelaySequence=0;
+function setAudioListenState(text){
+  const label=$('audioDock')?.querySelector('span');
+  if(label)label.textContent=text;
+}
+function cancelAudioRelayFallback(){
+  if(zyroRelayTimer!==null)clearTimeout(zyroRelayTimer);
+  zyroRelayTimer=null;
+}
+function scheduleAudioRelayFallback(owner){
+  cancelAudioRelayFallback();
+  zyroRelayTimer=setTimeout(()=>{
+    zyroRelayTimer=null;
+    if(listeningTo!==owner)return;
+    const p=peers.get(owner);
+    if(p?.connectionState==='connected')return;
+    requestAudioRelayFallback(owner);
+  },6500);
+}
+function requestAudioRelayFallback(owner){
+  if(listeningTo!==owner||zyroRelaySubscribed)return;
+  if(!wsSend({type:'audio-relay-subscribe',to:owner})){
+    setAudioListenState('⚠ Server scollegato. Riprova quando Internet torna disponibile.');
+    return;
+  }
+  setAudioListenState('🎧 Collegamento alternativo al server in corso...');
+}
+function handleAudioRelayStatus(m){
+  if(listeningTo!==m.owner)return;
+  if(m.active!==true){
+    setAudioListenState('⚠ Audio non raggiungibile: '+String(m.reason||'connessione non disponibile').slice(0,125));
+    toast('L’audio SOS non è ancora collegato. Verifica il microfono dell’altro telefono.',true);
+    return;
+  }
+  if(peers.get(m.owner)?.connectionState==='connected'){
+    // WebRTC won the race: do not start a second unneeded connection.
+    wsSend({type:'audio-relay-unsubscribe',to:m.owner});
+    return;
+  }
+  zyroRelaySubscribed=true;
+  setAudioListenState('🎧 Ricezione audio tramite server · premi ▶ per ascoltare');
+}
+function retryListenAfterReconnect(){
+  if(!listeningTo)return;
+  zyroRelaySubscribed=false;
+  setAudioListenState('🎧 Riconnessione al server in corso...');
+  requestAudioRelayFallback(listeningTo);
+}
+function closeAudioRelayPlayback(notifyServer=false){
+  cancelAudioRelayFallback();
+  if(notifyServer && listeningTo && zyroRelaySubscribed)
+    wsSend({type:'audio-relay-unsubscribe',to:listeningTo});
+  zyroRelaySubscribed=false;
+  const r=zyroRelayListener;zyroRelayListener=null;
+  if(r)void r.ctx.close().catch(()=>{});
+}
+function ensureAudioRelayPlayback(){
+  if(zyroRelayListener)return zyroRelayListener;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)throw Error('Audio in tempo reale non supportato su questo telefono.');
+  const ctx=new AC({latencyHint:'interactive'});
+  const sink=ctx.createMediaStreamDestination();
+  const player=$('remoteAudio');player.srcObject=sink.stream;
+  zyroRelayListener={ctx,sink,nextTime:0,started:false};
+  void ctx.resume().catch(()=>{});
+  void player.play().catch(()=>setAudioListenState('🎧 Audio disponibile · premi ▶ sul lettore per sentirlo'));
+  return zyroRelayListener;
+}
+function handleAudioRelayPacket(m){
+  if(!zyroRelaySubscribed||m.from!==listeningTo||typeof m.pcm!=='string')return;
+  try{
+    const raw=atob(m.pcm),frames=raw.length/2;
+    if(!Number.isInteger(frames)||frames<50||frames>4096)return;
+    const r=ensureAudioRelayPlayback();
+    const buffer=r.ctx.createBuffer(1,frames,16000);
+    const out=buffer.getChannelData(0);
+    for(let i=0;i<frames;i++){
+      const lo=raw.charCodeAt(i*2),hi=raw.charCodeAt(i*2+1);
+      const signed=(hi<<8)|lo;out[i]=(signed>32767?signed-65536:signed)/32768;
+    }
+    const source=r.ctx.createBufferSource();source.buffer=buffer;source.connect(r.sink);
+    const now=r.ctx.currentTime;
+    if(r.nextTime<now+.12||r.nextTime>now+1)r.nextTime=now+.17;
+    source.start(r.nextTime);r.nextTime+=buffer.duration;
+    if(!r.started){r.started=true;setAudioListenState('🎧 Audio in diretta tramite server (non E2EE)');}
+  }catch(error){
+    console.warn('Audio relay playback issue:',error?.name||'unknown');
+  }
+}
+async function startAudioRelaySender(){
+  if(zyroRelaySender||!localStream||!current?.me?.sos||current.me.sosAudioConsent!==true)return;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return;
+  let ctx;
+  try{
+    ctx=new AC({latencyHint:'interactive'});
+    const source=ctx.createMediaStreamSource(localStream);
+    // ScriptProcessor only runs when a recipient explicitly requests fallback.
+    // Supported in Android WebView; no recording is retained.
+    const processor=ctx.createScriptProcessor(4096,1,1);
+    const silent=ctx.createGain();silent.gain.value=0;
+    source.connect(processor);processor.connect(silent);silent.connect(ctx.destination);
+    const sender={ctx,source,processor,silent};zyroRelaySender=sender;
+    processor.onaudioprocess=e=>{
+      if(zyroRelaySender!==sender||!localStream||!current?.me?.sos||
+         current.me.sosAudioConsent!==true||socket?.readyState!==WebSocket.OPEN)return;
+      // Skip data if the socket is congested: latency matters more than backlog.
+      if(socket.bufferedAmount>96*1024)return;
+      const input=e.inputBuffer.getChannelData(0),rate=e.inputBuffer.sampleRate;
+      const sampleCount=Math.floor(input.length*16000/rate);
+      if(sampleCount<50||sampleCount>4096)return;
+      const bytes=new Uint8Array(sampleCount*2);
+      for(let i=0;i<sampleCount;i++){
+        const v=Math.max(-1,Math.min(1,input[Math.min(input.length-1,Math.floor(i*rate/16000))]||0));
+        const p=v<0?Math.round(v*32768):Math.round(v*32767);
+        bytes[i*2]=p&255;bytes[i*2+1]=(p>>8)&255;
+      }
+      let binary='';for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+      wsSend({type:'audio-relay-data',pcm:btoa(binary),seq:zyroRelaySequence++});
+    };
+    await ctx.resume();
+    if(zyroRelaySender!==sender)void ctx.close().catch(()=>{});
+  }catch(error){
+    console.warn('SOS audio relay not supported:',error?.name||'unknown');
+    if(ctx)void ctx.close().catch(()=>{});
+    zyroRelaySender=null;
+  }
+}
+function stopAudioRelaySender(){
+  const r=zyroRelaySender;zyroRelaySender=null;
+  if(!r)return;
+  r.processor.onaudioprocess=null;
+  try{r.source.disconnect();r.processor.disconnect();r.silent.disconnect();}catch{}
+  void r.ctx.close().catch(()=>{});
+}
 async function enablePush(){
   if(!current?.pushEnabled)throw Error('Le notifiche Web Push non sono ancora configurate sul server.');
   if(!('serviceWorker'in navigator) || !('PushManager'in window)) {
@@ -1588,7 +1768,7 @@ function renderInvitedPeople(){
  const micCopy=document.createElement('span');
  const micTitle=document.createElement('strong');micTitle.textContent='Consenti cosa succede intorno a me';
  const micExplanation=document.createElement('small');
- micExplanation.textContent='Se attivo, quando premi SOS l’app tenta di accendere automaticamente il microfono. Solo i destinatari SOS selezionati possono richiedere l’ascolto audio in diretta. Nessuna registrazione viene salvata sul server.';
+ micExplanation.textContent='Se attivo, premendo SOS il microfono può trasmettere audio in diretta esclusivamente ai destinatari selezionati che toccano «Ascolta». Se la connessione diretta fallisce, l’audio può transitare temporaneamente sul server per arrivare al destinatario: non viene registrato né conservato, ma questo percorso non è crittografato end-to-end. Puoi disattivare questa funzione in qualsiasi momento.';
  micCopy.append(micTitle,micExplanation);
  const micInput=document.createElement('input');micInput.type='checkbox';micInput.id='sosAudioConsent';
  micInput.checked=current.me.sosAudioConsent===true;
