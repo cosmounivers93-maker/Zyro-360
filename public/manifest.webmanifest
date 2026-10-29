@@ -2,22 +2,22 @@
   "id": "/",
   "name": "ZYRO 360",
   "short_name": "ZYRO 360",
-  "description": "Sicurezza personale, mappa GPS live, cerchie private, SOS e antifurto sperimentale",
+  "description": "Sicurezza personale, cerchie private, mappa GPS e SOS per contatti autorizzati",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#f6f8fc",
-  "theme_color": "#0b1831",
+  "background_color": "#0B1D2B",
+  "theme_color": "#0B1D2B",
   "lang": "it",
   "icons": [
     {
-      "src": "/assets/icon192.png",
+      "src": "/zyro-icon-192-v36.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/assets/icon512.png",
+      "src": "/zyro-icon-512-v36.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
