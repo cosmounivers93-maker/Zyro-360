@@ -290,8 +290,16 @@ function notifyAdminUsers(){
  if(!ADMIN_ID || !db.users[ADMIN_ID])return;
  for(const ws of connections(ADMIN_ID))sendSocket(ws,{type:'admin-users-changed'});
 }
+function deviceForRequest(req){
+ const value=req.body?.device;
+ const native=value && value.source==='android-app' && value.platform==='Android';
+ const ua=String(req.headers['user-agent']||'');
+ const platform=native?'Android':/Android/i.test(ua)?'Android':/iPhone|iPad/i.test(ua)?'iOS':/Windows/i.test(ua)?'Windows':/Macintosh/i.test(ua)?'macOS':/Linux/i.test(ua)?'Linux':'Non disponibile';
+ const safe=x=>typeof x==='string'?cleanText(x,80):'';
+ return {platform,manufacturer:native?safe(value.manufacturer):'',model:native?safe(value.model):'',osVersion:native?safe(value.osVersion):'',source:native?'android-app':'browser',at:now()};
+}
 function auditLogin(req,user){
- user.lastLoginIp=visitorIp(req);user.lastLoginAt=now();
+ user.lastLoginIp=visitorIp(req);user.lastLoginAt=now();user.lastDevice=deviceForRequest(req);
 }
 
 app.get('/api/health', (_, res) => {
@@ -331,7 +339,7 @@ app.post('/api/register', limit, (req, res) => {
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({error:'Email già registrata.'});
   const id = token(12), salt = token(16);
   db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], sosAudioConsent: false, avatar: null };
-  auditLogin(req, db.users[id]);db.users[id].registrationIp=db.users[id].lastLoginIp; loginUser(res, id);notifyAdminUsers(); res.json({ ok:true });
+  auditLogin(req, db.users[id]);db.users[id].registrationIp=db.users[id].lastLoginIp;db.users[id].registrationDevice=db.users[id].lastDevice; loginUser(res, id);notifyAdminUsers(); res.json({ ok:true });
 });
 app.post('/api/login', limit, (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase(), password = String(req.body.password || '');
@@ -354,7 +362,11 @@ app.post('/api/logout', requireAuth, (req,res) => {
 });
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
-const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
+const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
+app.post('/api/settings/device',requireAuth,limit,(req,res)=>{
+ const device=deviceForRequest(req);
+ req.user.lastDevice=device;save();notifyAdminUsers();res.json({ok:true});
+});
 app.get('/api/admin/connection-ip',requireAuth,requireAdmin,(req,res)=>{res.set('Cache-Control','no-store');res.json({ip:visitorIp(req),source:process.env.RENDER==='true'?'render-cloudflare':'direct',checkedAt:now()});});
 app.get('/api/admin/users',requireAuth,requireAdmin,(req,res)=>{
  res.set('Cache-Control','no-store');
@@ -1013,6 +1025,7 @@ setInterval(()=>{
   for (const [k,a] of Object.entries(db.alerts)) if (!a.active && a.endedAt<t-7*86400*1000) {delete db.alerts[k];changed=true;}
   for(const u of Object.values(db.users))if(u.lastLoginAt && u.lastLoginAt<t-30*86400e3 && u.lastLoginIp){delete u.lastLoginIp;changed=true;}
   for(const u of Object.values(db.users))if(u.registrationIp && u.createdAt<t-30*86400e3){delete u.registrationIp;changed=true;}
+  for(const u of Object.values(db.users)){if(u.lastDevice?.at<t-30*86400e3){delete u.lastDevice;changed=true;}if(u.registrationDevice && u.createdAt<t-30*86400e3){delete u.registrationDevice;changed=true;}}
   if (changed) save();
 },3600000).unref();
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -1026,6 +1039,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
 
 
 
