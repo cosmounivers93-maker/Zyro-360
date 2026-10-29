@@ -50,7 +50,7 @@ function clearHeadingMotion(){
   compassHeading=null;gpsCourseActive=false;
 }
 function renderHeadingOnly(){
-  if(!lastCoords)return;
+  if(!lastCoords || activeView!=='home' || document.hidden)return;
   const shown=Number.isFinite(headingMotion.display)?headingMotion.display:null;
   lastCoords.heading=shown;
   const pin=stableMap?.pinNodes?.get('me');
@@ -529,7 +529,8 @@ async function sendPushTest(){
     toast(result.notice||'Test inviato.',result.accepted===0);
   }finally{button.disabled=false;}
 }
-function showView(view){if(view!=='settings')closeProfileSettings();if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='settings' && current?.me?.isAdmin && !adminLoaded)void action(adminLoad);if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
+let sectionAnimation=null;
+function showView(view){const previousView=activeView;const sectionOrder=['home','circles','modes','chats','settings'];if(!sectionOrder.includes(view))return;if(view!=='settings')closeProfileSettings();if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'instant'});sectionAnimation?.cancel();if(previousView!==view && !matchMedia('(prefers-reduced-motion: reduce)').matches){const panel=$(`${view}View`);if(panel?.animate)sectionAnimation=panel.animate([{opacity:.75,transform:`translateX(${sectionOrder.indexOf(view)>sectionOrder.indexOf(previousView)?24:-24}px)`},{opacity:1,transform:'translateX(0)'}],{duration:180,easing:'cubic-bezier(.2,.7,.2,1)'});}if(view==='settings' && current?.me?.isAdmin && !adminLoaded)void action(adminLoad);if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
 // Native Android V21 runs GPS and sensors independently of the paused WebView.
 // The owner always activates it via an explicit first-party on-screen action.
 
@@ -2056,56 +2057,41 @@ init();
 
 
 
-// V40: navigation gestures share the existing section navigation.
+// V41: swipe on page content, including cards and buttons; inputs/maps keep their gestures.
 (() => {
  const order=['home','circles','modes','chats','settings'];
- let gesture=null, suppressClickUntil=0;
- const blocked='input,textarea,select,button,a,label,[contenteditable="true"],audio,video,#liveMap,.bottom-nav,[role="dialog"],.theft-overlay,.zyro-settings-drawer';
- function available(){
-  return !$('appScreen')?.classList.contains('hidden') &&
-   !document.body.classList.contains('zyro-settings-open') &&
-   !document.querySelector('[role="dialog"][aria-hidden="false"]') &&
-   !Array.from(document.querySelectorAll('[aria-modal="true"]')).some(el=>
-    el.getAttribute('aria-hidden')!=='true' && !el.inert && !el.closest('.hidden,[hidden]') && el.getClientRects().length>0) &&
-   !document.activeElement?.matches('input,textarea,select,[contenteditable="true"]');
- }
- document.addEventListener('touchstart',event=>{
-  gesture=null;
-  if(event.touches.length!==1 || !available())return;
-  const target=event.target;
-  if(!(target instanceof Element))return;
-  const onNav=!!target.closest('.bottom-nav');
-  if(!onNav && (target.closest(blocked) || !target.closest('.view')))return;
-  const touch=event.touches[0];
-  // Leave Android's edge gestures and nested horizontal scrolling alone.
-  if(touch.clientX<24 || touch.clientX>innerWidth-24)return;
-  for(let el=target;!onNav && el && !el.classList.contains('view');el=el.parentElement){
-   if(el.scrollWidth>el.clientWidth+4 && /auto|scroll/.test(getComputedStyle(el).overflowX))return;
+ let g=null, suppressUntil=0;
+ function available(){return !$('appScreen').classList.contains('hidden') &&
+  !document.body.classList.contains('zyro-settings-open') &&
+  !Array.from(document.querySelectorAll('[aria-modal="true"]')).some(el=>
+   el.getAttribute('aria-hidden')!=='true' && !el.inert && !el.closest('.hidden,[hidden]') && el.getClientRects().length>0);}
+ document.addEventListener('touchstart',e=>{
+  g=null;if(e.touches.length!==1 || !available())return;
+  const el=e.target instanceof Element?e.target:e.target.parentElement;
+  if(!el?.closest('.view,.bottom-nav') || el.closest('input,textarea,select,[contenteditable="true"],audio,video,#liveMap,[role="slider"]'))return;
+  const t=e.touches[0];if(t.clientX<24 || t.clientX>innerWidth-24)return;
+  for(let n=el;n && !n.matches('.view,.bottom-nav');n=n.parentElement){
+   if(n.scrollWidth>n.clientWidth+4 && /auto|scroll/.test(getComputedStyle(n).overflowX))return;
   }
-  gesture={id:touch.identifier,x:touch.clientX,y:touch.clientY,time:performance.now(),view:activeView};
+  g={id:t.identifier,x:t.clientX,y:t.clientY,time:performance.now(),view:activeView,axis:null};
  },{passive:true,capture:true});
- document.addEventListener('touchmove',event=>{
-  if(!gesture)return;
-  const t=Array.from(event.touches).find(t=>t.identifier===gesture.id);
-  if(event.touches.length!==1 || !t || Math.abs(t.clientY-gesture.y)>26)gesture=null;
- },{passive:true,capture:true});
- document.addEventListener('touchcancel',()=>{gesture=null;},{passive:true,capture:true});
- document.addEventListener('touchend',event=>{
-  const g=gesture;gesture=null;
-  if(!g || event.touches.length || !available() || activeView!==g.view)return;
-  const t=Array.from(event.changedTouches).find(t=>t.identifier===g.id);if(!t)return;
+ document.addEventListener('touchmove',e=>{
+  if(!g)return;const t=Array.from(e.touches).find(t=>t.identifier===g.id);
+  if(e.touches.length!==1 || !t){g=null;return;}
   const dx=t.clientX-g.x,dy=t.clientY-g.y;
-  if(performance.now()-g.time>900 || Math.abs(dx)<72 || Math.abs(dy)>26 || Math.abs(dx)<Math.abs(dy)*2)return;
-  const next=order[order.indexOf(activeView)+(dx<0?1:-1)];if(!next)return;
-  suppressClickUntil=performance.now()+350;
-  showView(next);
-  window.scrollTo({top:0,behavior:'instant'});
-  const panel=$(`${next}View`);
-  if(panel?.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches){
-   panel.animate([{opacity:0.75,transform:`translateX(${dx<0?20:-20}px)`},{opacity:1,transform:'translateX(0)'}],{duration:200,easing:'ease-out'});
+  if(!g.axis && Math.max(Math.abs(dx),Math.abs(dy))>12){
+   if(Math.abs(dx)>Math.abs(dy)*1.35)g.axis='x';else{g=null;return;}
   }
+  if(g.axis==='x' && e.cancelable)e.preventDefault();
+ },{passive:false,capture:true});
+ document.addEventListener('touchcancel',()=>{g=null;},{passive:true,capture:true});
+ document.addEventListener('touchend',e=>{
+  const s=g;g=null;if(!s || e.touches.length || !available() || activeView!==s.view)return;
+  const t=Array.from(e.changedTouches).find(t=>t.identifier===s.id);if(!t)return;
+  const dx=t.clientX-s.x,dy=t.clientY-s.y;
+  if(performance.now()-s.time>1200 || Math.abs(dx)<56 || Math.abs(dx)<Math.abs(dy)*1.35)return;
+  const next=order[order.indexOf(activeView)+(dx<0?1:-1)];if(!next)return;
+  suppressUntil=performance.now()+400;showView(next);
  },{passive:true,capture:true});
- document.addEventListener('click',event=>{
-  if(performance.now()<suppressClickUntil){event.preventDefault();event.stopImmediatePropagation();}
- },true);
+ document.addEventListener('click',e=>{if(performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation();}},true);
 })();
