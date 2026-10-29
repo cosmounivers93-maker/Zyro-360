@@ -25,6 +25,7 @@ window.addEventListener('zyro:android-ready',()=>{void syncDeviceInfo();});
 const $ = id => document.getElementById(id);
 let current = null;
 let adminUsersCache = [];
+let adminArchivedView=false;
 let adminLoaded = false;
 let socket = null;
 let wsRetry = null;
@@ -225,7 +226,7 @@ function renderAdminAccess(){
  if(adminMenu){adminMenu.classList.remove('hidden');adminMenu.dataset.settingsTarget=admin?'admin':'reports';adminMenu.querySelector('span:nth-child(2)').innerHTML=admin?'Centro amministratore<small>Segnalazioni e utenti registrati</small>':'Segnala un utente<small>Invia una segnalazione privata</small>';}
 
  $('premiumPanel')?.classList.toggle('zyro-premium-owner',admin);
- if(!admin){adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
+ if(!admin){adminArchivedView=false;if($('adminArchiveToggle')){$('adminArchiveToggle').textContent='Mostra archiviate';$('adminArchiveToggle').setAttribute('aria-pressed','false');}adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
 }
 function renderReportContacts(){
  const select=$('reportUser');if(!select)return;
@@ -247,13 +248,15 @@ async function submitReport(){
 function fmtAdminDate(n){return n?new Date(n).toLocaleString('it-IT'):'Non disponibile';}
 function renderAdminUsers(){
  const term=$('adminFilter').value.trim().toLowerCase();
- const users=adminUsersCache.filter(u=>[u.name,u.email,u.id,u.lastLoginIp,u.registrationIp,u.lastDevice?.manufacturer,u.lastDevice?.model].some(v=>String(v||'').toLowerCase().includes(term)));
+ const users=adminUsersCache.filter(u=>Boolean(u.adminArchivedAt)===adminArchivedView).filter(u=>[u.name,u.email,u.id,u.lastLoginIp,u.registrationIp,u.lastDevice?.manufacturer,u.lastDevice?.model].some(v=>String(v||'').toLowerCase().includes(term)));
  $('adminUsers').innerHTML=users.length?users.map(u=>`<article class="zyro-admin-user">
  <div class="zyro-admin-user-title"><b>${escapeHtml(u.name)}</b><span class="zyro-admin-chip ${u.bannedAt?'is-banned':u.premiumGiftLifetime?'is-gift':''}">${u.bannedAt?'Sospeso':u.premiumGiftLifetime?'Premium a vita':u.premiumActive?'Premium attivo':'Standard'}</span></div>
  <p>${escapeHtml(u.email)}</p><div class="zyro-admin-meta"><small>ID</small><code>${escapeHtml(u.id)}</code><small>IP alla registrazione</small><code>${escapeHtml(u.registrationIp||'Non disponibile')}</code><small>Registrato il</small><span>${escapeHtml(fmtAdminDate(u.createdAt))}</span><small>Ultimo IP rilevato</small><code>${escapeHtml(u.lastLoginIp||'Non disponibile')}</code><small>Dispositivo alla registrazione</small><span>${escapeHtml(adminDeviceLabel(u.registrationDevice))}</span><small>Ultimo dispositivo</small><span>${escapeHtml(adminDeviceLabel(u.lastDevice))}</span><small>Rilevato il</small><span>${escapeHtml(fmtAdminDate(u.lastDevice?.at))}</span><small>Origine dati</small><span>${u.lastDevice?.source==='android-app'?'App Android · dati del sistema dichiarati dall’app':'Browser · informazioni limitate'}</span><small>Ultimo accesso</small><span>${escapeHtml(fmtAdminDate(u.lastLoginAt))}</span></div>
  ${u.sameIpBannedAccounts?.length?`<p class="zyro-admin-ip-match">IP condiviso con ${u.sameIpBannedAccounts.length} account sospesi. Verifica gli account: una rete condivisa non dimostra la stessa identità.</p><small>ID: ${u.sameIpBannedAccounts.map(escapeHtml).join(', ')}</small>`:''}
  ${u.id===current.me.id?'<small>Account proprietario — non sospendibile.</small>':`<div class="zyro-admin-actions"><button type="button" data-admin-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button><button type="button" data-admin-gift="${escapeHtml(u.id)}">${u.premiumGiftLifetime?'Revoca regalo Premium':'Regala Premium a vita'}</button></div>`}
+ <button type="button" class="zyro-admin-archive" data-archive-user="${escapeHtml(u.id)}">${adminArchivedView?'Riapri scheda':'Chiudi esaminazione'}</button>
  </article>`).join(''):'<p class="setting-description">Nessun account corrispondente alla ricerca.</p>';
+ $('adminUsers').querySelectorAll('[data-archive-user]').forEach(b=>b.addEventListener('click',()=>action(()=>adminArchive('user',b.dataset.archiveUser))));
  $('adminUsers').querySelectorAll('[data-admin-ban]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeBan(b.dataset.adminBan))));
  $('adminUsers').querySelectorAll('[data-admin-gift]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeGift(b.dataset.adminGift))));
 }
@@ -272,8 +275,9 @@ async function adminLoad(){
  const data=await api('/api/admin/users');
  if(!current?.me?.isAdmin || current.me.id!==expectedAdminId)return;
  adminUsersCache=data.users||[];adminLoaded=true;renderAdminUsers();
- const reports=data.reports||[];
- $('adminReportCount').textContent=String(reports.filter(r=>r.status==='open').length);
+ const allReports=data.reports||[];
+ const reports=allReports.filter(r=>Boolean(r.adminArchivedAt)===adminArchivedView);
+ $('adminReportCount').textContent=String(allReports.filter(r=>!r.adminArchivedAt&&r.status==='open').length);
  $('adminUserCount').textContent=String(adminUsersCache.length);
  $('adminReports').innerHTML=reports.length?reports.map(r=>{
   const u=r.user,reporter=r.reporter;
@@ -281,8 +285,9 @@ async function adminLoad(){
   <dl class="zyro-admin-report-data"><dt>Email</dt><dd>${escapeHtml(u?.email||'Non disponibile')}</dd><dt>ID utente</dt><dd>${escapeHtml(r.userId)}</dd><dt>IP registrazione</dt><dd>${escapeHtml(u?.registrationIp||'Non disponibile')}</dd><dt>Ultimo IP rilevato</dt><dd>${escapeHtml(u?.lastLoginIp||'Non disponibile')}</dd><dt>Ultimo accesso</dt><dd>${escapeHtml(fmtAdminDate(u?.lastLoginAt))}</dd><dt>Dispositivo utente</dt><dd>${escapeHtml(adminDeviceLabel(u?.lastDevice))}</dd><dt>Ricevuta il</dt><dd>${escapeHtml(fmtAdminDate(r.at))}</dd></dl>
   <p class="zyro-admin-report-label">Messaggio della segnalazione</p><blockquote class="zyro-admin-message">${escapeHtml(r.reason)}</blockquote>
   <small>Inviata da ${escapeHtml(reporter?.name||r.reporterId)} · ID ${escapeHtml(r.reporterId)}</small>
-  <div class="zyro-admin-actions">${r.status==='open'?`<button type="button" data-admin-review="${escapeHtml(r.id)}">Segna come esaminata</button>`:''}${u && u.id!==current.me.id?`<button type="button" data-report-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button>`:''}</div></article>`;
+  <div class="zyro-admin-actions">${r.status==='open'?`<button type="button" data-admin-review="${escapeHtml(r.id)}">Segna come esaminata</button>`:''}${u && u.id!==current.me.id?`<button type="button" data-report-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button>`:''}</div><button type="button" class="zyro-admin-archive" data-archive-report="${escapeHtml(r.id)}">${adminArchivedView?'Riapri segnalazione':'Chiudi esaminazione'}</button></article>`;
  }).join(''):'<div class="zyro-admin-empty">Nessuna segnalazione ricevuta.</div>';
+ $('adminReports').querySelectorAll('[data-archive-report]').forEach(b=>b.addEventListener('click',()=>action(()=>adminArchive('report',b.dataset.archiveReport))));
  $('adminReports').querySelectorAll('[data-admin-review]').forEach(b=>b.addEventListener('click',()=>action(()=>adminReview(b.dataset.adminReview))));
  $('adminReports').querySelectorAll('[data-report-ban]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeBan(b.dataset.reportBan))));
  $('adminAudit').innerHTML=(data.audit||[]).map(a=>`<p><b>${escapeHtml(a.kind)}</b> · ${escapeHtml(a.for||'')} · ${escapeHtml(fmtAdminDate(a.at))}</p>`).join('')||'<p>Nessuna azione registrata.</p>';
@@ -354,6 +359,11 @@ async function adminChangeGift(id){
  if(!password)return;
  await post('/api/admin/premium-gift',{userId:id,enabled,password});
  await adminLoad();toast(enabled?'Premium a vita concesso.':'Regalo Premium revocato.');
+}
+async function adminArchive(kind,id){
+ if(!current?.me?.isAdmin)return;
+ await post('/api/admin/archive',{kind,id,archived:!adminArchivedView});
+ await adminLoad();toast(adminArchivedView?'Scheda riaperta nell’elenco principale.':'Esaminazione chiusa. Scheda spostata nelle archiviate.');
 }
 async function adminReview(reportId){
  const password=await zyroOwnerDialog({title:'Conferma amministratore',description:'Autorizza la revisione della segnalazione con la tua password.',kind:'password',submitLabel:'Segna come esaminata'});
@@ -2095,6 +2105,7 @@ async function init(){
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
   $('reportSubmit').addEventListener('click',()=>action(submitReport));
   $('adminLoad').addEventListener('click',()=>action(adminLoad));
+  $('adminArchiveToggle').addEventListener('click',()=>{adminArchivedView=!adminArchivedView;$('adminArchiveToggle').setAttribute('aria-pressed',String(adminArchivedView));$('adminArchiveToggle').textContent=adminArchivedView?'Torna all’elenco principale':'Mostra archiviate';void action(adminLoad);});
   document.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>showAdminTab(b.dataset.adminTab)));
   $('adminFilter').addEventListener('input',renderAdminUsers);
   $('copyMyId').addEventListener('click',async()=>{if(!current)return;try{await copyAccountId(current.me.id);toast('ID account copiato.');}catch{toast('Copia non disponibile. Seleziona il codice e copialo manualmente.',true);}});
@@ -2161,6 +2172,7 @@ init();
 
 // Resume visual map updates when the app returns to the foreground.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeView==='home'){stableMap?.resize();renderHeadingOnly();}});
+
 
 
 

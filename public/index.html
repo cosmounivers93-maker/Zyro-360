@@ -123,6 +123,17 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 #zyroAdminPanel .zyro-admin-empty{padding:30px 12px;text-align:center;font-size:13px}
 #zyroAdminPanel [hidden]{display:none!important}
 </style>
+<style>
+#appScreen>.topbar{display:flex!important;justify-content:center!important;align-items:center!important;position:relative;min-height:70px;padding:18px 24px!important}
+#appScreen>.topbar .connection-pill{display:none!important}
+#appScreen>.topbar .brand{display:flex!important;align-items:center;justify-content:center;gap:12px!important;opacity:1!important;color:#ecfffc!important;letter-spacing:3px!important;font-size:19px!important;font-weight:750!important}
+#appScreen>.topbar .brand>span{color:#ecfffc!important;text-shadow:none!important;line-height:1.3}
+#appScreen>.topbar .brand b{color:#68e6d2!important;font-weight:750!important}
+#appScreen>.topbar .brand-emblem{width:34px!important;height:34px!important;display:grid;place-items:center;font-size:24px!important;border-radius:12px!important;background:#60dac51a!important;color:#6ae5d1!important;border:1px solid #78dacc6b!important}
+#zyroAdminPanel .zyro-admin-archive{display:block;width:100%;padding:13px 12px;border:1px solid #6cb3af70;border-radius:13px;background:#4eaea914;color:inherit;font:inherit;font-size:12px;font-weight:700;margin-top:16px;cursor:pointer}
+#zyroAdminPanel .zyro-admin-toolbar{display:flex;flex-wrap:wrap;gap:10px}
+#zyroAdminPanel .zyro-admin-toolbar>button{flex:1;min-width:120px;white-space:normal}
+</style>
 </head>
 <body>
 <div id="authScreen" class="auth-shell">
@@ -147,7 +158,7 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 <div id="appScreen" class="app-shell hidden">
   <header class="topbar">
     <div class="brand"><div class="brand-emblem">✦</div><span>ZYRO <b>360</b></span></div>
-    <div class="connection-pill"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">Connessione...</span></div>
+    <div class="connection-pill" hidden aria-hidden="true"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">Connessione...</span></div>
   </header>
   <main class="container">
     <section id="homeView" class="view home-map-view">
@@ -364,7 +375,7 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
       <section id="zyroAdminPanel" class="zyro-admin-panel hidden" aria-label="Gestione riservata amministratore">
         <div class="zyro-admin-head"><span class="zyro-admin-lock">🔐</span><div><span class="mini-overline">ACCESSO ESCLUSIVO</span><h2>Gestione riservata</h2><p>Nuove iscrizioni, accessi e gestione account. Visibile soltanto al proprietario.</p></div></div>
         <div class="zyro-admin-tabs" aria-label="Aree amministrazione"><button type="button" data-admin-tab="reports" aria-pressed="true" aria-controls="adminReportsSection">Segnalazioni <b id="adminReportCount">0</b></button><button type="button" data-admin-tab="users" aria-pressed="false" aria-controls="adminUsersSection">Utenti registrati <b id="adminUserCount">0</b></button></div>
-        <div class="zyro-admin-toolbar"><button id="adminLoad" class="btn btn-dark" type="button">Aggiorna elenco</button></div>
+        <div class="zyro-admin-toolbar"><button id="adminLoad" class="btn btn-dark" type="button">Aggiorna elenco</button><button id="adminArchiveToggle" class="btn btn-outline" type="button" aria-pressed="false">Mostra archiviate</button></div>
         <p id="adminStatus" class="setting-description" role="status">Caricamento gestione riservata…</p>
         <section id="adminReportsSection" aria-label="Segnalazioni ricevute"><div id="adminReports" class="zyro-admin-reports"></div></section>
         <section id="adminUsersSection" aria-label="Utenti registrati" hidden><input id="adminFilter" type="search" aria-label="Cerca un account" placeholder="Cerca nome, email, ID, IP o modello"><div id="adminUsers" class="zyro-admin-users"></div></section>
@@ -447,9 +458,10 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=48.0" defer></script>
+<script src="/app.js?v=49.0" defer></script>
 </body>
 </html>
+
 
 
 
