@@ -489,6 +489,70 @@ function nativeBackgroundSync(options={}){
  if(result==='zyro-needs-login')throw Error('Accedi all’account prima di attivare la protezione.');
  throw Error('Monitoraggio Android non avviato. Controlla i permessi e riprova.');
 }
+// V23: diagnose the ACTUAL Android service. A green UI toggle alone
+// does not prove GPS was uploaded or sensors received while screen off.
+function zyroNativeAge(ms){
+ if(!Number.isFinite(ms) || ms<=0)return 'mai verificato';
+ const seconds=Math.max(0,Math.round((Date.now()-ms)/1000));
+ if(seconds<60)return seconds+' s fa';
+ if(seconds<3600)return Math.round(seconds/60)+' min fa';
+ return Math.round(seconds/3600)+' h fa';
+}
+function nativeDiagnosticText(state){
+ if(!window.ZyroAndroidSafetySupported)
+   return '⚠ Questo ambiente non conferma un servizio Android in background. Apri Zyro 360 come APK nativo aggiornato, non dal browser.';
+ if(window.ZyroAndroidSafetyBuild!==23 || state?.build!=='v23-android')
+   return '⚠ APK precedente: il monitoraggio Android non è verificabile da questa schermata. Installa V23 senza disinstallare l’app esistente.';
+ if(!state?.running)
+   return '○ Servizio Android non attivo. Attiva GPS LIVE o Pick Pocket per avviare il monitoraggio. Nessuna protezione in background è confermata.';
+ const parts=['● Servizio Android attivo · notifica persistente richiesta'];
+ if(state.sharing){
+   parts.push('GPS: ultimo rilevamento '+zyroNativeAge(state.lastLocationAt));
+   const elapsed=Date.now()-Number(state.lastServerAcceptedAt||0);
+   parts.push((elapsed<120000?'✓':'⚠')+' Invio GPS accettato dal server: '+zyroNativeAge(state.lastServerAcceptedAt));
+ }else parts.push('GPS LIVE: non condiviso');
+ if(state.pick){
+   const lastSensor=Date.now()-Number(state.lastSensorAt||0);
+   parts.push((state.sensorReady&&state.sensorSamplingActive&&lastSensor<90000?'✓':'⚠')+
+     ' Sensori Android: '+(state.sensorReady?'registrati':'non disponibili')+
+     ' · campione '+zyroNativeAge(state.lastSensorAt));
+ }else parts.push('Sensori antifurto: non armati');
+ if(state.batteryUnrestricted===false)
+   parts.push('⚠ Risparmio batteria: Android potrebbe interrompere il monitoraggio.');
+ if(state.problem)parts.push('⚠ '+String(state.problem).slice(0,130));
+ parts.push('Il servizio può interrompersi se Android arresta l’app o viene spento il telefono.');
+ return parts.join('\n');
+}
+function renderNativeDiagnostic(){
+ const panel=$('zyroNativeMonitor');if(!panel)return;
+ panel.hidden=!current;
+ if(!current)return;
+ const status=window.ZyroNativeSafety;
+ $('zyroNativeMonitorText').textContent=nativeDiagnosticText(status);
+ const isV23=window.ZyroAndroidSafetyBuild===23;
+ $('zyroNativeCheck').disabled=!isV23;
+ $('zyroNativeBattery').disabled=!isV23;
+}
+function readNativeSafetyStatus(){
+ if(window.ZyroAndroidSafetyBuild!==23){
+   renderNativeDiagnostic();
+   throw Error('Questa APK non contiene ancora la diagnostica Android V23. Non confondere una spunta verde con il background attivo.');
+ }
+ const answer=window.prompt('ZYRO360_BG_STATUS','');
+ let value;
+ try{value=JSON.parse(answer||'null');}catch{throw Error('Il servizio Android non ha restituito uno stato valido.');}
+ if(value?.build!=='v23-android')throw Error('Servizio Android non aggiornato.');
+ window.ZyroNativeSafety=value;
+ renderNativeDiagnostic();renderPickControls();
+ return value;
+}
+function openNativeBatterySettings(){
+ if(window.ZyroAndroidSafetyBuild!==23)
+   throw Error('Installa la versione Android V23 prima di aprire le impostazioni.');
+ const value=window.prompt('ZYRO360_BG_SETTINGS','');
+ if(value!=='zyro-native')throw Error('Impossibile aprire le impostazioni Android.');
+ toast('Nella scheda Zyro 360 cerca Batteria e, se disponibile, scegli Nessuna restrizione.');
+}
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();geolocationError='';renderMap();return;}
   if(watchId!==null)return;
@@ -921,10 +985,11 @@ function renderPickControls(){
     ?'🚨 Movimento sospetto rilevato. Inserisci la password nella schermata di allarme.'
     :pickArmed && window.ZyroAndroidSafetySupported
       ?nativeStatus?.running && nativeStatus?.pick
-        ?'🟢 Monitoraggio Android attivo: può continuare con schermo bloccato. La notifica permanente deve restare presente. Possibili falsi allarmi.'
-        :'🟡 Avvio servizio Android richiesto: controlla la notifica di monitoraggio. Se manca, disattiva e riprova.'
-      :pickArmed?'🟢 Pick Pocket attiva solo con app aperta; serve l’APK Android V21 per il background.'
+        ?'🟢 Servizio Android avviato. Premi «Verifica servizio Android» dopo aver bloccato e riaperto lo schermo per controllare i sensori.'
+        :'⚠ Servizio Android non confermato. Premi «Verifica servizio Android»: il semplice tasto Attiva non prova il funzionamento.'
+      :pickArmed?'⚠ Pick Pocket attiva solo con app aperta: serve un APK Android V23 aggiornato per verificare il background.'
       :'Protezione disattivata. Attiva solo quando serve: il monitoraggio usa batteria e sensori.';
+  renderNativeDiagnostic();
 }
 async function motionPermission(){
   if(!('DeviceMotionEvent' in window))throw Error('Questo telefono/browser non espone i sensori di movimento.');
@@ -1454,6 +1519,7 @@ async function init(){
     if(status.pick && !theftTriggered)pickArmed=true;
     else if(!status.pick && window.ZyroAndroidSafetySupported)pickArmed=false;
     renderPickControls();
+    renderNativeDiagnostic();
   });
   window.addEventListener('zyro:android-location-permission',event=>{
     if(event?.detail?.granted===false)zyroLocationFix=null;
@@ -1488,6 +1554,15 @@ async function init(){
   $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;ownCentered=false;void orientationPermission();updateGeo(null,true);if(lastCoords){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
   $('pickNotify').addEventListener('change',renderPickControls);
   $('pickRecipientsList').addEventListener('change',e=>{if(!e.target.matches('[data-pickcontact]'))return;const id=e.target.dataset.pickcontact;if(e.target.checked)pickSelected.add(id);else pickSelected.delete(id);});
+  $('zyroNativeCheck')?.addEventListener('click',()=>action(async()=>{
+    readNativeSafetyStatus();
+    toast('Stato del servizio Android aggiornato.');
+  }));
+  $('zyroNativeBattery')?.addEventListener('click',()=>action(async()=>openNativeBatterySettings()));
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible' && window.ZyroAndroidSafetyBuild===23)
+      try{readNativeSafetyStatus();}catch(e){console.warn('Android monitor:',e.message);}
+  });
   $('pickArm').addEventListener('click',()=>action(armPick));
   $('pickTest').addEventListener('click',()=>action(previewSiren));
   $('theftStop').addEventListener('click',()=>action(stopTheft));

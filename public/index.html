@@ -20,6 +20,7 @@
   <link rel="stylesheet" href="/zyro-permissions-v3.css?v=18.0">
   <link rel="stylesheet" href="/zyro-settings-final-v19.css?v=19.1">
   <link rel="stylesheet" href="/zyro-emergency-v22.css?v=22.0">
+  <link rel="stylesheet" href="/zyro-native-monitor-v23.css?v=23.0">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -117,6 +118,16 @@
         <div class="pick-section pick-control-section" aria-label="Attivazione antifurto">
           <div class="pick-section-heading"><span class="pick-section-icon" aria-hidden="true">✓</span><div><strong>Stato della protezione</strong><small>Attivazione e test della sirena</small></div></div>
           <div class="pick-status" id="pickStatus" role="status" aria-live="polite">Protezione disattivata. Per attivarla lascia ZYRO 360 aperta e autorizza i sensori.</div>
+          <section id="zyroNativeMonitor" class="zyro-native-monitor" aria-label="Diagnostica del servizio Android" hidden>
+            <div class="zyro-native-monitor-head">
+              <span class="zyro-native-monitor-icon" aria-hidden="true">◉</span>
+              <div><strong>Monitoraggio Android</strong><small>Stato reale del GPS e dei sensori in background</small></div>
+            </div>
+            <p id="zyroNativeMonitorText" role="status" aria-live="polite">Controlla se Android ha avviato il servizio.</p>
+            <button type="button" id="zyroNativeCheck" class="zyro-native-check">Verifica servizio Android</button>
+            <button type="button" id="zyroNativeBattery" class="zyro-native-battery">Impostazioni batteria del telefono</button>
+            <p class="zyro-native-monitor-note">Con lo schermo spento il servizio può essere limitato da Android. Lo stato verrà aggiornato quando riapri Zyro 360.</p>
+          </section>
           <button id="pickArm" type="button" class="btn btn-dark btn-wide">Attiva Pick Pocket</button>
           <button id="pickTest" type="button" class="pick-test">Ascolta la sirena (test locale, nessun avviso)</button>
         </div>
@@ -315,6 +326,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=21.0" defer></script>
+<script src="/app.js?v=23.0" defer></script>
 </body>
 </html>

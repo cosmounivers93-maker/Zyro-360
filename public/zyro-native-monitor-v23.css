@@ -1,0 +1,47 @@
+/* V23 Android native monitor diagnostics. Scoped to Modalità > Pick Pocket;
+   emergency V22 skin, GPS map and other screens are unchanged. */
+#modesView .zyro-native-monitor[hidden]{display:none!important}
+#modesView .zyro-native-monitor{
+  display:grid;gap:11px;min-width:0;
+  margin:13px 0 15px;padding:16px 15px;
+  border:1px solid rgba(101,218,208,.27);
+  border-radius:17px;
+  background:linear-gradient(138deg,rgba(47,128,139,.12),rgba(44,91,117,.08));
+}
+#modesView .zyro-native-monitor-head{display:flex;align-items:center;gap:12px}
+#modesView .zyro-native-monitor-icon{
+  width:39px;height:39px;display:grid;place-items:center;
+  border-radius:13px;flex-shrink:0;
+  background:rgba(62,212,191,.2);border:1px solid rgba(85,214,198,.25);
+  color:#14a692;font-size:22px;font-weight:900;
+}
+#modesView .zyro-native-monitor-head strong{display:block;font-size:14px;line-height:1.3;color:var(--z-panel-fg,#173448)}
+#modesView .zyro-native-monitor-head small{display:block;margin-top:4px;font-size:11px;line-height:1.5;color:var(--z-panel-muted,#527484)}
+#modesView #zyroNativeMonitorText{
+  white-space:pre-line;overflow-wrap:anywhere;
+  color:var(--z-panel-fg,#173448);
+  border:1px solid var(--z-subpanel-edge,#d7e7ea);
+  background:var(--z-subpanel-bg,#eef6f7);
+  padding:13px;border-radius:13px;margin:0;
+  font-size:12px;line-height:1.65;
+}
+#modesView .zyro-native-check,
+#modesView .zyro-native-battery{
+  width:100%;border-radius:12px;min-height:44px;
+  font-size:12px;font-weight:800;cursor:pointer;
+}
+#modesView .zyro-native-check{color:#063d3c;background:linear-gradient(110deg,#7df5da,#51decd);border:0}
+#modesView .zyro-native-battery{background:transparent;border:1px solid rgba(52,164,164,.55);color:var(--z-panel-fg,#173448)}
+#modesView .zyro-native-monitor-note{margin:0;color:var(--z-panel-muted,#5a7483);font-size:11px;line-height:1.5}
+#modesView .zyro-native-monitor button:focus-visible{outline:2px solid #1ac6b2;outline-offset:3px}
+html[data-theme="dark"] #modesView .zyro-native-monitor{
+  border-color:rgba(109,222,205,.3);
+  background:linear-gradient(145deg,rgba(33,92,108,.32),rgba(21,53,74,.25));
+}
+html[data-theme="dark"] #modesView .zyro-native-monitor-icon{
+  color:#96ffe9;background:rgba(44,191,166,.18)
+}
+@media(max-width:390px){
+ #modesView .zyro-native-monitor{padding:13px}
+ #modesView #zyroNativeMonitorText{padding:11px;font-size:11px}
+}
