@@ -88,7 +88,15 @@ const token = (n = 24) => crypto.randomBytes(n).toString('base64url');
 const now = () => Date.now();
 // Only a verified, server-side purchase may set premiumUntil. Never trust premium=true from a browser.
 // Actual Play Billing purchase verification is NOT configured in this web prototype.
-const premiumActive = user => isAdmin(user) || user?.premiumGiftLifetime === true || Number(user?.premiumUntil || 0) > now();
+// Entitlements are server-owned. Subscription verification will set plan + expiry.
+const premiumPlan = user => {
+ if(isAdmin(user)||user?.premiumGiftLifetime===true)return 'family';
+ if(Number(user?.premiumUntil||0)<=now())return 'free';
+ return user?.premiumPlan==='family'?'family':'personal';
+};
+const premiumActive = user => premiumPlan(user)!=='free';
+const familyActive = user => premiumPlan(user)==='family';
+const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
@@ -167,7 +175,7 @@ function stateFor(id) {
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
     startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), sosAudioConsent:me.sosAudioConsent===true, gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil: Number(me.premiumUntil||0)>now()?me.premiumUntil:null, isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:false, persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -611,8 +619,9 @@ function overdueCheck(){
  for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){c.status='late';c.lateAt=t;changed=true;void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);for(const x of c.recipients)pushState(x);}
  if(changed)save();
 }
-app.get('/api/premium/status',requireAuth,(req,res)=>res.json({active:premiumActive(req.user),billingReady:false,priceHint:'3,99 €/mese (indicativo)',message:'Gli acquisti Google Play non sono ancora collegati. Non effettuare pagamenti.'}));
+app.get('/api/premium/status',requireAuth,(req,res)=>res.json({active:premiumActive(req.user),plan:premiumPlan(req.user),features:planFeatures(req.user),billingReady:false,plans:[{id:'zyro_premium_monthly',monthlyEUR:3.99},{id:'zyro_family_monthly',monthlyEUR:6.99}],message:'Gli acquisti Google Play non sono ancora collegati. Non effettuare pagamenti.'}));
 app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
+ if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients);
  const destination=cleanText(req.body.destination,70);const mins=Number(req.body.minutes);
  if(!recipients||!destination||!Number.isInteger(mins)||mins<5||mins>720)return res.status(400).json({error:'Indica meta, minuti (5-720) e destinatari della cerchia.'});
@@ -631,6 +640,7 @@ app.post('/api/journey/end',requireAuth,(req,res)=>{
  save();refreshRelated(req.user.id);void sendEventPush(j.recipients,arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`);res.json({ok:true});
 });
 app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
+ if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients),minutes=Number(req.body.minutes);
  if(!recipients||!Number.isInteger(minutes)||minutes<5||minutes>1440)return res.status(400).json({error:'Scegli i contatti e un controllo tra 5 e 1440 minuti.'});
  if(['pending','late'].includes(db.checkins[req.user.id]?.status))return res.status(409).json({error:'Hai già un check-in attivo.'});
@@ -700,6 +710,7 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
 app.post('/api/settings/sos-audio',requireAuth,limit,(req,res)=>{
   const enabled=req.body?.enabled;
   if(typeof enabled!=='boolean')return res.status(400).json({error:'Impostazione audio non valida.'});
+  if(enabled&&!familyActive(req.user))return res.status(402).json({error:'L’audio SOS è incluso soltanto in ZYRO Family.'});
   req.user.sosAudioConsent=enabled;
   if(!enabled){
     // Immediately prevent new listening requests and signalling when revoked.
@@ -811,6 +822,7 @@ app.post('/api/sos/stop', requireAuth, (req,res) => {
 // Experimental Pick Pocket: browser sensors and alarm cannot lock Android or resist shutdown.
 // The contact list is explicitly approved by the owner at activation time.
 app.post('/api/pickpocket/start', requireAuth, limit, (req,res) => {
+ if(!premiumActive(req.user))return res.status(402).json({error:'Pick Pocket richiede ZYRO Premium o Family.'});
   const existing = currentAlert(req.user.id);
   if (existing) return res.status(409).json({error:'Un altro allarme è già attivo.'});
   const ids = req.body.recipients;
@@ -851,7 +863,7 @@ function relay(id, msg, preferMicrophone=false) { const con=[...connections(id)]
 const sosAudioRelaySubscribers=new Map();
 function authorizedAudioRelay(viewer,owner,alert){
   return !!alert?.active && alert.kind==='sos' && alert.userId===owner &&
-    owner!==viewer && db.users[owner]?.sosAudioConsent===true &&
+    owner!==viewer && familyActive(db.users[owner]) && db.users[owner]?.sosAudioConsent===true &&
     canSeeAlert(viewer,alert);
 }
 function audioRelayOwnerUpdate(owner){
@@ -877,8 +889,8 @@ wss.on('connection', ws => {
     if(db.users[self]?.bannedAt){ws.close(1008,'Account sospeso');return;}
     if (m.type==='audio-ready') {
       const a=currentAlert(self); if (!a) return;
-      ws.microphoneReady = m.ready === true && db.users[self]?.sosAudioConsent===true;
-      a.hasAudio = a.kind !== 'pickpocket' && db.users[self]?.sosAudioConsent===true
+      ws.microphoneReady = familyActive(db.users[self]) && m.ready === true && db.users[self]?.sosAudioConsent===true;
+      a.hasAudio = familyActive(db.users[self]) && a.kind !== 'pickpocket' && db.users[self]?.sosAudioConsent===true
         && [...connections(self)].some(x => x.microphoneReady);
       if(!a.hasAudio){sosAudioRelaySubscribers.delete(self);relay(self,{type:'audio-relay-stop'},true);}
       save(); refreshRelated(self);
@@ -905,7 +917,7 @@ wss.on('connection', ws => {
     }
     if(m.type==='audio-relay-data'){
       const a=currentAlert(self),listeners=sosAudioRelaySubscribers.get(self);
-      if(!a||a.kind!=='sos'||db.users[self]?.sosAudioConsent!==true||
+      if(!familyActive(db.users[self])||!a||a.kind!=='sos'||db.users[self]?.sosAudioConsent!==true||
          ws.microphoneReady!==true||!a.hasAudio||!listeners?.size)return;
       const pcm=m.pcm;
       if(typeof pcm!=='string'||pcm.length<128||pcm.length>11000||
@@ -924,12 +936,12 @@ wss.on('connection', ws => {
     }
     if (m.type==='listen-request') {
       const owner=String(m.to||''); const a=currentAlert(owner);
-      if (!a || a.kind==='pickpocket' || !a.hasAudio || db.users[owner]?.sosAudioConsent!==true || !canSeeAlert(self,a) || owner===self) return;
+      if (!familyActive(db.users[owner]) || !a || a.kind==='pickpocket' || !a.hasAudio || db.users[owner]?.sosAudioConsent!==true || !canSeeAlert(self,a) || owner===self) return;
       relay(owner,{type:'listen-request',from:self,alertId:a.id},true);
     }
     if (m.type==='rtc') {
       const target=String(m.to||''); const a=currentAlert(self) || currentAlert(target);
-      if (!a || a.kind==='pickpocket' || db.users[a.userId]?.sosAudioConsent!==true ||
+      if (!a || !familyActive(db.users[a.userId]) || a.kind==='pickpocket' || db.users[a.userId]?.sosAudioConsent!==true ||
           !canSeeAlert(self,a) || !canSeeAlert(target,a) || ![self,target].includes(a.userId) || self===target) return;
       const signal=m.signal;
       if (!signal || typeof signal!=='object' || !['offer','answer','candidate'].includes(signal.kind) || JSON.stringify(signal).length>24000) return;
@@ -971,3 +983,4 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
