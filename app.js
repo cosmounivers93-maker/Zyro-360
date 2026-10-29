@@ -1,3 +1,9 @@
+function hasFamilyPlan(){return current?.me?.features?.sosAudio===true;}
+function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione è inclusa in ZYRO Family.');}}
+function updateMarkupIfChanged(node,html){
+ if(node._zyroMarkup===html)return;
+ node._zyroMarkup=html;node.innerHTML=html;
+}
 'use strict';
 const $ = id => document.getElementById(id);
 let current = null;
@@ -10,6 +16,7 @@ let lastCoords = null;
 let sentAt = 0;
 let localStream = null;
 let micBusy = false;
+let sosAudioError = '';
 let activeView = 'home';
 let authMode = 'login';
 let toastTimer;
@@ -49,7 +56,7 @@ function clearHeadingMotion(){
   compassHeading=null;gpsCourseActive=false;
 }
 function renderHeadingOnly(){
-  if(!lastCoords)return;
+  if(!lastCoords || activeView!=='home' || document.hidden)return;
   const shown=Number.isFinite(headingMotion.display)?headingMotion.display:null;
   lastCoords.heading=shown;
   const pin=stableMap?.pinNodes?.get('me');
@@ -87,6 +94,10 @@ function aimHeading(){
     headingMotion.target=null;headingMotion.source=null;
     if(headingMotion.frame!==null){cancelAnimationFrame(headingMotion.frame);headingMotion.frame=null;}
     headingMotion.previousFrame=0;headingMotion.display=null;renderHeadingOnly();return;
+  }
+  if(document.hidden || activeView!=='home'){
+    headingMotion.target=choice.angle;headingMotion.display=choice.angle;
+    headingMotion.source=choice.source;return;
   }
   const current=headingMotion.target;
   // Ignore tiny compass noise, but allow accumulated real rotation to pass.
@@ -148,26 +159,34 @@ function connectSocket(){
   const proto=location.protocol==='https:'?'wss':'ws';
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
   socket=ws;
-  ws.onopen=()=>{ connection(true); if(localStream)ws.send(JSON.stringify({type:'audio-ready',ready:true})); };
+  ws.onopen=()=>{ connection(true); if(localStream)ws.send(JSON.stringify({type:'audio-ready',ready:true})); if(listeningTo)retryListenAfterReconnect(); };
   ws.onmessage=async(event)=>{
     let m;try{m=JSON.parse(event.data);}catch{return;}
     if(m.type==='state'){setState(m.data);}
     if(m.type==='listen-request') await action(()=>sendOffer(m.from));
     if(m.type==='rtc') await action(()=>handleRTC(m.from,m.signal));
+    if(m.type==='audio-relay-start') await action(startAudioRelaySender);
+    if(m.type==='audio-relay-stop') stopAudioRelaySender();
+    if(m.type==='audio-relay-status') handleAudioRelayStatus(m);
+    if(m.type==='audio-relay-data') handleAudioRelayPacket(m);
     if(m.type==='account-banned'){alert(m.notice||'Account sospeso.');location.reload();return;}
     if(m.type==='admin-new-report' && current?.me?.isAdmin){toast('Nuova segnalazione ricevuta nel Centro amministratore.');void action(adminLoad);}
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
   };
-  ws.onclose=()=>{if(socket!==ws)return;socket=null;connection(false);if(current)wsRetry=setTimeout(connectSocket,3000);};
+  ws.onclose=()=>{if(socket!==ws)return;socket=null;connection(false);stopAudioRelaySender();if(current)wsRetry=setTimeout(connectSocket,3000);};
   ws.onerror=()=>{connection(false);};
 }
-function wsSend(message){if(socket?.readyState===WebSocket.OPEN)socket.send(JSON.stringify(message));}
+function wsSend(message){if(socket?.readyState!==WebSocket.OPEN)return false;socket.send(JSON.stringify(message));return true;}
 function connection(up){$('connectionText').textContent=up?'Collegato':'Non collegato';$('connectionDot').classList.toggle('connected',up);}
 function setState(data){
   if(!data?.me)return;
   const prev = current;
   current=data;
+  // Revoking explicit opt-in stops ongoing live audio locally as well.
+  if((data.me.sosAudioConsent!==true || data.me.features?.sosAudio!==true) && localStream)stopAudio();
+  if(window.ZyroAndroidSafetySupported && window.ZyroNativeSafety?.pick===true && !theftTriggered)
+    pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
   renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
@@ -314,27 +333,71 @@ function renderHome(){
   $('myLocationText').textContent= sos?'SOS attivo. Posizione condivisa solo se già autorizzata.':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
   $('sosCard').classList.toggle('is-active',!!me.sos);
   $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS attivo sul server (consegna non garantita)':'Hai bisogno di aiuto?';
-  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'Le persone selezionate vedono l’allarme. Premi «Attiva microfono» se vuoi trasmettere audio.':'Nessun contatto nella tua cerchia: il tuo SOS non raggiunge nessuno. In emergenza chiama il 112.'):'SOS Premium richiede un abbonamento attivo. In caso di pericolo reale chiama il 112.';
+  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'SOS registrato. I destinatari selezionati possono visualizzare l’allarme; la consegna non è garantita.':'Nessun contatto nella tua cerchia: il SOS non raggiunge nessuno. Chiama il 112 in emergenza.'):'SOS Premium richiede un abbonamento attivo. In caso di pericolo reale chiama il 112.';
   $('sosButton').disabled=!!me.sos;
   $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Apri SOS Premium');
   $('sosActiveActions').classList.toggle('hidden',!sos);
   $('sosInactiveNote').classList.toggle('hidden',!!me.sos);
-  $('audioButton').textContent=localStream?'🔇 Disattiva microfono':'🎙 Attiva microfono';
-  $('contactsList').innerHTML=contacts.length?contacts.map((u,i)=>{
+  const micState=$('sosAudioState');
+  if(micState){
+    const consent=me.sosAudioConsent===true;
+    micState.dataset.status=!consent?'off':localStream?'on':sosAudioError?'error':'pending';
+    micState.textContent=!consent?'Audio ambientale disattivato nelle impostazioni.'
+      :localStream?'🎙 Microfono acceso · un destinatario autorizzato deve premere «Ascolta» per ricevere l’audio.'
+      :sosAudioError?'⚠ Audio non disponibile: '+sosAudioError
+      :'Audio autorizzato · avvio microfono in corso…';
+  }
+  const contactsRoot=$('contactsList');
+  const contactHtml=contacts.length?contacts.map((u,i)=>{
     const status=u.sos?(u.sos.kind==='pickpocket'?'🚨 POSSIBILE FURTO':'🆘 SOS ATTIVO'):u.online?(u.sharing?'Posizione attiva':'Online'):'Offline';
     const loc=u.location, time=loc?when(loc.updatedAt):(u.sharing?'Posizione in attesa':'Posizione non condivisa');
-    return `<div class="contact-card"><div class="contact-avatar ${i%2?'alt':''}">${avatarHTML(u)}</div><div class="contact-info"><b>${escapeHtml(u.name)}</b><small>${escapeHtml(time)}</small></div><div class="contact-actions"><span class="status-chip ${u.sos?'alert':!u.online?'off':''}">${escapeHtml(status)}</span>${loc?`<a class="mini-btn" target="_blank" rel="noopener noreferrer" href="${locationUrl(loc)}">📍 Mappa</a>`:''}${u.sos?.hasAudio?`<button type="button" class="mini-btn audio" data-listen="${escapeHtml(u.id)}">🎧 Ascolta</button>`:''}</div></div>`;
+    return `<div class="contact-card"><div class="contact-avatar ${i%2?'alt':''}">${avatarHTML(u)}</div><div class="contact-info"><b>${escapeHtml(u.name)}</b><small>${escapeHtml(time)}</small></div><div class="contact-actions"><span class="status-chip ${u.sos?'alert':!u.online?'off':''}">${escapeHtml(status)}</span>${loc?`<a class="mini-btn" target="_blank" rel="noopener noreferrer" href="${locationUrl(loc)}">📍 Mappa</a>`:''}${u.sos?.hasAudio?`<button type="button" class="mini-btn audio" data-listen="${escapeHtml(u.id)}">🎧 Ascolta</button>`:u.sos?.kind==='sos'?'<span class="status-chip off" title="La persona deve attivare il microfono SOS sul suo telefono">🎙 Audio in attesa</span>':''}</div></div>`;
   }).join(''):`<div class="empty-state"><div class="empty-symbol">♧</div><strong>La tua cerchia inizia da qui</strong>Aggiungi le persone di cui ti fidi per condividere la posizione e ricevere SOS.</div>`;
+  if(contactsRoot._zyroHtml!==contactHtml){contactsRoot.innerHTML=contactHtml;contactsRoot._zyroHtml=contactHtml;}
   const otherAlerts=current.alerts.filter(a=>a.userId!==me.id);
+  // V33: show the SOS audio action on Home, at the moment the authorized
+  // recipient receives the server state. It is enabled ONLY when server says
+  // hasAudio=true; a push/map location alone is not an audio connection.
+  const incomingSOS=otherAlerts.find(a=>(a.kind||'sos')==='sos');
+  const homeSOSListen=$('homeSOSListen');
+  if(homeSOSListen){
+    homeSOSListen.classList.toggle('hidden',!incomingSOS);
+    if(incomingSOS){
+      const ready=incomingSOS.hasAudio===true;
+      const name=escapeHtml(incomingSOS.name||'Una persona fidata');
+      const nextHtml=`<div class="zyro-home-sos-text"><b>🆘 SOS ricevuto da ${name}</b>`+
+        `<small>${ready?'🎙 Microfono segnalato pronto. Tocca Ascolta per collegarti.':'🎙 Audio non ancora disponibile. Il mittente deve autorizzare e accendere il microfono SOS.'}</small></div>`+
+        `<div class="zyro-home-sos-actions">`+
+        (ready?`<button type="button" data-listen="${escapeHtml(incomingSOS.userId)}" class="zyro-home-listen-button">🎧 Ascolta microfono</button>`:
+          `<button type="button" class="zyro-home-listen-button" disabled aria-disabled="true">🎧 In attesa del microfono</button>`)+
+        `<button type="button" data-sos-detail="1" class="zyro-home-sos-details">Dettagli SOS</button></div>`;
+      if(homeSOSListen._zyroHtml!==nextHtml){
+        homeSOSListen.innerHTML=nextHtml;
+        homeSOSListen._zyroHtml=nextHtml;
+        homeSOSListen.querySelector('[data-sos-detail]')?.addEventListener('click',()=>showView('modes'));
+      }
+    }else{
+      homeSOSListen.replaceChildren();
+      homeSOSListen._zyroHtml='';
+    }
+  }
   $('activeAlerts').classList.toggle('hidden',!otherAlerts.length);
-  $('activeAlerts').innerHTML=otherAlerts.map(a=>`<div class="alert-box"><h3>${a.kind==='pickpocket'?'🚨 Possibile furto:':'🆘'} ${escapeHtml(a.name)} ${a.kind==='pickpocket'?'potrebbe aver subito uno scippo':'chiede aiuto'}</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p><div class="action-row">${a.address?`<p>📍 ${escapeHtml(a.address)}</p>`:''}${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
-  document.querySelectorAll('[data-listen]').forEach(btn=>btn.addEventListener('click',()=>action(()=>listenTo(btn.dataset.listen))));
+  const alertsRoot=$('activeAlerts');
+  const alertsHtml=otherAlerts.map(a=>`<div class="alert-box"><h3>${a.kind==='pickpocket'?'🚨 Possibile furto:':'🆘'} ${escapeHtml(a.name)} ${a.kind==='pickpocket'?'potrebbe aver subito uno scippo':'chiede aiuto'}</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p>${a.kind!=='pickpocket'&&!a.hasAudio?'<p role="status">🎙 Audio non ancora disponibile. Chi invia SOS deve abilitare il consenso microfono e verificare che compaia “Microfono acceso”.</p>':''}<div class="action-row">${a.address?`<p>📍 ${escapeHtml(a.address)}</p>`:''}${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.kind!=='pickpocket'?(a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:'<button type="button" disabled title="Attendi che il telefono che invia il SOS abbia attivato il microfono">🎧 In attesa del microfono</button>'):''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
+  if(alertsRoot._zyroHtml!==alertsHtml){alertsRoot.innerHTML=alertsHtml;alertsRoot._zyroHtml=alertsHtml;}
+  document.querySelectorAll('[data-listen]:not([data-zyro-wired])').forEach(btn=>{
+    btn.dataset.zyroWired='1';
+    btn.addEventListener('click',()=>action(()=>listenTo(btn.dataset.listen)));
+  });
   renderMap();
 }
 function inviteBox(code){const link=location.origin+'/?invite='+encodeURIComponent(code);return `<div class="invite-code-box"><small>LINK E CODICE MONOUSO · VALIDI 24 ORE</small><code>${escapeHtml(code)}</code><button type="button" class="copy-code">Copia codice</button><input readonly aria-label="Link invito" value="${escapeHtml(link)}"><div class="invite-share-actions"><button type="button" class="copy-invite-link">🔗 Copia link</button><button type="button" class="share-invite-link">↗ Condividi</button></div></div>`;}
 function renderCircles(){
   if(!current)return;
   const list=$('circlesList');
+  const sig=JSON.stringify([current.me.id,(current.circles||[]).map(c=>[c.id,c.name,c.mine,(c.members||[]).map(m=>[m.id,m.name])]),[...inviteCodes.entries()]]);
+  if(list._zyroSig===sig&&list.children.length)return;
+  list._zyroSig=sig;
   list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions"><button type="button" data-chatcircle="${escapeHtml(c.id)}">💬 Chat gruppo</button><button type="button" data-invite="${escapeHtml(c.id)}">✚ Genera codice invito</button>${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
   list.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
     const r=await post('/api/invites',{circleId:b.dataset.invite});
@@ -359,6 +422,9 @@ function renderSOSRecipients(){
   if(!current)return;
   const contacts=uniqueContacts(), selected=new Set(sosPending===null ? (current.me.sosRecipients||[]) : sosPending);
   const node=$('sosRecipientList');
+  const sig=JSON.stringify([contacts.map(u=>[u.id,u.name,u.avatar||'']),[...selected],current.me.premiumActive,current.pushEnabled]);
+  if(node._zyroSig===sig&&node.children.length)return;
+  node._zyroSig=sig;
   node.innerHTML=contacts.length?contacts.map(u=>`<label class="recipient-line"><input type="checkbox" data-sos-to="${escapeHtml(u.id)}" ${selected.has(u.id)?'checked':''}><span>${avatarHTML(u)} ${escapeHtml(u.name)}</span></label>`).join(''):'<p class="setting-description">Invita prima una persona nella cerchia.</p>';
   $('sosPushNote').textContent=(current.me.premiumActive?'Premium attivo. ':'Premium non attivo: SOS non inviabile. ')+(current.pushEnabled?'Push configurate; consegna non garantita.':'Push non configurate su Render.');
 }
@@ -384,6 +450,10 @@ const roomChatIcon=`<svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg
 function renderChatRooms(){
   if(!current)return;
   const circles=current.circles||[], contacts=uniqueContacts();
+  const list=$('chatRooms');
+  const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
+  if(list._zyroSig===sig&&list.children.length)return;
+  list._zyroSig=sig;
   const matching=(name)=>String(name).toLocaleLowerCase('it').includes(chatSearch.toLocaleLowerCase('it'));
   const rooms=[];
   if(chatCategory!=='direct')for(const c of circles.filter(c=>matching(c.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(c.name)}</b><small>Gruppo famiglia · ${c.members.length} ${c.members.length===1?'persona':'persone'}</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
@@ -443,7 +513,7 @@ async function loadChat(older=false){
 }
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
-function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;$('profileAccessLabel').textContent=current.me.isAdmin?'Creatore · Premium incluso':'Account personale';setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';const status=$('profileStorageStatus');if(status){status.textContent=current.persistentStorage?'✓ Profilo collegato al database persistente. Non serve registrarsi nuovamente a ogni accesso.':'⚠️ Archivio temporaneo: i profili potrebbero sparire dopo il riavvio del server. Configura DATABASE_URL su Render.';status.style.borderColor=current.persistentStorage?'#86cbb8':'#e9b3a4';}renderPushTestContacts();}
+function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;$('profileAccessLabel').textContent=current.me.isAdmin?'Creatore · Premium incluso':'Account personale';setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';const status=$('profileStorageStatus');if(status){status.textContent=current.persistentStorage?'✓ Profilo salvato.':'Salvataggio del profilo non disponibile: i dati potrebbero non essere conservati. Riprova più tardi.';status.style.borderColor=current.persistentStorage?'#86cbb8':'#e9b3a4';}renderPushTestContacts();}
 function renderPushTestContacts(){
   const select=$('pushTestRecipient'), button=$('pushTestButton');
   if(!select||!button)return;
@@ -469,7 +539,136 @@ async function sendPushTest(){
     toast(result.notice||'Test inviato.',result.accepted===0);
   }finally{button.disabled=false;}
 }
-function showView(view){if(view!=='settings')closeProfileSettings();if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='settings' && current?.me?.isAdmin && !adminLoaded)void action(adminLoad);if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
+let sectionAnimation=null;
+function showView(view){const previousView=activeView;const sectionOrder=['home','circles','modes','chats','settings'];if(!sectionOrder.includes(view))return;if(view!=='settings')closeProfileSettings();if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'instant'});sectionAnimation?.cancel();if(previousView!==view && !matchMedia('(prefers-reduced-motion: reduce)').matches){const panel=$(`${view}View`);if(panel?.animate)sectionAnimation=panel.animate([{opacity:.75,transform:`translateX(${sectionOrder.indexOf(view)>sectionOrder.indexOf(previousView)?24:-24}px)`},{opacity:1,transform:'translateX(0)'}],{duration:180,easing:'cubic-bezier(.2,.7,.2,1)'});}if(view==='settings' && current?.me?.isAdmin && !adminLoaded)void action(adminLoad);if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
+// Native Android V21 runs GPS and sensors independently of the paused WebView.
+// The owner always activates it via an explicit first-party on-screen action.
+
+const zyroBridgePending=new Map();
+let zyroBridgeRequestNumber=0;
+function hasZyroNativeBridge(){
+ return typeof window.ZyroNative?.postMessage==='function';
+}
+function isZyroNativeAvailable(){
+ return hasZyroNativeBridge()||window.ZyroAndroidSafetySupported===true;
+}
+function zyroNativeRequest(action,payload={}){
+ if(!hasZyroNativeBridge())return Promise.reject(Error('Non risulta un collegamento Android: apri l’APK, non il sito.'));
+ if(!window.ZyroNative.__zyroBound){
+   window.ZyroNative.onmessage=event=>{
+     let msg;try{msg=JSON.parse(event.data);}catch{return;}
+     const entry=zyroBridgePending.get(msg?.requestId);if(!entry)return;
+     clearTimeout(entry.timeout);zyroBridgePending.delete(msg.requestId);
+     msg.ok?entry.resolve(msg):entry.reject(Error(msg.result||'Comando Android non riuscito.'));
+   };
+   window.ZyroNative.__zyroBound=true;
+ }
+ return new Promise((resolve,reject)=>{
+   const requestId='zyro'+(++zyroBridgeRequestNumber);
+   const timeout=setTimeout(()=>{zyroBridgePending.delete(requestId);reject(Error('Android non risponde al controllo nativo.'));},7000);
+   zyroBridgePending.set(requestId,{resolve,reject,timeout});
+   try{window.ZyroNative.postMessage(JSON.stringify({requestId,action,payload}));}
+   catch(err){clearTimeout(timeout);zyroBridgePending.delete(requestId);reject(err);}
+ });
+}
+function nativeSyncError(code){
+ if(code==='zyro-needs-location')return 'Consenti la posizione Android e riprova.';
+ if(code==='zyro-needs-login')return 'Accedi dall’app Android, non dal browser.';
+ if(code==='zyro-denied')return 'Il sistema non autorizza il monitoraggio.';
+ if(code==='zyro-invalid-recipients')return 'Contatti selezionati non validi.';
+ return 'Servizio Android non avviato: controlla autorizzazioni e batteria.';
+}
+async function nativeBackgroundSync(options={}){
+ if(!isZyroNativeAvailable())return false;
+ const sharing=options.sharing===undefined?Boolean(current?.me?.sharing||current?.me?.sos):!!options.sharing;
+ const pick=options.pick===undefined?!!(pickArmed&&!theftTriggered):!!options.pick;
+ const recipients=$('pickNotify')?.checked?[...pickSelected]:[];
+ const sensitivity=$('pickSensitivity')?.value==='high'?'high':'normal';
+ const payload={sharing,pick,recipients,sensitivity};
+ let result;
+ if(hasZyroNativeBridge()){
+   const response=await zyroNativeRequest('sync',payload);
+   result=response.result;
+   window.ZyroAndroidSafetySupported=true;
+   window.ZyroAndroidSafetyBuild=24;
+ }else result=window.prompt('ZYRO360_BG_SYNC',JSON.stringify(payload));
+ if(result==='zyro-native')return true;
+ throw Error(nativeSyncError(result));
+}
+
+function zyroNativeAge(ms){
+ if(!Number.isFinite(ms) || ms<=0)return 'mai verificato';
+ const seconds=Math.max(0,Math.round((Date.now()-ms)/1000));
+ if(seconds<60)return seconds+' s fa';
+ if(seconds<3600)return Math.round(seconds/60)+' min fa';
+ return Math.round(seconds/3600)+' h fa';
+}
+
+function nativeDiagnosticText(state){
+ if(!isZyroNativeAvailable())
+   return '⚠ Collegamento Android assente. Potresti aver aperto il sito o un collegamento del browser. Controlla in Impostazioni Android → App → Zyro 360 la versione 1.0.0-rc3, poi apri l’app dalla sua icona.';
+ if(!state || !['v23-android','v24-android'].includes(state.build))
+   return '⚠ Collegamento non ancora verificato. Premi «Verifica servizio Android»: controlliamo la risposta diretta del telefono.';
+ if(!state.running)
+   return '○ Servizio Android non attivo. Attiva GPS LIVE oppure Pick Pocket, poi verifica di nuovo.';
+ const parts=['● Servizio Android in esecuzione · notifica persistente richiesta'];
+ if(state.sharing){
+   parts.push('GPS: ultimo rilevamento '+zyroNativeAge(state.lastLocationAt));
+   const fresh=Date.now()-Number(state.lastServerAcceptedAt||0)<120000;
+   parts.push((fresh?'✓':'⚠')+' GPS accettato dal server: '+zyroNativeAge(state.lastServerAcceptedAt));
+ }else parts.push('GPS LIVE: non condiviso');
+ if(state.pick){
+   const recent=Date.now()-Number(state.lastSensorAt||0)<90000;
+   parts.push((state.sensorReady&&state.sensorSamplingActive&&recent?'✓':'⚠')+
+     ' Sensori Android: '+(state.sensorReady?'registrati':'non disponibili')+
+     ' · campione '+zyroNativeAge(state.lastSensorAt));
+ }else parts.push('Pick Pocket: sensori non armati');
+ if(state.batteryUnrestricted===false)
+   parts.push('⚠ Risparmio energetico: il sistema potrebbe interrompere il monitoraggio.');
+ if(state.problem)parts.push('⚠ '+String(state.problem).slice(0,150));
+ parts.push('Non garantito dopo arresto forzato, revoca permessi o spegnimento.');
+ return parts.join('\n');
+}
+function renderNativeDiagnostic(){
+ const panel=$('zyroNativeMonitor');if(!panel)return;
+ panel.hidden=!current;
+ if(!current)return;
+ $('zyroNativeMonitorText').textContent=nativeDiagnosticText(window.ZyroNativeSafety);
+ // A disabled button hides diagnostics. Keep it clickable even if the APK is outdated.
+ $('zyroNativeCheck').disabled=false;
+ $('zyroNativeBattery').disabled=!isZyroNativeAvailable();
+}
+async function readNativeSafetyStatus(){
+ let status;
+ if(hasZyroNativeBridge()){
+   const response=await zyroNativeRequest('status');
+   status=response.status;
+   if(status?.build!=='v24-android')throw Error('APK Android non aggiornata alla V24.');
+   window.ZyroAndroidSafetySupported=true;
+   window.ZyroAndroidSafetyBuild=24;
+ }else if(window.ZyroAndroidSafetyBuild===23){
+   const answer=window.prompt('ZYRO360_BG_STATUS','');
+   try{status=JSON.parse(answer||'null');}
+   catch{throw Error('Android V23 non ha risposto correttamente.');}
+   if(status?.build!=='v23-android')throw Error('Servizio Android V23 non raggiungibile.');
+ }else{
+   const error='Servizio nativo non rilevato. Controlla in Impostazioni Android → App → Zyro 360 che sia installata la V24 (1.0.0-rc3); apri la sua icona e non un collegamento del browser.';
+   $('zyroNativeMonitorText').textContent='⚠ '+error;
+   throw Error(error);
+ }
+ window.ZyroNativeSafety=status;
+ renderNativeDiagnostic();renderPickControls();
+ return status;
+}
+async function openNativeBatterySettings(){
+ if(hasZyroNativeBridge())await zyroNativeRequest('settings');
+ else if(window.ZyroAndroidSafetyBuild===23){
+   const answer=window.prompt('ZYRO360_BG_SETTINGS','');
+   if(answer!=='zyro-native')throw Error('Impostazioni Android non disponibili.');
+ }else throw Error('Apri l’APK Android aggiornata, non il browser.');
+ toast('Apri Batteria e, se disponibile, scegli Nessuna restrizione.');
+}
+
 function updateGeo(oldOn,newOn){
   if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();geolocationError='';renderMap();return;}
   if(watchId!==null)return;
@@ -488,29 +687,79 @@ function updateGeo(oldOn,newOn){
       heading:Number.isFinite(headingMotion.display)?headingMotion.display:null};
     aimHeading();geolocationError='';
     const canShare=!!current?.me?.sharing || !!current?.me?.sos;
-    if(canShare && Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
+    if(canShare && !(window.ZyroNativeSafety?.running && window.ZyroNativeSafety?.sharing)
+        && Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
     renderHome();
   },err=>{geolocationError=`GPS: ${err.message||'permesso negato'}`;renderHome();toast(geolocationError,true);},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
 }
 async function refresh(){if(!current)return;const data=await api('/api/state');setState(data);}
+// The user opted-in in Profilo > Persone invitate. Begin requesting
+// microphone access in the physical SOS button gesture (before GPS/network
+// awaits), but publish a stream ONLY after the server accepts SOS.
+async function openZyroMicrophone(){
+ if(!navigator.mediaDevices?.getUserMedia)
+   throw Error('Il microfono non è supportato da Android System WebView.');
+ try{
+   return await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+ }catch(firstError){
+   // Android WebView can fail to open the default voice-processing route
+   // even when runtime permission is already granted. One alternative route
+   // without optional processing is worth trying; neither path ever stores audio.
+   if(firstError?.name!=='NotReadableError' &&
+      !/Could not start audio source/i.test(firstError?.message||''))throw firstError;
+   try{
+     return await navigator.mediaDevices.getUserMedia({
+       audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false},
+       video:false
+     });
+   }catch(secondError){throw secondError;}
+ }
+}
+function acquireSOSEmergencyAudio(){
+ return openZyroMicrophone().then(stream=>({stream}),error=>({error}));
+}
 async function startSOS(){
  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS Premium non attivo: nessun allarme è stato inviato. In emergenza chiama il 112.',true);return;}
- // Try to include a fresh GPS fix, without indefinitely delaying a request for help.
- if(!lastCoords && navigator.geolocation){try{
-   const pos=await Promise.race([new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,maximumAge:10000,timeout:2400})),new Promise((_,reject)=>setTimeout(()=>reject(Error('GPS non disponibile')),2600))]);
-   lastCoords={lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy,heading:null};
- }catch{/* SOS can still start without a fix. */}}
- const result=await post('/api/sos/start',{location:lastCoords?{lat:lastCoords.lat,lon:lastCoords.lon,accuracy:lastCoords.accuracy}:null});
- await refresh();mapTracking=true;updateGeo(null,true);
- if(result.serverRecorded){
-   const pushCount=Number(result.pushAccepted||0);
-   if(!result.pushConfigured)toast('SOS registrato, ma Firebase non risulta configurato su Render. In emergenza chiama il 112.',true);
-   else if(Number(result.recipientCount||0)===0)toast('SOS attivo, ma non hai selezionato destinatari. Apri Persone invitate.',true);
-   else if(Number(result.pushAttempted||0)===0)toast('SOS sulla mappa, ma nessun telefono dei destinatari risulta registrato alle notifiche. Chiedi di aprire Abilita permessi.',true);
-   else if(!pushCount)toast('SOS registrato, ma Firebase non ha accettato l’invio. Il destinatario deve verificare Firebase in Abilita permessi.',true);
-   else toast(`SOS attivato. ${pushCount} invii accettati dal provider; ricezione non garantita.`);
+ const optedIn=hasFamilyPlan()&&current.me.sosAudioConsent===true;
+ sosAudioError='';
+ const preparedAudio=optedIn?acquireSOSEmergencyAudio():null;
+ let serverStarted=false;
+ try{
+   // Request a fresh GPS fix, but never delay an SOS indefinitely.
+   if(!lastCoords && navigator.geolocation)try{
+     const pos=await Promise.race([new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,maximumAge:10000,timeout:2400})),new Promise((_,reject)=>setTimeout(()=>reject(Error('GPS non disponibile')),2600))]);
+     lastCoords={lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy,heading:null};
+   }catch{/* GPS may be unavailable; SOS should still continue. */}
+   const result=await post('/api/sos/start',{location:lastCoords?{lat:lastCoords.lat,lon:lastCoords.lon,accuracy:lastCoords.accuracy}:null});
+   serverStarted=true;
+   await refresh();mapTracking=true;updateGeo(null,true);
+   if(preparedAudio){
+     try{await startAudio(preparedAudio);}
+     catch(error){
+       sosAudioError=sosMicErrorMessage(error);
+       renderHome();
+       toast('SOS attivo, ma microfono non disponibile: '+sosAudioError,true);
+     }
+   }
+   if(isZyroNativeAvailable()){
+     try{await nativeBackgroundSync({sharing:true});}
+     catch(err){toast('SOS attivo, ma GPS in background non avviato: '+err.message,true);}
+   }
+   if(result.serverRecorded){
+     const pushCount=Number(result.pushAccepted||0);
+     if(!result.pushConfigured)toast('SOS registrato, ma Firebase non risulta configurato su Render. In emergenza chiama il 112.',true);
+     else if(Number(result.recipientCount||0)===0)toast('SOS attivo, ma non hai selezionato destinatari. Apri Persone invitate.',true);
+     else if(Number(result.pushAttempted||0)===0)toast('SOS sulla mappa, ma nessun telefono dei destinatari risulta registrato alle notifiche.',true);
+     else if(!pushCount)toast('SOS registrato, ma Firebase non ha accettato l’invio.',true);
+     else toast('SOS attivato. '+pushCount+' invii accettati dal provider; ricezione non garantita.');
+   }
+ }catch(error){
+   // No microphone should remain active if an SOS was not recorded.
+   if(!serverStarted && preparedAudio)void preparedAudio.then(result=>{
+     if(result.stream)result.stream.getTracks().forEach(track=>track.stop());
+   });
+   throw error;
  }
- if($('sosAudioConsent').checked){try{await startAudio();toast('Microfono attivo: i contatti possono richiedere ascolto in diretta.');}catch(err){toast('Allarme attivo, ma microfono non disponibile: '+err.message,true);}}
 }
 async function stopSOS(){
   const confirmed=await zyroOwnerDialog({
@@ -522,56 +771,133 @@ async function stopSOS(){
   await post('/api/sos/stop');
   stopAudio();
   await refresh();
+  if(isZyroNativeAvailable()){
+    try{await nativeBackgroundSync({sharing:!!current?.me?.sharing});}
+    catch(err){toast('Controllo servizio GPS: '+err.message,true);}
+  }
   toast('Allarme SOS terminato.');
 }
-async function startAudio(){
-  if(localStream || micBusy || !current?.me?.sos)return;
-  const consent=await zyroOwnerDialog({
-    title:'Consenti accesso al microfono',
-    description:'Vuoi attivare il microfono per il tuo SOS? L’audio potrà essere ascoltato solo dai destinatari SOS da te selezionati quando lo richiedono. Puoi interromperlo in qualsiasi momento.',
-    submitLabel:'Consenti e attiva'
-  });
-  if(!consent)return;
-  if(!navigator.mediaDevices?.getUserMedia)throw Error('Il microfono non è supportato sul dispositivo. Aggiorna Zyro 360 e Android System WebView.');
-  micBusy=true;
-  try{
-    // Start with the least restrictive supported constraints. Some Android
-    // devices refuse noise-processing requests despite working microphones.
-    const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
-    if(!current?.me?.sos){stream.getTracks().forEach(t=>t.stop());return;}
-    localStream=stream;
-    localStream.getAudioTracks().forEach(t=>t.addEventListener('ended',()=>{if(localStream)stopAudio();}));
-    wsSend({type:'audio-ready',ready:true});
-    toast('Microfono attivo. Solo i destinatari SOS possono richiedere l’ascolto.');
-    renderHome();
-  }catch(error){
-    if(error?.name==='NotAllowedError'||error?.name==='PermissionDeniedError'||error?.name==='SecurityError')
-      throw Error('Accesso microfono negato. Apri Impostazioni Android → Zyro 360 → Autorizzazioni e abilita il microfono, poi riprova.');
-    if(error?.name==='NotReadableError'||/Could not start audio source/i.test(error?.message||''))
-      throw Error('Android non riesce ad aprire il microfono. Chiudi altre app che lo usano, verifica il controllo privacy del microfono e riprova.');
-    if(error?.name==='NotFoundError'||error?.name==='DevicesNotFoundError')
-      throw Error('Nessun microfono disponibile su questo dispositivo.');
-    throw Error('Microfono non disponibile. Controlla autorizzazioni e impostazioni Android e riprova.');
-  }finally{micBusy=false;}
+function sosMicErrorMessage(error){
+ if(['NotAllowedError','PermissionDeniedError','SecurityError'].includes(error?.name))
+   return 'Permesso microfono negato. Apri Impostazioni Android → App → Zyro 360 → Autorizzazioni → Microfono.';
+ if(error?.name==='NotReadableError'||/Could not start audio source/i.test(error?.message||''))
+   return 'Android non riesce ad aprire il microfono. Controlla la privacy del microfono e chiudi le altre app che lo utilizzano.';
+ if(['NotFoundError','DevicesNotFoundError'].includes(error?.name))
+   return 'Nessun microfono rilevato su questo dispositivo.';
+ return error?.message||'Verifica il permesso microfono e Android System WebView.';
 }
-function stopAudio(){if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}for(const p of peers.values())p.close();peers.clear();pendingIce.clear();wsSend({type:'audio-ready',ready:false});renderHome();}
+async function testSOSMicrophone(){
+ // TEST requested on Settings page, not an SOS stream. Nothing is stored
+ // and the OS microphone is released immediately.
+ const stream=await openZyroMicrophone();
+ stream.getTracks().forEach(track=>track.stop());
+ return true;
+}
+async function testZyroNativeMicrophone(){
+ if(!hasZyroNativeBridge())
+   throw Error('Per questo test serve la nuova APK Android V26, non il browser.');
+ let response;
+ try{response=await zyroNativeRequest('mic-diagnostic');}
+ catch(error){
+   if(/zyro-unknown-action/i.test(error.message))
+     throw Error('L’APK installata non contiene la diagnostica Android V26. Aggiorna prima la versione Android.');
+   throw error;
+ }
+ const result=response.result||{};
+ if(result.permission!==true)
+   throw Error('Android non concede il permesso microfono.');
+ if(result.microphoneMuted===true)
+   throw Error('L’accesso globale al microfono è disattivato sul telefono.');
+ if(result.passed===true)
+   return '✓ Microfono hardware Android funzionante ('+Number(result.capturedSamples||0)+
+     ' campioni letti). Se il test WebView fallisce ancora, il problema è nel collegamento WebView/WebRTC, non nel permesso.';
+ throw Error('Anche Android nativo non riesce ad aprire il microfono: '+
+   String(result.problem||'sorgente audio non disponibile')+
+   '. Controlla chiamate e altre app che usano l’audio.');
+}
+async function startAudio(preparedAudio){
+ if(!hasFamilyPlan()||localStream||micBusy || !current?.me?.sos || current?.me?.sosAudioConsent!==true){
+   if(preparedAudio)void preparedAudio.then(r=>r.stream?.getTracks().forEach(t=>t.stop()));
+   return;
+ }
+ micBusy=true;
+ try{
+   // No second consent dialog: the user explicitly enabled this feature in
+   // Persone invitate. Android still requests OS microphone permission.
+   const acquired=preparedAudio?await preparedAudio:await acquireSOSEmergencyAudio();
+   if(acquired.error)throw acquired.error;
+   const stream=acquired.stream;
+   if(!stream)throw Error('Nessun flusso audio disponibile.');
+   if(!current?.me?.sos || current.me.sosAudioConsent!==true){
+     stream.getTracks().forEach(track=>track.stop());return;
+   }
+   localStream=stream;
+   sosAudioError='';
+   localStream.getAudioTracks().forEach(track=>track.addEventListener('ended',()=>{
+     if(localStream && localStream.getAudioTracks().includes(track)){
+       sosAudioError='Android ha interrotto il microfono.';
+       stopAudio();
+     }
+   }));
+   wsSend({type:'audio-ready',ready:true});
+   renderHome();
+ }finally{micBusy=false;}
+}
+function stopAudio(){stopAudioRelaySender();if(localStream){localStream.getTracks().forEach(t=>t.stop());localStream=null;}for(const p of peers.values())p.close();peers.clear();pendingIce.clear();wsSend({type:'audio-ready',ready:false});renderHome();}
 function makePeer(remoteId,send){
   let peer=peers.get(remoteId);if(peer)return peer;
   peer=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'},{urls:'stun:stun1.l.google.com:19302'}]});
   peer.onicecandidate=e=>{if(e.candidate)wsSend({type:'rtc',to:remoteId,signal:{kind:'candidate',candidate:e.candidate.toJSON()}});};
-  peer.onconnectionstatechange=()=>{if(['failed','closed'].includes(peer.connectionState)){peer.close();peers.delete(remoteId);}};
-  peer.ontrack=ev=>{if(listeningTo!==remoteId)return;const audio=$('remoteAudio');audio.srcObject=ev.streams[0]||new MediaStream([ev.track]);$('audioDock').classList.remove('hidden');audio.play().catch(()=>toast('Tocca ▶ nel lettore per ascoltare l’audio.'));};
+  peer.onconnectionstatechange=()=>{
+    if(peer.connectionState==='connected' && listeningTo===remoteId){
+      cancelAudioRelayFallback();
+      closeAudioRelayPlayback(true);
+      const received=peer._zyroIncomingStream;
+      if(received){
+        const audio=$('remoteAudio');audio.srcObject=received;
+        audio.play().catch(()=>toast('Tocca ▶ nel lettore per ascoltare l’audio.'));
+      }
+      setAudioListenState('🎧 Audio in diretta collegato (WebRTC)');
+    }else if(peer.connectionState==='failed' && listeningTo===remoteId){
+      requestAudioRelayFallback(remoteId);
+    }
+    if(['failed','closed'].includes(peer.connectionState)){peer.close();peers.delete(remoteId);}
+  };
+  peer.ontrack=ev=>{
+    if(listeningTo!==remoteId)return;
+    // ontrack fires at SDP negotiation, sometimes before ICE has a network
+    // connection. Keep the fallback timer alive until connectionState=connected.
+    peer._zyroIncomingStream=ev.streams[0]||new MediaStream([ev.track]);
+    $('audioDock').classList.remove('hidden');
+    if(peer.connectionState==='connected'){
+      cancelAudioRelayFallback();
+      closeAudioRelayPlayback(true);
+      const audio=$('remoteAudio');audio.srcObject=peer._zyroIncomingStream;
+      audio.play().catch(()=>toast('Tocca ▶ nel lettore per ascoltare l’audio.'));
+      setAudioListenState('🎧 Audio in diretta collegato (WebRTC)');
+    }else{
+      setAudioListenState('🎧 Traccia rilevata · attendo connessione o alternativa server...');
+    }
+  };
   if(send&&localStream)for(const track of localStream.getTracks())peer.addTrack(track,localStream);
   peers.set(remoteId,peer);return peer;
 }
 async function sendOffer(remoteId){if(!localStream||!current?.me?.sos)return;const prior=peers.get(remoteId);if(prior){prior.close();peers.delete(remoteId);}const p=makePeer(remoteId,true);const offer=await p.createOffer();await p.setLocalDescription(offer);wsSend({type:'rtc',to:remoteId,signal:{kind:'offer',sdp:p.localDescription.toJSON()}});}
 async function listenTo(remoteId){
   if(!current?.alerts.some(a=>a.userId===remoteId&&a.hasAudio)){toast('Microfono non disponibile in questo momento.',true);return;}
-  if(!('RTCPeerConnection' in window)){toast('Questo browser non supporta l’audio live.',true);return;}
+  if(!socket||socket.readyState!==WebSocket.OPEN){toast('Server audio non connesso: riapri l’app e riprova.',true);return;}
   stopListening();listeningTo=remoteId;
   $('audioDock').classList.remove('hidden');
-  toast('Richiesta di ascolto inviata. Se necessario, premi Play.');
-  wsSend({type:'listen-request',to:remoteId});
+  // Prime the fallback AudioContext while the receiver's tap gesture is still
+  // active. Android WebView may otherwise suspend context creation later.
+  try{ensureAudioRelayPlayback();}catch(error){console.warn('Audio playback unavailable:',error?.name||'unknown');}
+  setAudioListenState('🎧 Connessione audio in corso...');
+  // WebRTC is attempted first; the authenticated live relay is the fallback.
+  if('RTCPeerConnection' in window){
+    wsSend({type:'listen-request',to:remoteId});
+    scheduleAudioRelayFallback(remoteId);
+  }else requestAudioRelayFallback(remoteId);
+  toast('Ascolto richiesto. Se il lettore rimane in pausa, premi ▶.');
 }
 async function handleRTC(remoteId,signal){
   if(!signal || !['offer','answer','candidate'].includes(signal.kind))return;
@@ -591,7 +917,146 @@ async function handleRTC(remoteId,signal){
   }
 }
 async function flushIce(remoteId){const p=peers.get(remoteId);for(const item of pendingIce.get(remoteId)||[])await p?.addIceCandidate(new RTCIceCandidate(item)).catch(()=>{});pendingIce.delete(remoteId);}
-function stopListening(){if(listeningTo){const p=peers.get(listeningTo);if(p){p.close();peers.delete(listeningTo);}pendingIce.delete(listeningTo);}listeningTo=null;const a=$('remoteAudio');a.pause();a.srcObject=null;$('audioDock').classList.add('hidden');}
+function stopListening(){cancelAudioRelayFallback();closeAudioRelayPlayback(true);if(listeningTo){const p=peers.get(listeningTo);if(p){p.close();peers.delete(listeningTo);}pendingIce.delete(listeningTo);}listeningTo=null;const a=$('remoteAudio');a.pause();a.srcObject=null;$('audioDock').classList.add('hidden');}
+// V29: End-to-end audio connection feedback and a consent-gated WebSocket PCM
+// fallback. PCM packets are forwarded only to authorized active SOS recipients
+// by the server, in RAM, and are not stored or logged. Audio is NOT E2EE.
+let zyroRelaySender=null,zyroRelayListener=null,zyroRelayTimer=null,zyroRelaySubscribed=false;
+let zyroRelaySequence=0;
+function setAudioListenState(text){
+  const label=$('audioDock')?.querySelector('span');
+  if(label)label.textContent=text;
+}
+function cancelAudioRelayFallback(){
+  if(zyroRelayTimer!==null)clearTimeout(zyroRelayTimer);
+  zyroRelayTimer=null;
+}
+function scheduleAudioRelayFallback(owner){
+  cancelAudioRelayFallback();
+  zyroRelayTimer=setTimeout(()=>{
+    zyroRelayTimer=null;
+    if(listeningTo!==owner)return;
+    const p=peers.get(owner);
+    if(p?.connectionState==='connected')return;
+    requestAudioRelayFallback(owner);
+  },6500);
+}
+function requestAudioRelayFallback(owner){
+  if(listeningTo!==owner||zyroRelaySubscribed)return;
+  if(!wsSend({type:'audio-relay-subscribe',to:owner})){
+    setAudioListenState('⚠ Server scollegato. Riprova quando Internet torna disponibile.');
+    return;
+  }
+  setAudioListenState('🎧 Collegamento alternativo al server in corso...');
+}
+function handleAudioRelayStatus(m){
+  if(listeningTo!==m.owner)return;
+  if(m.active!==true){
+    setAudioListenState('⚠ Audio non raggiungibile: '+String(m.reason||'connessione non disponibile').slice(0,125));
+    toast('L’audio SOS non è ancora collegato. Verifica il microfono dell’altro telefono.',true);
+    return;
+  }
+  if(peers.get(m.owner)?.connectionState==='connected'){
+    // WebRTC won the race: do not start a second unneeded connection.
+    wsSend({type:'audio-relay-unsubscribe',to:m.owner});
+    return;
+  }
+  zyroRelaySubscribed=true;
+  setAudioListenState('🎧 Ricezione audio tramite server · premi ▶ per ascoltare');
+}
+function retryListenAfterReconnect(){
+  if(!listeningTo)return;
+  zyroRelaySubscribed=false;
+  setAudioListenState('🎧 Riconnessione al server in corso...');
+  requestAudioRelayFallback(listeningTo);
+}
+function closeAudioRelayPlayback(notifyServer=false){
+  cancelAudioRelayFallback();
+  if(notifyServer && listeningTo && zyroRelaySubscribed)
+    wsSend({type:'audio-relay-unsubscribe',to:listeningTo});
+  zyroRelaySubscribed=false;
+  const r=zyroRelayListener;zyroRelayListener=null;
+  if(r)void r.ctx.close().catch(()=>{});
+}
+function ensureAudioRelayPlayback(){
+  if(zyroRelayListener)return zyroRelayListener;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)throw Error('Audio in tempo reale non supportato su questo telefono.');
+  const ctx=new AC({latencyHint:'interactive'});
+  const sink=ctx.createMediaStreamDestination();
+  const player=$('remoteAudio');player.srcObject=sink.stream;
+  zyroRelayListener={ctx,sink,nextTime:0,started:false};
+  void ctx.resume().catch(()=>{});
+  void player.play().catch(()=>setAudioListenState('🎧 Audio disponibile · premi ▶ sul lettore per sentirlo'));
+  return zyroRelayListener;
+}
+function handleAudioRelayPacket(m){
+  if(!zyroRelaySubscribed||m.from!==listeningTo||typeof m.pcm!=='string')return;
+  try{
+    const raw=atob(m.pcm),frames=raw.length/2;
+    if(!Number.isInteger(frames)||frames<50||frames>4096)return;
+    const r=ensureAudioRelayPlayback();
+    const buffer=r.ctx.createBuffer(1,frames,16000);
+    const out=buffer.getChannelData(0);
+    for(let i=0;i<frames;i++){
+      const lo=raw.charCodeAt(i*2),hi=raw.charCodeAt(i*2+1);
+      const signed=(hi<<8)|lo;out[i]=(signed>32767?signed-65536:signed)/32768;
+    }
+    const source=r.ctx.createBufferSource();source.buffer=buffer;source.connect(r.sink);
+    const now=r.ctx.currentTime;
+    if(r.nextTime<now+.12||r.nextTime>now+1)r.nextTime=now+.17;
+    source.start(r.nextTime);r.nextTime+=buffer.duration;
+    if(!r.started){r.started=true;setAudioListenState('🎧 Audio in diretta tramite server (non E2EE)');}
+  }catch(error){
+    console.warn('Audio relay playback issue:',error?.name||'unknown');
+  }
+}
+async function startAudioRelaySender(){
+  if(zyroRelaySender||!localStream||!current?.me?.sos||current.me.sosAudioConsent!==true)return;
+  const AC=window.AudioContext||window.webkitAudioContext;
+  if(!AC)return;
+  let ctx;
+  try{
+    ctx=new AC({latencyHint:'interactive'});
+    const source=ctx.createMediaStreamSource(localStream);
+    // ScriptProcessor only runs when a recipient explicitly requests fallback.
+    // Supported in Android WebView; no recording is retained.
+    const processor=ctx.createScriptProcessor(4096,1,1);
+    const silent=ctx.createGain();silent.gain.value=0;
+    source.connect(processor);processor.connect(silent);silent.connect(ctx.destination);
+    const sender={ctx,source,processor,silent};zyroRelaySender=sender;
+    processor.onaudioprocess=e=>{
+      if(zyroRelaySender!==sender||!localStream||!current?.me?.sos||
+         current.me.sosAudioConsent!==true||socket?.readyState!==WebSocket.OPEN)return;
+      // Skip data if the socket is congested: latency matters more than backlog.
+      if(socket.bufferedAmount>96*1024)return;
+      const input=e.inputBuffer.getChannelData(0),rate=e.inputBuffer.sampleRate;
+      const sampleCount=Math.floor(input.length*16000/rate);
+      if(sampleCount<50||sampleCount>4096)return;
+      const bytes=new Uint8Array(sampleCount*2);
+      for(let i=0;i<sampleCount;i++){
+        const v=Math.max(-1,Math.min(1,input[Math.min(input.length-1,Math.floor(i*rate/16000))]||0));
+        const p=v<0?Math.round(v*32768):Math.round(v*32767);
+        bytes[i*2]=p&255;bytes[i*2+1]=(p>>8)&255;
+      }
+      let binary='';for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+      wsSend({type:'audio-relay-data',pcm:btoa(binary),seq:zyroRelaySequence++});
+    };
+    await ctx.resume();
+    if(zyroRelaySender!==sender)void ctx.close().catch(()=>{});
+  }catch(error){
+    console.warn('SOS audio relay not supported:',error?.name||'unknown');
+    if(ctx)void ctx.close().catch(()=>{});
+    zyroRelaySender=null;
+  }
+}
+function stopAudioRelaySender(){
+  const r=zyroRelaySender;zyroRelaySender=null;
+  if(!r)return;
+  r.processor.onaudioprocess=null;
+  try{r.source.disconnect();r.processor.disconnect();r.silent.disconnect();}catch{}
+  void r.ctx.close().catch(()=>{});
+}
 async function enablePush(){
   if(!current?.pushEnabled)throw Error('Le notifiche Web Push non sono ancora configurate sul server.');
   if(!('serviceWorker'in navigator) || !('PushManager'in window)) {
@@ -716,6 +1181,7 @@ class ZyroRasterMap{
   this.el.addEventListener('pointerup',this.onUp);this.el.addEventListener('pointercancel',this.onUp);
   this.el.addEventListener('wheel',this.onWheel,{passive:false});
   this.resize();
+  if(typeof ResizeObserver!=='undefined'){this.sizeObserver=new ResizeObserver(()=>this.resize());this.sizeObserver.observe(this.el);}
  }
  getZoom(){return this.zoom;}
  zoomTo(newZoom){
@@ -736,8 +1202,8 @@ class ZyroRasterMap{
   const p=toWorld(this.center.lat,this.center.lon,this.zoom),n=fromWorld(p.x-dx,p.y-dy,this.zoom);
   this.center=n;this.schedule();
  }
- resize(){this.schedule();}
- schedule(){if(this.removed||this.pending!==null)return;this.pending=requestAnimationFrame(()=>{this.pending=null;this.draw();});}
+ resize(){this.viewportWidth=this.el.clientWidth;this.viewportHeight=this.el.clientHeight;this.schedule();}
+ schedule(){if(this.removed||this.pending!==null||document.hidden||activeView!=='home')return;this.pending=requestAnimationFrame(()=>{this.pending=null;this.draw();});}
  clearTiles(){for(const img of this.tiles.values())img.remove();this.tiles.clear();}
  positionTile(img,left,top,w,h){
   const tileZoom=Number(img.dataset.zyroZ),scale=2**(this.zoom-tileZoom);
@@ -748,13 +1214,14 @@ class ZyroRasterMap{
   // Keep the projection close to the viewport across the date line.
   wx+=Math.round(((left+w/2)-(wx+size/2))/world)*world;
   const px=Math.round(wx-left),py=Math.round(Number(img.dataset.zyroY)*size-top);
-  img.style.width=`${size}px`;img.style.height=`${size}px`;
-  img.style.transform=`translate3d(${px}px,${py}px,0)`;
+  if(img._zyroSize!==size){img._zyroSize=size;img.style.width=`${size}px`;img.style.height=`${size}px`;}
+  const transform=`translate3d(${px}px,${py}px,0)`;
+  if(img._zyroTransform!==transform){img._zyroTransform=transform;img.style.transform=transform;}
   return px+size>-256&&px<w+256&&py+size>-256&&py<h+256;
  }
  draw(){
   if(this.removed)return;
-  const w=this.el.clientWidth,h=this.el.clientHeight;if(w<20||h<20)return;
+  const w=this.viewportWidth,h=this.viewportHeight;if(w<20||h<20)return;
   const center=toWorld(this.center.lat,this.center.lon,this.zoom),count=2**this.zoom;
   const left=center.x-w/2,top=center.y-h/2;
   const startX=Math.floor(left/TILE_SIZE)-1,endX=Math.floor((left+w)/TILE_SIZE)+1;
@@ -777,7 +1244,7 @@ class ZyroRasterMap{
      if(this.removed||!this.tiles.has(key))return;
      img.dataset.zyroReady='error';img.style.visibility='hidden';
      this.failed++;
-     if(this.loaded===0&&this.failed>=3)this.onError?.('Le immagini della mappa non arrivano dal server. Riprova o verifica Render.');
+     if(this.loaded===0&&this.failed>=3)this.onError?.('Le immagini della mappa non arrivano dal server. Riprova o verifica la connessione.');
     };
     this.tiles.set(key,img);this.layer.appendChild(img);
     img.src=`/api/map-tile/${this.zoom}/${((xx%count)+count)%count}/${yy}.png`;
@@ -814,7 +1281,7 @@ class ZyroRasterMap{
   }
   for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
  }
- remove(){this.removed=true;if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
+ remove(){this.removed=true;this.sizeObserver?.disconnect();if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
 }
 function syncStableMarkers(){stableMap?.schedule();}
 function focusStableMap(lat,lon,zoom=16){if(!stableMap||!mapValidPoint({lat,lon}))return;stableMap.easeTo({center:[Number(lon),Number(lat)],zoom});}
@@ -836,7 +1303,7 @@ function ensureStableMap(){
   if(boot!==stableBootId)return;
   if(stableMapState!=='ready'){stableMapState='ready';mapHideFailure();mapStatus('Cartografia caricata. Attiva il GPS per localizzarti.');renderMap();}
  },message=>{if(boot===stableBootId)mapShowFailure(message);});
- stableLoadTimer=setTimeout(()=>{if(stableMapState!=='ready'&&boot===stableBootId)mapShowFailure('Non arrivano le strade. Controlla la rete e il servizio su Render.');},14000);
+ stableLoadTimer=setTimeout(()=>{if(stableMapState!=='ready'&&boot===stableBootId)mapShowFailure('Non arrivano le strade. Controlla la connessione e riprova.');},14000);
 }
 function renderMap(){
  if(!current||$('homeView').classList.contains('hidden'))return;
@@ -879,7 +1346,11 @@ function renderPickControls(){
   if(!current)return;
   const contacts=uniqueContacts(), validIds=new Set(contacts.map(c=>c.id));
   for(const id of [...pickSelected])if(!validIds.has(id))pickSelected.delete(id);
-  $('pickRecipientsList').innerHTML=contacts.length?contacts.map(c=>`<label><input type="checkbox" data-pickcontact="${escapeHtml(c.id)}" ${pickSelected.has(c.id)?'checked':''}><span>${escapeHtml(c.name)}</span></label>`).join(''):'<span class="empty-contacts">Prima aggiungi qualcuno a una cerchia.</span>';
+  const pickRoot=$('pickRecipientsList');
+  const pickHtml=contacts.length?contacts.map(c=>`<label><input type="checkbox" data-pickcontact="${escapeHtml(c.id)}" ${pickSelected.has(c.id)?'checked':''}><span>${escapeHtml(c.name)}</span></label>`).join(''):'<span class="empty-contacts">Prima aggiungi qualcuno a una cerchia.</span>';
+  // User-selectable Pick Pocket recipients remain in place during unrelated
+  // live-location and FCM updates; delegated change handler still works.
+  if(pickRoot._zyroHtml!==pickHtml){pickRoot.innerHTML=pickHtml;pickRoot._zyroHtml=pickHtml;}
   $('pickRecipients').classList.toggle('hidden',!$('pickNotify').checked);
   $('pickPanel').classList.toggle('armed',pickArmed);
   $('pickPanel').classList.toggle('alarming',theftTriggered);
@@ -887,8 +1358,17 @@ function renderPickControls(){
   $('pickArm').disabled=theftTriggered;
   $('pickSensitivity').disabled=pickArmed;
   $('pickNotify').disabled=pickArmed;
-  $('pickRecipientsList').querySelectorAll('input').forEach(el=>el.disabled=pickArmed);
-  $('pickStatus').textContent=theftTriggered?'🚨 Movimento sospetto rilevato. Inserisci la password nella schermata di allarme.':pickArmed?'🟢 Pick Pocket attiva: tieni ZYRO 360 aperta. La protezione si ferma se il browser sospende i sensori.':'Protezione disattivata. Attivala solo per i test con l’app aperta.';
+  pickRoot.querySelectorAll('input').forEach(el=>{if(el.disabled!==pickArmed)el.disabled=pickArmed;});
+  const nativeStatus=window.ZyroNativeSafety;
+  $('pickStatus').textContent=theftTriggered
+    ?'🚨 Movimento sospetto rilevato. Inserisci la password nella schermata di allarme.'
+    :pickArmed && isZyroNativeAvailable()
+      ?nativeStatus?.running && nativeStatus?.pick
+        ?'🟢 Servizio Android avviato. Premi «Verifica servizio Android» dopo aver bloccato e riaperto lo schermo per controllare i sensori.'
+        :'⚠ Servizio Android non confermato. Premi «Verifica servizio Android»: il semplice tasto Attiva non prova il funzionamento.'
+      :pickArmed?'⚠ Modalità web di prova, non adatta alla protezione in background. Usa l’app Android V24.'
+      :'Protezione disattivata. Attiva solo quando serve: il monitoraggio usa batteria e sensori.';
+  renderNativeDiagnostic();
 }
 async function motionPermission(){
   if(!('DeviceMotionEvent' in window))throw Error('Questo telefono/browser non espone i sensori di movimento.');
@@ -936,9 +1416,25 @@ function showTheftOverlay(message){$('theftOverlay').classList.remove('hidden');
 function hideTheftOverlay(){$('theftOverlay').classList.add('hidden');$('theftPassword').value='';}
 async function armPick(){
   if(theftTriggered)return;
-  if(pickArmed){pickArmed=false;window.removeEventListener('devicemotion',motionListener);updateGeo(null,current?.me?.sharing||!!current?.me?.sos||mapTracking);renderPickControls();toast('Pick Pocket disattivata.');return;}
+  if(pickArmed){
+    if(isZyroNativeAvailable())await nativeBackgroundSync({pick:false});
+    pickArmed=false;window.removeEventListener('devicemotion',motionListener);
+    updateGeo(null,current?.me?.sharing||!!current?.me?.sos||mapTracking);
+    renderPickControls();toast('Pick Pocket disattivata.');return;
+  }
+  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Pick Pocket è incluso in ZYRO Premium e Family.');}
   if($('pickNotify').checked && !pickSelected.size)throw Error('Seleziona almeno un familiare o un amico da avvisare.');
-  await motionPermission();
+  if(isZyroNativeAvailable()){
+    const confirmed=confirm('Attiva Pick Pocket: il monitoraggio continuerà a schermo bloccato tramite una notifica Android. Movimenti bruschi possono creare falsi allarmi. Vuoi attivarlo?');
+    if(!confirmed)return;
+    await nativeBackgroundSync({pick:true});
+    pickArmed=true;armTime=Date.now();renderPickControls();
+    toast('Monitoraggio nativo richiesto. Controlla la notifica permanente di Zyro 360.');
+    return;
+  }
+  // Safety mode must never claim armed protection from browser-only sensors.
+  // Native FGS is required: browser motion events stop when Android suspends it.
+  throw Error('Pick Pocket in background richiede l’APK Android Zyro 360 V24. Apri l’app installata dalla sua icona, non il sito nel browser.');
   // Autoplay permission is tied to this user gesture; still not guaranteed by every browser.
   try{const AC=window.AudioContext||window.webkitAudioContext;if(AC){sirenContext ||= new AC();await sirenContext.resume();}}catch{}
   void orientationPermission();
@@ -969,12 +1465,14 @@ async function stopTheft(){
   try{
     await post('/api/pickpocket/stop',{password});
     theftTriggered=false;theftIsPending=false;stopSiren();hideTheftOverlay();
-    await refresh();renderPickControls();toast('Allarme antifurto terminato dal proprietario.');
+    await refresh();
+    if(isZyroNativeAvailable())await nativeBackgroundSync({pick:false});
+    renderPickControls();toast('Allarme antifurto terminato dal proprietario.');
   }finally{$('theftStop').disabled=false;}
 }
 async function previewSiren(){
   if(theftTriggered)return;
-  startSiren();toast('Test sirena locale di 2 secondi, nessun avviso inviato.');
+  startSiren();toast('Sirena attiva per 2 secondi. Nessun avviso inviato.');
   setTimeout(()=>{if(!theftTriggered)stopSiren();},2000);
 }
 
@@ -984,7 +1482,7 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.creatorPremium?'Account creatore verificato: tutte le funzioni Premium sono incluse gratuitamente. Nessun abbonamento richiesto.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`Premium attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Abbonamento Premium non attivo. Acquisti Play Store non ancora configurati: non è possibile inviare SOS Premium.';
+ $('premiumStatus').textContent=me.creatorPremium?'Account creatore verificato: tutte le funzioni Premium sono incluse gratuitamente. Nessun abbonamento richiesto.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Premium'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Nessun abbonamento attivo. Scegli Premium o Family. Gli acquisti saranno disponibili dopo il collegamento a Google Play.';
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
   const root=$(container);const members=uniqueContacts();const signature=members.map(x=>x.id).join(',');
@@ -997,11 +1495,12 @@ function renderV15(){if(!current)return;
  $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
  if(onC){$('checkinStatus').textContent=c.status==='late'?'Orario scaduto: conferma appena puoi':'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.`;}
  const others=(current.journeys||[]).filter(x=>x.userId!==me.id);
- $('journeyContactsStatus').innerHTML=others.map(x=>`<p class="zyro-v15-contact-status">🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)} · ${x.status==='late'?'In ritardo':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso annullato':'Arrivo previsto '+v15Time(x.dueAt)}</p>`).join('');
+ updateMarkupIfChanged($('journeyContactsStatus'),others.map(x=>`<p class="zyro-v15-contact-status">🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)} · ${x.status==='late'?'In ritardo':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso annullato':'Arrivo previsto '+v15Time(x.dueAt)}</p>`).join(''));
  const checks=(current.checkins||[]).filter(x=>x.userId!==me.id);
- $('checkinContactsStatus').innerHTML=checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join('');
+ updateMarkupIfChanged($('checkinContactsStatus'),checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join(''));
 }
 async function v15JourneyStart(){
+ requireFamilyPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
  const auto=$('journeyAuto').checked;
  if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
@@ -1009,7 +1508,7 @@ async function v15JourneyStart(){
  await refresh();toast(result.ok?'Accompagnami attivo. I contatti scelti vedono il percorso se hai attivato la posizione.':'Percorso non avviato.');
 }
 async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere il percorso?'))return;await post('/api/journey/end',{arrived});journeyTarget=null;$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato.');}
-async function v15CheckinStart(){if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
+async function v15CheckinStart(){requireFamilyPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
 // ZYRO V16: one right-side settings drawer for every account. Existing controls
@@ -1042,7 +1541,7 @@ function setupProfileSettings(){
   </section>
   <section class="zyro-permission-card" aria-label="Sensori Pick Pocket">
    <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">🛡️</span><div class="zyro-permission-head"><h4>Sensori Pick Pocket</h4><p>Controlla se il telefono può rilevare movimenti sospetti con l’app aperta.</p></div></div>
-   <p id="zyroSensorState" class="zyro-permission-state" data-state="pending" role="status">Funzione sperimentale da verificare.</p>
+   <p id="zyroSensorState" class="zyro-permission-state" data-state="pending" role="status">Autorizza i sensori per attivare la funzione.</p>
    <button type="button" class="zyro-permission-action" data-zyro-permission="sensors">Verifica sensori</button>
   </section>
  </div>
@@ -1290,6 +1789,9 @@ function closeProfileSettings(){
 }
 function renderInvitedPeople(){
  const root=$('savedInvitees');if(!root || !current)return;
+ const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.premiumPlan,current.me.gpsRecipients,current.me.sosRecipients,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.invitedByMe])])]);
+ if(root._zyroSig===sig&&root.children.length)return;
+ root._zyroSig=sig;
  const byId=new Map();
  for(const circle of current.circles||[]){
    for(const member of circle.members||[]){
@@ -1299,6 +1801,31 @@ function renderInvitedPeople(){
    }
  }
  root.replaceChildren();
+ // Only place that controls emergency microphone opt-in:
+ // Profilo > Persone invitate, alongside per-contact GPS/SOS permissions.
+ const micBox=document.createElement('section');
+ micBox.className='zyro-sos-mic-choice';
+ const micLabel=document.createElement('label');micLabel.className='zyro-access-toggle zyro-sos-mic-toggle';
+ const micCopy=document.createElement('span');
+ const micTitle=document.createElement('strong');micTitle.textContent='Condividi audio durante SOS';
+ const micExplanation=document.createElement('small');
+ micExplanation.textContent='Se attivo, premendo SOS il microfono può trasmettere audio in diretta esclusivamente ai destinatari selezionati che toccano «Ascolta». Se la connessione diretta fallisce, l’audio può transitare temporaneamente sul server per arrivare al destinatario: non viene registrato né conservato, ma questo percorso non è crittografato end-to-end. Puoi disattivare questa funzione in qualsiasi momento.';
+ micCopy.append(micTitle,micExplanation);
+ const micInput=document.createElement('input');micInput.type='checkbox';micInput.id='sosAudioConsent';
+ micInput.checked=hasFamilyPlan()&&current.me.sosAudioConsent===true;micInput.disabled=!hasFamilyPlan();
+ micInput.setAttribute('aria-label','Consenti audio in diretta automatico durante SOS');
+ micLabel.append(micCopy,micInput);
+ const micHint=document.createElement('p');micHint.className='zyro-sos-mic-note';
+ micHint.textContent='Incluso in ZYRO Family. Scegli prima di usare SOS. Android richiede il permesso microfono. L’audio può interrompersi con lo schermo spento; lo stato sarà indicato nella Home.';
+ const micTest=document.createElement('button');micTest.type='button';micTest.id='zyroTestMic';
+ micTest.className='zyro-sos-mic-test';micTest.textContent='Verifica microfono';micTest.disabled=!micInput.checked;
+ const micNative=document.createElement('button');micNative.type='button';
+ micNative.id='zyroMicNativeCheck';micNative.className='zyro-sos-mic-test';
+ micNative.textContent='Diagnostica microfono Android';micNative.disabled=!micInput.checked;
+ const micResult=document.createElement('p');micResult.id='zyroMicDiagnosticResult';
+ micResult.className='zyro-mic-diagnostic-result';micResult.hidden=true;
+ micResult.setAttribute('role','status');micResult.setAttribute('aria-live','polite');
+ micBox.append(micLabel,micHint,micTest,micNative,micResult);root.append(micBox);
  if(!byId.size){
    const p=document.createElement('p');p.className='zyro-invitees-empty';
    p.textContent='Nessuna persona collegata. Invita amici e familiari dalla sezione Cerchie.';
@@ -1398,11 +1925,43 @@ async function init(){
   window.addEventListener('zyro:fcm-status',()=>{void refreshPermissionStates();});
   window.addEventListener('zyro:android-notification-permission',()=>{void refreshPermissionStates();});
   window.addEventListener('zyro:android-microphone-permission',()=>{void refreshPermissionStates();});
+  window.addEventListener('zyro:android-ready',()=>{
+    if(hasZyroNativeBridge())void readNativeSafetyStatus().catch(()=>{});
+  });
+  window.addEventListener('zyro:android-safety-state',event=>{
+    const status=event.detail||{};
+    if(status.pick && !theftTriggered)pickArmed=true;
+    else if(!status.pick && isZyroNativeAvailable())pickArmed=false;
+    renderPickControls();
+    renderNativeDiagnostic();
+  });
   window.addEventListener('zyro:android-location-permission',event=>{
     if(event?.detail?.granted===false)zyroLocationFix=null;
     void refreshPermissionStates();
   });
   $('savedInvitees').addEventListener('change',e=>{
+    if(e.target.id==='sosAudioConsent'){
+      const input=e.target, enabled=input.checked;
+      if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede ZYRO Family.',true);return;}
+      input.disabled=true;
+      // Launch the permission check in this tap; never store or send test audio.
+      const probe=enabled?testSOSMicrophone().then(()=>null,error=>sosMicErrorMessage(error)):null;
+      void action(async()=>{
+        try{
+          await post('/api/settings/sos-audio',{enabled});
+          if(!enabled && localStream)stopAudio();
+          sosAudioError='';
+          await refresh();
+          const issue=probe?await probe:null;
+          if(issue)toast('Preferenza salvata, ma il microfono non è pronto: '+issue,true);
+          else toast(enabled?'Ascolto SOS automatico consentito. Si attiverà quando premi SOS.':'Ascolto ambientale SOS disattivato.');
+        }catch(err){
+          if(input.isConnected){input.checked=!enabled;input.disabled=false;}
+          throw err;
+        }
+      });
+      return;
+    }
     if(!e.target.matches('input[data-access-user]'))return;
     const input=e.target;input.disabled=true;
     void action(async()=>{
@@ -1412,12 +1971,35 @@ async function init(){
     });
   });
   $('savedInvitees').addEventListener('click',e=>{
+    if(e.target.id!=='zyroTestMic'&&e.target.id!=='zyroMicNativeCheck')return;
+    const button=e.target,native=e.target.id==='zyroMicNativeCheck';
+    button.disabled=true;
+    void action(async()=>{
+      const result=$('zyroMicDiagnosticResult');
+      if(result){result.hidden=false;result.dataset.status='pending';result.textContent='Test audio in corso…';}
+      try{
+        const message=native?await testZyroNativeMicrophone()
+          :(await testSOSMicrophone(),'✓ Microfono WebView verificato. Nessun audio salvato o trasmesso.');
+        if(result){result.hidden=false;result.dataset.status='ok';result.textContent=message;}
+        toast(message);
+      }catch(err){
+        const message='⚠ '+(native?err.message:sosMicErrorMessage(err));
+        if(result){result.hidden=false;result.dataset.status='error';result.textContent=message;}
+        toast(message,true);
+      }finally{if(button.isConnected)button.disabled=false;}
+    });
+  });
+  $('savedInvitees').addEventListener('click',e=>{
     if(e.target.id!=='zyroInviteesGpsGlobal')return;
     void action(async()=>{
       if(current?.me?.sos)throw Error('Termina prima il tuo SOS.');
       const enabled=!current.me.sharing;
       await post('/api/sharing',{enabled});
       await refresh();
+      if(isZyroNativeAvailable()){
+        try{await nativeBackgroundSync();}
+        catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}
+      }
       if(enabled)updateGeo(null,true);
       toast(enabled?'GPS attivo per i contatti autorizzati.':'Condivisione GPS disattivata.');
     });
@@ -1427,12 +2009,21 @@ async function init(){
   $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;ownCentered=false;void orientationPermission();updateGeo(null,true);if(lastCoords){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
   $('pickNotify').addEventListener('change',renderPickControls);
   $('pickRecipientsList').addEventListener('change',e=>{if(!e.target.matches('[data-pickcontact]'))return;const id=e.target.dataset.pickcontact;if(e.target.checked)pickSelected.add(id);else pickSelected.delete(id);});
+  $('zyroNativeCheck')?.addEventListener('click',()=>action(async()=>{
+    await readNativeSafetyStatus();
+    toast('Stato del servizio Android aggiornato.');
+  }));
+  $('zyroNativeBattery')?.addEventListener('click',()=>action(async()=>await openNativeBatterySettings()));
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible' && isZyroNativeAvailable())
+      void readNativeSafetyStatus().catch(e=>console.warn('Android monitor:',e.message));
+  });
   $('pickArm').addEventListener('click',()=>action(armPick));
   $('pickTest').addEventListener('click',()=>action(previewSiren));
   $('theftStop').addEventListener('click',()=>action(stopTheft));
   $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/circles',{name:$('circleName').value});$('circleName').value='';await refresh();toast('Cerchia creata! Ora puoi generare un invito.');});});
   $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/invites/join',{code:$('inviteInput').value});$('inviteInput').value='';await refresh();inviteFromLink=null;toast('Ora fai parte della cerchia!');});});
-  $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
+  $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();if(isZyroNativeAvailable()){try{await nativeBackgroundSync();}catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}}toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
   $('journeyRecipients').addEventListener('change',e=>{if(e.target.matches('[data-journey-to]')){e.target.checked?journeySelected.add(e.target.dataset.journeyTo):journeySelected.delete(e.target.dataset.journeyTo);}});
   $('checkinRecipients').addEventListener('change',e=>{if(e.target.matches('[data-checkin-to]')){e.target.checked?checkinSelected.add(e.target.dataset.checkinTo):checkinSelected.delete(e.target.dataset.checkinTo);}});
   $('journeySetTarget').addEventListener('click',()=>{if(!stableMap){toast('Apri prima la Home e carica la mappa.',true);return;}journeyTarget={lat:stableMap.center.lat,lon:stableMap.center.lon};$('journeyAuto').checked=true;$('journeyTargetInfo').textContent=`Meta impostata: ${journeyTarget.lat.toFixed(5)}, ${journeyTarget.lon.toFixed(5)}`;toast('Meta GPS salvata dal centro della mappa.');});
@@ -1445,7 +2036,7 @@ async function init(){
   $('premiumDetails').addEventListener('click',()=>toast('Pagamenti Google Play da integrare nell’app Android: al momento non si può acquistare Premium. Non viene inviato alcun SOS a pagamento.'));
   $('sosButton').addEventListener('click',()=>action(startSOS));
   $('stopSOS').addEventListener('click',()=>action(stopSOS));
-  $('audioButton').addEventListener('click',()=>action(async()=>{if(localStream){stopAudio();toast('Microfono disattivato. Il tuo SOS rimane attivo.');}else await startAudio();}));
+
   $('sosRecipientList').addEventListener('change',()=>{sosPending=[...$('sosRecipientList').querySelectorAll('[data-sos-to]:checked')].map(x=>x.dataset.sosTo);});
   $('saveSOSRecipients').addEventListener('click',()=>action(async()=>{const recipients=[...$('sosRecipientList').querySelectorAll('[data-sos-to]:checked')].map(x=>x.dataset.sosTo);await post('/api/settings/sos-recipients',{recipients});sosPending=null;await refresh();toast('Destinatari SOS salvati.');}));
   for(const id of ['avatarCamera','avatarGallery'])$(id).addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(()=>saveAvatar(file));e.target.value='';});
@@ -1463,7 +2054,9 @@ async function init(){
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
+    if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
+    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=16-profilo').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}
   catch(err){
@@ -1476,3 +2069,49 @@ async function init(){
   window.addEventListener('pagehide',()=>{ /* Browsers may suspend GPS, sensors and audio: never promise background safety. */ });
 }
 init();
+
+
+
+// V41: swipe on page content, including cards and buttons; inputs/maps keep their gestures.
+(() => {
+ const order=['home','circles','modes','chats','settings'];
+ let g=null, suppressUntil=0;
+ function available(){return !$('appScreen').classList.contains('hidden') &&
+  !document.body.classList.contains('zyro-settings-open') &&
+  !Array.from(document.querySelectorAll('[aria-modal="true"]')).some(el=>
+   el.getAttribute('aria-hidden')!=='true' && !el.inert && !el.closest('.hidden,[hidden]') && el.getClientRects().length>0);}
+ document.addEventListener('touchstart',e=>{
+  g=null;if(e.touches.length!==1 || !available())return;
+  const el=e.target instanceof Element?e.target:e.target.parentElement;
+  if(!el?.closest('.view,.bottom-nav') || el.closest('input,textarea,select,[contenteditable="true"],audio,video,#liveMap,[role="slider"]'))return;
+  const t=e.touches[0];if(t.clientX<24 || t.clientX>innerWidth-24)return;
+  for(let n=el;n && !n.matches('.view,.bottom-nav');n=n.parentElement){
+   if(n.scrollWidth>n.clientWidth+4 && /auto|scroll/.test(getComputedStyle(n).overflowX))return;
+  }
+  g={id:t.identifier,x:t.clientX,y:t.clientY,time:performance.now(),view:activeView,axis:null};
+ },{passive:true,capture:true});
+ document.addEventListener('touchmove',e=>{
+  if(!g)return;const t=Array.from(e.touches).find(t=>t.identifier===g.id);
+  if(e.touches.length!==1 || !t){g=null;return;}
+  const dx=t.clientX-g.x,dy=t.clientY-g.y;
+  if(!g.axis && Math.max(Math.abs(dx),Math.abs(dy))>12){
+   if(Math.abs(dx)>Math.abs(dy)*1.35)g.axis='x';else{g=null;return;}
+  }
+  if(g.axis==='x' && e.cancelable)e.preventDefault();
+ },{passive:false,capture:true});
+ document.addEventListener('touchcancel',()=>{g=null;},{passive:true,capture:true});
+ document.addEventListener('touchend',e=>{
+  const s=g;g=null;if(!s || e.touches.length || !available() || activeView!==s.view)return;
+  const t=Array.from(e.changedTouches).find(t=>t.identifier===s.id);if(!t)return;
+  const dx=t.clientX-s.x,dy=t.clientY-s.y;
+  if(performance.now()-s.time>1200 || Math.abs(dx)<56 || Math.abs(dx)<Math.abs(dy)*1.35)return;
+  const next=order[order.indexOf(activeView)+(dx<0?1:-1)];if(!next)return;
+  suppressUntil=performance.now()+400;showView(next);
+ },{passive:true,capture:true});
+ document.addEventListener('click',e=>{if(performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation();}},true);
+})();
+
+
+// Resume visual map updates when the app returns to the foreground.
+document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeView==='home'){stableMap?.resize();renderHeadingOnly();}});
+
