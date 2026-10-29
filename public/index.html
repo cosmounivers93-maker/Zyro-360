@@ -26,6 +26,7 @@
   <link rel="stylesheet" href="/zyro-layout-performance-v27.css?v=27.0">
   <link rel="stylesheet" href="/zyro-dark-scroll-v28.css?v=28.0">
   <link rel="stylesheet" href="/zyro-glass-v30.css?v=30.0">
+  <link rel="stylesheet" href="/zyro-sos-home-v33.css?v=33.0">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -64,6 +65,8 @@
           <div id="mapUnavailable" class="map-unavailable hidden" role="alert"><strong>Cartografia non disponibile</strong><span id="mapFailureText">Impossibile caricare la cartografia. Controlla Internet e riprova.</span><div class="map-recovery-actions"><button type="button" id="mapRetry">Riprova</button><a id="mapOpenGoogle" href="https://www.openstreetmap.org/" target="_blank" rel="noopener noreferrer">Apri OpenStreetMap</a></div></div>
           <div id="mapAttribution" class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a id="mapSourceCredit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">Dati OpenStreetMap</a></div>
         </div>
+        <!-- V33: avviso SOS audio visibile anche sulla mappa, solo per destinatari autorizzati. -->
+        <section id="homeSOSListen" class="zyro-home-sos-listen hidden" role="region" aria-label="SOS ricevuto e ascolto audio" aria-live="polite"></section>
         <div class="zyro-command-row" role="group" aria-label="Azioni rapide di ZYRO 360">
           <label class="zyro-command-btn zyro-command-share" for="shareToggle" title="Attiva o disattiva la condivisione GPS con le tue cerchie">
             <input id="shareToggle" type="checkbox" aria-label="Condividi la posizione in tempo reale con le mie cerchie">
@@ -101,6 +104,8 @@
 
     <section id="modesView" class="view hidden modes-page">
       <div class="mode-heading"><span class="mode-heading-emblem" aria-hidden="true">✧</span><p class="eyebrow">PROTEZIONE PERSONALIZZATA</p><h1>Modalità <span>360°</span></h1><p>Tutte le protezioni e i contatti d'emergenza in un unico posto.</p></div>
+      <!-- V32: gli SOS ricevuti compaiono subito, non in fondo alla schermata. -->
+      <div id="activeAlerts" class="hidden" aria-live="polite"></div>
       <div class="greeting"><div><p class="eyebrow muted">UNO SPAZIO DI FIDUCIA</p><h1>Ciao, <span id="greetingName">amico</span> <span class="wave">✳</span></h1><p>La tua sicurezza è la nostra priorità.</p></div><div class="avatar" id="myAvatar">S</div></div>
       <div class="top-cards">
         <div class="stat-card"><span class="stat-icon mint">◎</span><div><strong id="totalMembers">0</strong><small>Persone fidate</small></div></div>
@@ -178,7 +183,6 @@
         <p class="setting-description sos-push-note">Quando premi SOS, il server può usare un fornitore di geocodifica per convertire le coordinate GPS in via, eventuale numero civico e città, soltanto se il servizio è attivato. Il civico potrebbe non essere disponibile o esatto. L’indirizzo e la posizione dell’allarme sono comunicati ai destinatari SOS scelti.</p>
         <p id="sosPushNote" class="setting-description sos-push-note" role="status"></p>
       </section>
-      <div id="activeAlerts" class="hidden"></div>
       <div class="section-head space-top"><div><h2>Le persone della tua cerchia</h2><p>Posizione e aggiornamenti condivisi</p></div></div>
       <div id="contactsList" class="contacts-list"></div>
       <div class="emergency-card"><span>✚</span><div><b>Emergenza immediata?</b><p>Per un pericolo reale contatta sempre i soccorsi.</p></div><a href="tel:112" class="call-button">Chiama 112</a></div>
@@ -331,6 +335,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=29.0" defer></script>
+<script src="/app.js?v=32.0" defer></script>
 </body>
 </html>

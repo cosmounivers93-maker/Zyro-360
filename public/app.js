@@ -341,13 +341,39 @@ function renderHome(){
   const contactHtml=contacts.length?contacts.map((u,i)=>{
     const status=u.sos?(u.sos.kind==='pickpocket'?'🚨 POSSIBILE FURTO':'🆘 SOS ATTIVO'):u.online?(u.sharing?'Posizione attiva':'Online'):'Offline';
     const loc=u.location, time=loc?when(loc.updatedAt):(u.sharing?'Posizione in attesa':'Posizione non condivisa');
-    return `<div class="contact-card"><div class="contact-avatar ${i%2?'alt':''}">${avatarHTML(u)}</div><div class="contact-info"><b>${escapeHtml(u.name)}</b><small>${escapeHtml(time)}</small></div><div class="contact-actions"><span class="status-chip ${u.sos?'alert':!u.online?'off':''}">${escapeHtml(status)}</span>${loc?`<a class="mini-btn" target="_blank" rel="noopener noreferrer" href="${locationUrl(loc)}">📍 Mappa</a>`:''}${u.sos?.hasAudio?`<button type="button" class="mini-btn audio" data-listen="${escapeHtml(u.id)}">🎧 Ascolta</button>`:''}</div></div>`;
+    return `<div class="contact-card"><div class="contact-avatar ${i%2?'alt':''}">${avatarHTML(u)}</div><div class="contact-info"><b>${escapeHtml(u.name)}</b><small>${escapeHtml(time)}</small></div><div class="contact-actions"><span class="status-chip ${u.sos?'alert':!u.online?'off':''}">${escapeHtml(status)}</span>${loc?`<a class="mini-btn" target="_blank" rel="noopener noreferrer" href="${locationUrl(loc)}">📍 Mappa</a>`:''}${u.sos?.hasAudio?`<button type="button" class="mini-btn audio" data-listen="${escapeHtml(u.id)}">🎧 Ascolta</button>`:u.sos?.kind==='sos'?'<span class="status-chip off" title="La persona deve attivare il microfono SOS sul suo telefono">🎙 Audio in attesa</span>':''}</div></div>`;
   }).join(''):`<div class="empty-state"><div class="empty-symbol">♧</div><strong>La tua cerchia inizia da qui</strong>Aggiungi le persone di cui ti fidi per condividere la posizione e ricevere SOS.</div>`;
   if(contactsRoot._zyroHtml!==contactHtml){contactsRoot.innerHTML=contactHtml;contactsRoot._zyroHtml=contactHtml;}
   const otherAlerts=current.alerts.filter(a=>a.userId!==me.id);
+  // V33: show the SOS audio action on Home, at the moment the authorized
+  // recipient receives the server state. It is enabled ONLY when server says
+  // hasAudio=true; a push/map location alone is not an audio connection.
+  const incomingSOS=otherAlerts.find(a=>(a.kind||'sos')==='sos');
+  const homeSOSListen=$('homeSOSListen');
+  if(homeSOSListen){
+    homeSOSListen.classList.toggle('hidden',!incomingSOS);
+    if(incomingSOS){
+      const ready=incomingSOS.hasAudio===true;
+      const name=escapeHtml(incomingSOS.name||'Una persona fidata');
+      const nextHtml=`<div class="zyro-home-sos-text"><b>🆘 SOS ricevuto da ${name}</b>`+
+        `<small>${ready?'🎙 Microfono segnalato pronto. Tocca Ascolta per collegarti.':'🎙 Audio non ancora disponibile. Il mittente deve autorizzare e accendere il microfono SOS.'}</small></div>`+
+        `<div class="zyro-home-sos-actions">`+
+        (ready?`<button type="button" data-listen="${escapeHtml(incomingSOS.userId)}" class="zyro-home-listen-button">🎧 Ascolta microfono</button>`:
+          `<button type="button" class="zyro-home-listen-button" disabled aria-disabled="true">🎧 In attesa del microfono</button>`)+
+        `<button type="button" data-sos-detail="1" class="zyro-home-sos-details">Dettagli SOS</button></div>`;
+      if(homeSOSListen._zyroHtml!==nextHtml){
+        homeSOSListen.innerHTML=nextHtml;
+        homeSOSListen._zyroHtml=nextHtml;
+        homeSOSListen.querySelector('[data-sos-detail]')?.addEventListener('click',()=>showView('modes'));
+      }
+    }else{
+      homeSOSListen.replaceChildren();
+      homeSOSListen._zyroHtml='';
+    }
+  }
   $('activeAlerts').classList.toggle('hidden',!otherAlerts.length);
   const alertsRoot=$('activeAlerts');
-  const alertsHtml=otherAlerts.map(a=>`<div class="alert-box"><h3>${a.kind==='pickpocket'?'🚨 Possibile furto:':'🆘'} ${escapeHtml(a.name)} ${a.kind==='pickpocket'?'potrebbe aver subito uno scippo':'chiede aiuto'}</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p><div class="action-row">${a.address?`<p>📍 ${escapeHtml(a.address)}</p>`:''}${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
+  const alertsHtml=otherAlerts.map(a=>`<div class="alert-box"><h3>${a.kind==='pickpocket'?'🚨 Possibile furto:':'🆘'} ${escapeHtml(a.name)} ${a.kind==='pickpocket'?'potrebbe aver subito uno scippo':'chiede aiuto'}</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p>${a.kind!=='pickpocket'&&!a.hasAudio?'<p role="status">🎙 Audio non ancora disponibile. Chi invia SOS deve abilitare il consenso microfono e verificare che compaia “Microfono acceso”.</p>':''}<div class="action-row">${a.address?`<p>📍 ${escapeHtml(a.address)}</p>`:''}${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.kind!=='pickpocket'?(a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:'<button type="button" disabled title="Attendi che il telefono che invia il SOS abbia attivato il microfono">🎧 In attesa del microfono</button>'):''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
   if(alertsRoot._zyroHtml!==alertsHtml){alertsRoot.innerHTML=alertsHtml;alertsRoot._zyroHtml=alertsHtml;}
   document.querySelectorAll('[data-listen]:not([data-zyro-wired])').forEach(btn=>{
     btn.dataset.zyroWired='1';

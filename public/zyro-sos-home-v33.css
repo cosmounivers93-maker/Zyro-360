@@ -1,0 +1,59 @@
+/* ZYRO 360 V33 — SOS audio visibile nella Home (solo interfaccia).
+   Ereditata la grafica V30; nessuna modifica a streaming, consenso, server o GPS. */
+#homeView .geo-immersive #homeSOSListen.zyro-home-sos-listen {
+  position:absolute !important;
+  z-index: 38 !important;
+  top:clamp(190px, 26dvh, 290px);
+  left:clamp(10px, 3vw, 18px);
+  right:clamp(10px, 3vw, 18px);
+  width:auto;
+  max-width: min(calc(100% - 20px), 540px);
+  margin-inline:auto;
+  padding: 12px 13px;
+  border-radius: 18px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  box-sizing:border-box;
+  border:1px solid rgba(235,171,184,.73);
+  background:rgba(255,249,250,.96);
+  color:#3c2335;
+  box-shadow:0 10px 26px rgba(57,32,47,.21);
+  -webkit-backdrop-filter:blur(8px);
+  backdrop-filter:blur(8px);
+}
+#homeView #homeSOSListen.hidden{display:none!important}
+#homeView .zyro-home-sos-text{min-width:0;display:grid;gap:4px}
+#homeView .zyro-home-sos-text b{font-size:14px;line-height:1.3;overflow-wrap:anywhere}
+#homeView .zyro-home-sos-text small{font-size:12px;line-height:1.35;color:#675561;overflow-wrap:anywhere}
+#homeView .zyro-home-sos-actions{display:flex;align-items:stretch;gap:7px;flex-wrap:wrap}
+#homeView .zyro-home-sos-actions button{
+  border:0;border-radius:12px;padding:11px 12px;
+  font-size:12px;font-weight:700;line-height:1.2;
+  min-height:44px;touch-action:manipulation;
+}
+#homeView .zyro-home-listen-button{background:#bc3058;color:#fff;flex:1 1 150px}
+#homeView .zyro-home-listen-button:disabled{
+  background:#d3cbd0;color:#4d3e4a;opacity:1;cursor:default;
+}
+#homeView .zyro-home-sos-details{background:#eef2f4;color:#234355;flex:0 0 auto}
+html[data-theme="dark"] #homeView .geo-immersive #homeSOSListen{
+  background:rgba(22,38,54,.97);
+  border-color:rgba(219,115,145,.58);
+  box-shadow:0 12px 30px rgba(0,0,0,.32);
+  color:#fff4f8;
+}
+html[data-theme="dark"] #homeView .zyro-home-sos-text small{color:#d0dae3}
+html[data-theme="dark"] #homeView .zyro-home-listen-button{background:#b6325d;color:#fff}
+html[data-theme="dark"] #homeView .zyro-home-listen-button:disabled{background:#455360;color:#e5ecf1}
+html[data-theme="dark"] #homeView .zyro-home-sos-details{background:#254458;color:#f2ffff}
+@media(max-height:670px){
+  #homeView .geo-immersive #homeSOSListen.zyro-home-sos-listen{
+    top:145px;
+    padding:9px 10px;
+  }
+}
+@media(max-width:370px){
+  #homeView .zyro-home-sos-actions button{font-size:11px;padding:10px}
+  #homeView .zyro-home-sos-details{flex:1 1 100px}
+}
