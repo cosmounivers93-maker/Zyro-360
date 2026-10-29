@@ -134,6 +134,24 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 #zyroAdminPanel .zyro-admin-toolbar{display:flex;flex-wrap:wrap;gap:10px}
 #zyroAdminPanel .zyro-admin-toolbar>button{flex:1;min-width:120px;white-space:normal}
 </style>
+<style>
+/* V50: static cyan/turquoise halo, no animated filters or flashing. */
+#appScreen>.topbar .brand.zyro-neon-wordmark{
+ position:relative;isolation:isolate;gap:0!important;
+ padding:10px 24px!important;border:1px solid transparent!important;border-radius:18px!important;
+ background:linear-gradient(125deg,#103a48ed,#102c3deb) padding-box,linear-gradient(110deg,#65d5ff,#4de2c3) border-box!important;
+ box-shadow:0 0 5px #55d6ec70,0 0 15px #44d9d43d,inset 0 0 10px #4fddd91c!important;
+ font-size:19px!important;letter-spacing:3px!important;line-height:1.3!important;
+}
+#appScreen>.topbar .brand.zyro-neon-wordmark>span{
+ color:#efffff!important;text-shadow:0 0 7px #80eaff70,0 0 13px #4bdad92b!important;
+}
+#appScreen>.topbar .brand.zyro-neon-wordmark b{
+ color:#75efdb!important;text-shadow:0 0 7px #50e5cf75,0 0 13px #50dfe82b!important;
+}
+@media(max-width:360px){#appScreen>.topbar .brand.zyro-neon-wordmark{font-size:17px!important;padding:10px 20px!important;letter-spacing:2.5px!important}}
+@media(forced-colors:active){#appScreen>.topbar .brand.zyro-neon-wordmark{border:1px solid CanvasText!important;box-shadow:none!important}}
+</style>
 </head>
 <body>
 <div id="authScreen" class="auth-shell">
@@ -157,7 +175,7 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 
 <div id="appScreen" class="app-shell hidden">
   <header class="topbar">
-    <div class="brand"><div class="brand-emblem">✦</div><span>ZYRO <b>360</b></span></div>
+    <div class="brand zyro-neon-wordmark" aria-label="ZYRO 360"><span>ZYRO <b>360</b></span></div>
     <div class="connection-pill" hidden aria-hidden="true"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">Connessione...</span></div>
   </header>
   <main class="container">
@@ -461,6 +479,7 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 <script src="/app.js?v=49.0" defer></script>
 </body>
 </html>
+
 
 
 
