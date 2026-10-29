@@ -2056,7 +2056,7 @@ init();
 
 
 
-// V39: navigation gestures share the existing section navigation.
+// V40: navigation gestures share the existing section navigation.
 (() => {
  const order=['home','circles','modes','chats','settings'];
  let gesture=null, suppressClickUntil=0;
@@ -2065,28 +2065,31 @@ init();
   return !$('appScreen')?.classList.contains('hidden') &&
    !document.body.classList.contains('zyro-settings-open') &&
    !document.querySelector('[role="dialog"][aria-hidden="false"]') &&
-   !Array.from(document.querySelectorAll('[aria-modal="true"]')).some(el=>el.getClientRects().length>0) &&
+   !Array.from(document.querySelectorAll('[aria-modal="true"]')).some(el=>
+    el.getAttribute('aria-hidden')!=='true' && !el.inert && !el.closest('.hidden,[hidden]') && el.getClientRects().length>0) &&
    !document.activeElement?.matches('input,textarea,select,[contenteditable="true"]');
  }
  document.addEventListener('touchstart',event=>{
   gesture=null;
   if(event.touches.length!==1 || !available())return;
   const target=event.target;
-  if(!(target instanceof Element) || target.closest(blocked) || !target.closest('.view'))return;
+  if(!(target instanceof Element))return;
+  const onNav=!!target.closest('.bottom-nav');
+  if(!onNav && (target.closest(blocked) || !target.closest('.view')))return;
   const touch=event.touches[0];
   // Leave Android's edge gestures and nested horizontal scrolling alone.
   if(touch.clientX<24 || touch.clientX>innerWidth-24)return;
-  for(let el=target;el && !el.classList.contains('view');el=el.parentElement){
+  for(let el=target;!onNav && el && !el.classList.contains('view');el=el.parentElement){
    if(el.scrollWidth>el.clientWidth+4 && /auto|scroll/.test(getComputedStyle(el).overflowX))return;
   }
   gesture={id:touch.identifier,x:touch.clientX,y:touch.clientY,time:performance.now(),view:activeView};
- },{passive:true});
+ },{passive:true,capture:true});
  document.addEventListener('touchmove',event=>{
   if(!gesture)return;
   const t=Array.from(event.touches).find(t=>t.identifier===gesture.id);
   if(event.touches.length!==1 || !t || Math.abs(t.clientY-gesture.y)>26)gesture=null;
- },{passive:true});
- document.addEventListener('touchcancel',()=>{gesture=null;},{passive:true});
+ },{passive:true,capture:true});
+ document.addEventListener('touchcancel',()=>{gesture=null;},{passive:true,capture:true});
  document.addEventListener('touchend',event=>{
   const g=gesture;gesture=null;
   if(!g || event.touches.length || !available() || activeView!==g.view)return;
@@ -2101,7 +2104,7 @@ init();
   if(panel?.animate && !matchMedia('(prefers-reduced-motion: reduce)').matches){
    panel.animate([{opacity:0.75,transform:`translateX(${dx<0?20:-20}px)`},{opacity:1,transform:'translateX(0)'}],{duration:200,easing:'ease-out'});
   }
- },{passive:true});
+ },{passive:true,capture:true});
  document.addEventListener('click',event=>{
   if(performance.now()<suppressClickUntil){event.preventDefault();event.stopImmediatePropagation();}
  },true);
