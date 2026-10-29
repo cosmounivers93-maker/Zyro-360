@@ -503,7 +503,7 @@ async function loadChat(older=false){
 }
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
-function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;$('profileAccessLabel').textContent=current.me.isAdmin?'Creatore · Premium incluso':'Account personale';setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';const status=$('profileStorageStatus');if(status){status.textContent=current.persistentStorage?'✓ Profilo collegato al database persistente. Non serve registrarsi nuovamente a ogni accesso.':'⚠️ Archivio temporaneo: i profili potrebbero sparire dopo il riavvio del server. Configura DATABASE_URL su Render.';status.style.borderColor=current.persistentStorage?'#86cbb8':'#e9b3a4';}renderPushTestContacts();}
+function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;$('profileAccessLabel').textContent=current.me.isAdmin?'Creatore · Premium incluso':'Account personale';setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';const status=$('profileStorageStatus');if(status){status.textContent=current.persistentStorage?'✓ Profilo salvato.':'Salvataggio del profilo non disponibile: i dati potrebbero non essere conservati. Riprova più tardi.';status.style.borderColor=current.persistentStorage?'#86cbb8':'#e9b3a4';}renderPushTestContacts();}
 function renderPushTestContacts(){
   const select=$('pushTestRecipient'), button=$('pushTestButton');
   if(!select||!button)return;
@@ -1231,7 +1231,7 @@ class ZyroRasterMap{
      if(this.removed||!this.tiles.has(key))return;
      img.dataset.zyroReady='error';img.style.visibility='hidden';
      this.failed++;
-     if(this.loaded===0&&this.failed>=3)this.onError?.('Le immagini della mappa non arrivano dal server. Riprova o verifica Render.');
+     if(this.loaded===0&&this.failed>=3)this.onError?.('Le immagini della mappa non arrivano dal server. Riprova o verifica la connessione.');
     };
     this.tiles.set(key,img);this.layer.appendChild(img);
     img.src=`/api/map-tile/${this.zoom}/${((xx%count)+count)%count}/${yy}.png`;
@@ -1290,7 +1290,7 @@ function ensureStableMap(){
   if(boot!==stableBootId)return;
   if(stableMapState!=='ready'){stableMapState='ready';mapHideFailure();mapStatus('Cartografia caricata. Attiva il GPS per localizzarti.');renderMap();}
  },message=>{if(boot===stableBootId)mapShowFailure(message);});
- stableLoadTimer=setTimeout(()=>{if(stableMapState!=='ready'&&boot===stableBootId)mapShowFailure('Non arrivano le strade. Controlla la rete e il servizio su Render.');},14000);
+ stableLoadTimer=setTimeout(()=>{if(stableMapState!=='ready'&&boot===stableBootId)mapShowFailure('Non arrivano le strade. Controlla la connessione e riprova.');},14000);
 }
 function renderMap(){
  if(!current||$('homeView').classList.contains('hidden'))return;
@@ -1411,7 +1411,7 @@ async function armPick(){
   }
   if($('pickNotify').checked && !pickSelected.size)throw Error('Seleziona almeno un familiare o un amico da avvisare.');
   if(isZyroNativeAvailable()){
-    const confirmed=confirm('Pick Pocket sperimentale: il monitoraggio continuerà a schermo bloccato tramite una notifica Android. Movimenti bruschi possono creare falsi allarmi. Vuoi attivarlo?');
+    const confirmed=confirm('Attiva Pick Pocket: il monitoraggio continuerà a schermo bloccato tramite una notifica Android. Movimenti bruschi possono creare falsi allarmi. Vuoi attivarlo?');
     if(!confirmed)return;
     await nativeBackgroundSync({pick:true});
     pickArmed=true;armTime=Date.now();renderPickControls();
@@ -1458,7 +1458,7 @@ async function stopTheft(){
 }
 async function previewSiren(){
   if(theftTriggered)return;
-  startSiren();toast('Test sirena locale di 2 secondi, nessun avviso inviato.');
+  startSiren();toast('Sirena attiva per 2 secondi. Nessun avviso inviato.');
   setTimeout(()=>{if(!theftTriggered)stopSiren();},2000);
 }
 
@@ -1526,7 +1526,7 @@ function setupProfileSettings(){
   </section>
   <section class="zyro-permission-card" aria-label="Sensori Pick Pocket">
    <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">🛡️</span><div class="zyro-permission-head"><h4>Sensori Pick Pocket</h4><p>Controlla se il telefono può rilevare movimenti sospetti con l’app aperta.</p></div></div>
-   <p id="zyroSensorState" class="zyro-permission-state" data-state="pending" role="status">Funzione sperimentale da verificare.</p>
+   <p id="zyroSensorState" class="zyro-permission-state" data-state="pending" role="status">Autorizza i sensori per attivare la funzione.</p>
    <button type="button" class="zyro-permission-action" data-zyro-permission="sensors">Verifica sensori</button>
   </section>
  </div>
@@ -1792,7 +1792,7 @@ function renderInvitedPeople(){
  micBox.className='zyro-sos-mic-choice';
  const micLabel=document.createElement('label');micLabel.className='zyro-access-toggle zyro-sos-mic-toggle';
  const micCopy=document.createElement('span');
- const micTitle=document.createElement('strong');micTitle.textContent='Consenti cosa succede intorno a me';
+ const micTitle=document.createElement('strong');micTitle.textContent='Condividi audio durante SOS';
  const micExplanation=document.createElement('small');
  micExplanation.textContent='Se attivo, premendo SOS il microfono può trasmettere audio in diretta esclusivamente ai destinatari selezionati che toccano «Ascolta». Se la connessione diretta fallisce, l’audio può transitare temporaneamente sul server per arrivare al destinatario: non viene registrato né conservato, ma questo percorso non è crittografato end-to-end. Puoi disattivare questa funzione in qualsiasi momento.';
  micCopy.append(micTitle,micExplanation);
@@ -2053,3 +2053,4 @@ async function init(){
   window.addEventListener('pagehide',()=>{ /* Browsers may suspend GPS, sensors and audio: never promise background safety. */ });
 }
 init();
+
