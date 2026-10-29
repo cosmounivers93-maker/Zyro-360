@@ -253,16 +253,45 @@ function requireAuth(req, res, next) {
 function requireAdmin(req,res,next){if(!isAdmin(req.user))return res.status(403).json({error:'Accesso riservato all’amministratore.'});next();}
 function adminPassword(req,res){if(!String(req.body?.password||'') || !verifyPassword(String(req.body.password),req.user)){res.status(403).json({error:'Conferma con la password del tuo account amministratore.'});return false;}return true;}
 function recordAction(kind,actor,target,detail=''){db.adminAudit.push({id:token(8),kind,by:actor,for:target,detail,at:now()});if(db.adminAudit.length>500)db.adminAudit.splice(0,db.adminAudit.length-500);}
+// Public address validation; never label an internal proxy as a visitor IP.
 function normalizedClientIp(value){
  let ip=String(value||'').trim();if(ip.startsWith('::ffff:')&&isIP(ip.slice(7))===4)ip=ip.slice(7);
- return isIP(ip)?ip.toLowerCase():null;
+ if(!isIP(ip))return null;
+ if(isIP(ip)===6)return new URL(`http://[${ip}]/`).hostname.slice(1,-1).toLowerCase();
+ return ip;
+}
+function publicClientIp(value){
+ const ip=normalizedClientIp(value);if(!ip)return null;
+ if(isIP(ip)===4){
+  const [a,b,c]=ip.split('.').map(Number);
+  if(a===0||a===10||a===127||a>=224||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&b===168||a===100&&b>=64&&b<=127||a===198&&(b===18||b===19)||a===192&&b===0||a===198&&b===51&&c===100||a===203&&b===0&&c===113)return null;
+  return ip;
+ }
+ if(!/^[23][0-9a-f]{3}:/.test(ip)||ip.startsWith('2001:db8:')||ip.startsWith('2001:2:'))return null;
+ return ip;
+}
+function visitorIp(req){
+ const peer=normalizedClientIp(req.socket?.remoteAddress);
+ if(process.env.RENDER==='true'){
+  // Render public ingress is Cloudflare + internal load balancers. Trust only
+  // that deployment path, not arbitrary client-supplied X-Forwarded-For values.
+  if(!peer||publicClientIp(peer)||typeof req.headers['cf-ray']!=='string')return null;
+  const cf=publicClientIp(req.headers['cf-connecting-ip']);
+  // Cloudflare Pseudo IPv4 can preserve the original visitor IPv6 here.
+  if(cf)return cf;
+  const raw=normalizedClientIp(req.headers['cf-connecting-ip']);
+  if(raw&&isIP(raw)===4&&Number(raw.split('.')[0])>=240)return publicClientIp(req.headers['cf-connecting-ipv6']);
+  return null;
+ }
+ // Outside Render ignore forwarded headers. Direct public connections only.
+ return publicClientIp(peer);
 }
 function notifyAdminUsers(){
  if(!ADMIN_ID || !db.users[ADMIN_ID])return;
  for(const ws of connections(ADMIN_ID))sendSocket(ws,{type:'admin-users-changed'});
 }
 function auditLogin(req,user){
- user.lastLoginIp=normalizedClientIp(req.ip);user.lastLoginAt=now();
+ user.lastLoginIp=visitorIp(req);user.lastLoginAt=now();
 }
 
 app.get('/api/health', (_, res) => {
@@ -325,7 +354,8 @@ app.post('/api/logout', requireAuth, (req,res) => {
 });
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
-const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?(u.registrationIp||null):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?(u.lastLoginIp||null):null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
+const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
+app.get('/api/admin/connection-ip',requireAuth,requireAdmin,(req,res)=>{res.set('Cache-Control','no-store');res.json({ip:visitorIp(req),source:process.env.RENDER==='true'?'render-cloudflare':'direct',checkedAt:now()});});
 app.get('/api/admin/users',requireAuth,requireAdmin,(req,res)=>{
  res.set('Cache-Control','no-store');
  res.json({users:Object.values(db.users).map(adminUser).map(u=>{const ips=[u.registrationIp,u.lastLoginIp].filter(Boolean);const matches=Object.values(db.users).filter(v=>v.id!==u.id && v.bannedAt && [v.createdAt>now()-30*86400e3?v.registrationIp:null,v.lastLoginAt>now()-30*86400e3?v.lastLoginIp:null].some(ip=>ip&&ips.includes(ip)));return {...u,sameIpBannedAccounts:matches.map(v=>v.id)};}).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)),reports:db.userReports.slice(-100).reverse().map(r=>({...r,user:db.users[r.userId]?adminUser(db.users[r.userId]):null,reporter:db.users[r.reporterId]?adminUser(db.users[r.reporterId]):null})),audit:db.adminAudit.slice(-50).reverse()});
@@ -996,6 +1026,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
 
 
 
