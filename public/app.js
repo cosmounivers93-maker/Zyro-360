@@ -1,3 +1,7 @@
+function updateMarkupIfChanged(node,html){
+ if(node._zyroMarkup===html)return;
+ node._zyroMarkup=html;node.innerHTML=html;
+}
 'use strict';
 const $ = id => document.getElementById(id);
 let current = null;
@@ -88,6 +92,10 @@ function aimHeading(){
     headingMotion.target=null;headingMotion.source=null;
     if(headingMotion.frame!==null){cancelAnimationFrame(headingMotion.frame);headingMotion.frame=null;}
     headingMotion.previousFrame=0;headingMotion.display=null;renderHeadingOnly();return;
+  }
+  if(document.hidden || activeView!=='home'){
+    headingMotion.target=choice.angle;headingMotion.display=choice.angle;
+    headingMotion.source=choice.source;return;
   }
   const current=headingMotion.target;
   // Ignore tiny compass noise, but allow accumulated real rotation to pass.
@@ -1171,6 +1179,7 @@ class ZyroRasterMap{
   this.el.addEventListener('pointerup',this.onUp);this.el.addEventListener('pointercancel',this.onUp);
   this.el.addEventListener('wheel',this.onWheel,{passive:false});
   this.resize();
+  if(typeof ResizeObserver!=='undefined'){this.sizeObserver=new ResizeObserver(()=>this.resize());this.sizeObserver.observe(this.el);}
  }
  getZoom(){return this.zoom;}
  zoomTo(newZoom){
@@ -1191,8 +1200,8 @@ class ZyroRasterMap{
   const p=toWorld(this.center.lat,this.center.lon,this.zoom),n=fromWorld(p.x-dx,p.y-dy,this.zoom);
   this.center=n;this.schedule();
  }
- resize(){this.schedule();}
- schedule(){if(this.removed||this.pending!==null)return;this.pending=requestAnimationFrame(()=>{this.pending=null;this.draw();});}
+ resize(){this.viewportWidth=this.el.clientWidth;this.viewportHeight=this.el.clientHeight;this.schedule();}
+ schedule(){if(this.removed||this.pending!==null||document.hidden||activeView!=='home')return;this.pending=requestAnimationFrame(()=>{this.pending=null;this.draw();});}
  clearTiles(){for(const img of this.tiles.values())img.remove();this.tiles.clear();}
  positionTile(img,left,top,w,h){
   const tileZoom=Number(img.dataset.zyroZ),scale=2**(this.zoom-tileZoom);
@@ -1203,13 +1212,14 @@ class ZyroRasterMap{
   // Keep the projection close to the viewport across the date line.
   wx+=Math.round(((left+w/2)-(wx+size/2))/world)*world;
   const px=Math.round(wx-left),py=Math.round(Number(img.dataset.zyroY)*size-top);
-  img.style.width=`${size}px`;img.style.height=`${size}px`;
-  img.style.transform=`translate3d(${px}px,${py}px,0)`;
+  if(img._zyroSize!==size){img._zyroSize=size;img.style.width=`${size}px`;img.style.height=`${size}px`;}
+  const transform=`translate3d(${px}px,${py}px,0)`;
+  if(img._zyroTransform!==transform){img._zyroTransform=transform;img.style.transform=transform;}
   return px+size>-256&&px<w+256&&py+size>-256&&py<h+256;
  }
  draw(){
   if(this.removed)return;
-  const w=this.el.clientWidth,h=this.el.clientHeight;if(w<20||h<20)return;
+  const w=this.viewportWidth,h=this.viewportHeight;if(w<20||h<20)return;
   const center=toWorld(this.center.lat,this.center.lon,this.zoom),count=2**this.zoom;
   const left=center.x-w/2,top=center.y-h/2;
   const startX=Math.floor(left/TILE_SIZE)-1,endX=Math.floor((left+w)/TILE_SIZE)+1;
@@ -1269,7 +1279,7 @@ class ZyroRasterMap{
   }
   for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
  }
- remove(){this.removed=true;if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
+ remove(){this.removed=true;this.sizeObserver?.disconnect();if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
 }
 function syncStableMarkers(){stableMap?.schedule();}
 function focusStableMap(lat,lon,zoom=16){if(!stableMap||!mapValidPoint({lat,lon}))return;stableMap.easeTo({center:[Number(lon),Number(lat)],zoom});}
@@ -1482,9 +1492,9 @@ function renderV15(){if(!current)return;
  $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
  if(onC){$('checkinStatus').textContent=c.status==='late'?'Orario scaduto: conferma appena puoi':'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.`;}
  const others=(current.journeys||[]).filter(x=>x.userId!==me.id);
- $('journeyContactsStatus').innerHTML=others.map(x=>`<p class="zyro-v15-contact-status">🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)} · ${x.status==='late'?'In ritardo':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso annullato':'Arrivo previsto '+v15Time(x.dueAt)}</p>`).join('');
+ updateMarkupIfChanged($('journeyContactsStatus'),others.map(x=>`<p class="zyro-v15-contact-status">🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)} · ${x.status==='late'?'In ritardo':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso annullato':'Arrivo previsto '+v15Time(x.dueAt)}</p>`).join(''));
  const checks=(current.checkins||[]).filter(x=>x.userId!==me.id);
- $('checkinContactsStatus').innerHTML=checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join('');
+ updateMarkupIfChanged($('checkinContactsStatus'),checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join(''));
 }
 async function v15JourneyStart(){
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
@@ -2095,3 +2105,7 @@ init();
  },{passive:true,capture:true});
  document.addEventListener('click',e=>{if(performance.now()<suppressUntil){e.preventDefault();e.stopImmediatePropagation();}},true);
 })();
+
+
+// Resume visual map updates when the app returns to the foreground.
+document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeView==='home'){stableMap?.resize();renderHeadingOnly();}});

@@ -41,6 +41,18 @@ html{scroll-behavior:auto!important}
 #appScreen .bottom-nav button{touch-action:pan-y pinch-zoom}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 </style>
+<style>
+/* Avoid repeated backdrop sampling behind the mobile map and fixed navigation. */
+@media(max-width:760px){
+ #appScreen .topbar,#appScreen .bottom-nav,
+ #appScreen .panel,#appScreen .circle-card,
+ #appScreen .map-zoom-controls,#appScreen .zyro-map-brand,
+ #appScreen .map-attribution,#appScreen .zyro-atlas-contact-name{
+  backdrop-filter:none!important;-webkit-backdrop-filter:none!important;
+ }
+}
+
+</style>
 </head>
 <body>
 <div id="authScreen" class="auth-shell">
@@ -348,9 +360,10 @@ html{scroll-behavior:auto!important}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=41.0" defer></script>
+<script src="/app.js?v=42.0" defer></script>
 </body>
 </html>
+
 
 
 
