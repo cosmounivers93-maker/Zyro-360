@@ -4,12 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
+  <meta name="zyro-ui-build" content="v17.1-home-gradient-admin">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
-  <meta name="color-scheme" content="light">
+  <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" type="image/png" href="/assets/icon192.png">
   <link rel="apple-touch-icon" href="/assets/icon192.png">
-  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/style.css?v=16.0">
+  <link rel="stylesheet" href="/zyro-settings-compact.css?v=16.1">
+  <link rel="stylesheet" href="/zyro-glass-v162.css?v=16.2">
+  <link rel="stylesheet" href="/zyro-settings-balanced-v163.css?v=16.3">
+  <link rel="stylesheet" href="/zyro-home-glass-v169.css?v=16.9">
+  <link rel="stylesheet" href="/zyro-home-true-glass-v170.css?v=17.0">
+  <link rel="stylesheet" href="/zyro-gradient-admin-v171.css?v=17.1">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -41,31 +48,50 @@
     <section id="homeView" class="view home-map-view">
       <section class="geo-panel geo-immersive" aria-label="Mappa reale della tua posizione">
         <div id="liveMap" class="live-map" aria-label="Mappa interattiva. Trascina per spostarti, usa due dita per ingrandire.">
-          <div id="googleMap" class="google-map hidden" aria-label="Google Maps con i membri della tua cerchia"></div>
-          <div id="mapTiles" class="map-tiles" aria-hidden="true"></div>
-          <div id="mapPins" class="map-pins" aria-hidden="true"></div>
-          <div class="map-top-label"><span class="map-live-dot"></span> MAPPA IN TEMPO REALE</div>
+          <div id="zyroVectorMap" class="zyro-vector-map" aria-label="Cartografia mondiale interattiva di ZYRO 360"></div>
+          <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button></div>
+          <div class="zyro-atlas-legend" aria-label="Legenda GPS, cerchia e SOS"><span><i class="atlas-key-you"></i> Tu</span><span><i class="atlas-key-circle"></i> Cerchia</span><span><i class="atlas-key-sos"></i> SOS</span></div>
           <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
-          <div id="mapUnavailable" class="map-unavailable hidden" role="alert">La mappa incorporata non è disponibile. <a id="mapOpenGoogle" href="https://www.google.com/maps" target="_blank" rel="noopener noreferrer">Apri Google Maps</a></div>
-          <div id="mapAttribution" class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a href="https://carto.com/attributions" target="_blank" rel="noopener noreferrer">© CARTO</a></div>
+          <div id="mapUnavailable" class="map-unavailable hidden" role="alert"><strong>Cartografia non disponibile</strong><span id="mapFailureText">Impossibile caricare la cartografia. Controlla Internet e riprova.</span><div class="map-recovery-actions"><button type="button" id="mapRetry">Riprova</button><a id="mapOpenGoogle" href="https://www.openstreetmap.org/" target="_blank" rel="noopener noreferrer">Apri OpenStreetMap</a></div></div>
+          <div id="mapAttribution" class="map-attribution"><a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">© OpenStreetMap</a> · <a id="mapSourceCredit" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">Dati OpenStreetMap</a></div>
         </div>
-        <div class="home-map-actions">
-          <label class="home-share-action" for="shareToggle"><span class="home-action-symbol">◎</span><span class="home-action-text">Attiva posizione</span><span class="switch"><input id="shareToggle" type="checkbox" aria-label="Attiva o disattiva la condivisione posizione con la cerchia"><span class="switch-slider"></span></span></label>
-          <button id="locateMe" class="home-locate-action" type="button"><span class="home-action-symbol">⌖</span><span>Trova la mia posizione</span></button>
+        <div class="zyro-command-row" role="group" aria-label="Azioni rapide di ZYRO 360">
+          <label class="zyro-command-btn zyro-command-share" for="shareToggle" title="Attiva o disattiva la condivisione GPS con le tue cerchie">
+            <input id="shareToggle" type="checkbox" aria-label="Condividi la posizione in tempo reale con le mie cerchie">
+            <span class="zyro-cmd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-12A7 7 0 0 0 5 9c0 5.8 7 12 7 12Z"/><circle cx="12" cy="9" r="2.2"/></svg></span>
+            <span class="zyro-cmd-title">Attiva<br>posizione</span>
+            <span id="shareState" class="zyro-cmd-state">OFF</span>
+          </label>
+          <button id="locateMe" class="zyro-command-btn zyro-command-locate" type="button" title="Centra la mappa sul mio GPS">
+            <span class="zyro-cmd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 1v4m0 14v4M1 12h4m14 0h4"/></svg></span>
+            <span class="zyro-cmd-title">Trova la mia<br>posizione</span>
+            <span class="zyro-cmd-state">GPS</span>
+          </button>
+          <button id="sosButton" class="zyro-command-btn zyro-command-sos" type="button" aria-label="Invia una richiesta SOS ai contatti selezionati" title="Avvisa i contatti SOS che hai selezionato">
+            <span class="zyro-cmd-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3Z"/><path d="M12 9v5m0 3h.01"/></svg></span>
+            <span class="zyro-cmd-title">Invia<br>SOS</span>
+            <span class="zyro-cmd-state">AIUTO</span>
+          </button>
         </div>
-      <div class="sos-card" id="sosCard">
-        <div class="sos-card-top"><span class="white-dot"></span><span>ALLERTA AI CONTATTI CHE HAI SCELTO</span><span class="sos-sparkle">✧</span></div>
-        <h2 id="sosTitle">Hai bisogno di aiuto?</h2>
-        <p id="sosDescription">Invia una richiesta di aiuto ai contatti SOS scelti. La posizione si condivide separatamente.</p>
-        <button id="sosButton" class="sos-button" type="button" aria-label="Attiva SOS"><span class="sos-button-inner"><span class="sos-icon">✳</span><b>SOS</b><small>PREMI QUI</small></span></button>
-        <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> ALLARME ATTIVO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">🎙 Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div></div>
-        <div id="sosInactiveNote" class="sos-card-bottom"><span>♧</span><span>Avvisa soltanto i destinatari SOS selezionati</span></div>
-      </div>
+        <div class="zyro-sos-status" id="sosCard" role="status" aria-live="polite">
+          <div class="zyro-sos-status-header"><span class="pulse-dot"></span><strong id="sosTitle">SOS attivo</strong></div>
+          <p id="sosDescription">Avviso inviato ai contatti selezionati</p>
+          <div id="sosActiveActions" class="hidden"><span class="sos-live"><span class="pulse-dot"></span> ALLARME ATTIVO</span><div class="sos-actions"><button id="audioButton" class="light-button" type="button">Attiva microfono</button><button id="stopSOS" class="light-button outline" type="button">Termina SOS</button></div></div>
+          <div id="sosInactiveNote" class="hidden">La condivisione GPS è indipendente dall'SOS.</div>
+        </div>
       </section>
     </section>
 
-    <section id="circlesView" class="view hidden">
-      <div class="page-heading"><p class="eyebrow muted">PERSONE SPECIALI</p><h1>Le tue cerchie <span>✧</span></h1><p>Persone fidate, sicurezza e tutte le tue funzioni.</p></div>
+    <section id="circlesView" class="view hidden circles-clean-page">
+      <div class="page-heading"><p class="eyebrow muted">LE PERSONE DI CUI TI FIDI</p><h1>Le tue cerchie <span>✧</span></h1><p>Crea un gruppo privato, invita amici e familiari e decidi con chi condividere la posizione.</p></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon">＋</span><div><h2>Crea una cerchia</h2><p>Amici, famiglia o persone fidate</p></div></div><form id="createCircleForm" class="inline-form"><input id="circleName" maxlength="48" required placeholder="Es. Famiglia ❤️" aria-label="Nome cerchia"><button class="btn btn-primary" type="submit">Crea</button></form></div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">⌘</span><div><h2>Hai ricevuto un codice?</h2><p>Entra nella cerchia di qualcuno</p></div></div><form id="joinCircleForm" class="inline-form"><input id="inviteInput" maxlength="28" required placeholder="Codice di invito" aria-label="Codice di invito" autocapitalize="characters"><button class="btn btn-dark" type="submit">Entra</button></form></div>
+      <div class="section-head space-top"><div><h2>I miei gruppi</h2><p>Un invito dura 24 ore e si usa una volta</p></div></div>
+      <div id="circlesList" class="circle-list"></div>
+    </section>
+
+    <section id="modesView" class="view hidden modes-page">
+      <div class="mode-heading"><span class="mode-heading-emblem" aria-hidden="true">✧</span><p class="eyebrow">PROTEZIONE PERSONALIZZATA</p><h1>Modalità <span>360°</span></h1><p>Tutte le protezioni e i contatti d'emergenza in un unico posto.</p></div>
       <div class="greeting"><div><p class="eyebrow muted">UNO SPAZIO DI FIDUCIA</p><h1>Ciao, <span id="greetingName">amico</span> <span class="wave">✳</span></h1><p>La tua sicurezza è la nostra priorità.</p></div><div class="avatar" id="myAvatar">S</div></div>
       <div class="top-cards">
         <div class="stat-card"><span class="stat-icon mint">◎</span><div><strong id="totalMembers">0</strong><small>Persone fidate</small></div></div>
@@ -75,25 +101,68 @@
       <section class="pick-panel" id="pickPanel">
         <div class="pick-top"><div class="pick-symbol">🛡</div><div><p class="eyebrow muted">ANTIFURTO SPERIMENTALE</p><h2>Modalità Pick Pocket</h2><p>Rileva uno strappo brusco con i sensori del telefono e prova ad avviare una sirena.</p></div></div>
         <div class="pick-settings" id="pickSettings">
-          <label class="pick-select-line"><span>Sensibilità ai movimenti</span><select id="pickSensitivity"><option value="normal">Normale (consigliata)</option><option value="high">Alta · più falsi allarmi</option></select></label>
-          <label class="pick-check-line"><input type="checkbox" id="pickNotify"><span><b>Avvisa i miei contatti se scatta l'allarme</b><small>Inoltra un avviso e il GPS solo alle persone che selezioni, se la connessione è disponibile.</small></span></label>
-          <div id="pickRecipients" class="pick-recipients hidden"><p>Scegli chi avvisare:</p><div id="pickRecipientsList"></div></div>
+          <div class="pick-section" aria-label="Sensibilità antifurto">
+            <div class="pick-section-heading"><span class="pick-section-icon" aria-hidden="true">◉</span><div><strong>Rilevamento</strong><small>Regola la risposta ai movimenti improvvisi.</small></div></div>
+            <label class="pick-select-line"><span>Sensibilità ai movimenti</span><select id="pickSensitivity"><option value="normal">Normale (consigliata)</option><option value="high">Alta · più falsi allarmi</option></select></label>
+          </div>
+          <div class="pick-section" aria-label="Avvisi antifurto">
+            <div class="pick-section-heading"><span class="pick-section-icon" aria-hidden="true">♧</span><div><strong>Avvisi ai contatti</strong><small>Decidi se informare le persone fidate.</small></div></div>
+            <label class="pick-check-line"><input type="checkbox" id="pickNotify"><span><b>Avvisa i miei contatti se scatta l'allarme</b><small>Invia un avviso e la posizione solo ai destinatari scelti, quando la connessione è disponibile.</small></span></label>
+            <div id="pickRecipients" class="pick-recipients hidden"><p>Scegli chi avvisare:</p><div id="pickRecipientsList"></div></div>
+          </div>
         </div>
-        <div class="pick-status" id="pickStatus">Protezione disattivata. Per attivarla lascia ZYRO 360 aperta e autorizza i sensori.</div>
-        <button id="pickArm" type="button" class="btn btn-dark btn-wide">Attiva Pick Pocket</button>
-        <button id="pickTest" type="button" class="pick-test">Ascolta la sirena (test locale, nessun avviso)</button>
-        <p class="pick-limits">Non blocca il sistema Android, non impedisce spegnimento o chiusura dell'app e non garantisce l'allarme con schermo spento. La sirena rispetta il volume del dispositivo. Uno strappo può essere confuso con un normale movimento.</p>
+        <div class="pick-section pick-control-section" aria-label="Attivazione antifurto">
+          <div class="pick-section-heading"><span class="pick-section-icon" aria-hidden="true">✓</span><div><strong>Stato della protezione</strong><small>Attivazione e test della sirena</small></div></div>
+          <div class="pick-status" id="pickStatus" role="status" aria-live="polite">Protezione disattivata. Per attivarla lascia ZYRO 360 aperta e autorizza i sensori.</div>
+          <button id="pickArm" type="button" class="btn btn-dark btn-wide">Attiva Pick Pocket</button>
+          <button id="pickTest" type="button" class="pick-test">Ascolta la sirena (test locale, nessun avviso)</button>
+        </div>
+        <p class="pick-limits">Questa funzione è sperimentale: non blocca Android, non impedisce lo spegnimento e può fermarsi a schermo spento. Rispetta il volume del dispositivo e può produrre falsi allarmi.</p>
       </section>
-      <section class="panel sos-recipient-panel"><div class="panel-title"><span class="panel-icon">🆘</span><div><h2>Destinatari SOS</h2><p>Scegli le persone da avvisare quando premi SOS. Non attiva la posizione.</p></div></div><div id="sosRecipientList" class="recipient-grid"></div><button id="saveSOSRecipients" class="btn btn-dark btn-wide" type="button">Salva destinatari SOS</button><p id="sosPushNote" class="setting-description"></p></section>
+
+      <section class="zyro-v15-panel" id="journeyPanel">
+        <div class="zyro-v15-heading"><span class="zyro-v15-symbol">↗</span><div><p class="eyebrow muted">VIAGGIA CON PIÙ TRANQUILLITÀ</p><h2>Accompagnami</h2><p>Condividi il percorso con i contatti scelti e indica quando pensi di arrivare.</p></div></div>
+        <div id="journeyInactive">
+          <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, lavoro, stazione" autocomplete="off"></label>
+          <label class="zyro-v15-field">Tempo previsto<select id="journeyMinutes"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e mezza</option><option value="120">2 ore</option><option value="240">4 ore</option></select></label>
+          <div class="zyro-v15-destination"><label><input id="journeyAuto" type="checkbox"> Arrivo automatico (se imposti il centro della mappa come destinazione)</label><small>Seleziona la destinazione spostando prima la mappa nella Home. Il rilevamento automatico richiede GPS e app aperta.</small><button id="journeySetTarget" type="button" class="zyro-v15-secondary">Usa il centro della mappa come meta</button><span id="journeyTargetInfo">Nessuna meta GPS impostata</span></div>
+          <p class="zyro-v15-subhead">Chi può seguire il tuo percorso?</p><div id="journeyRecipients" class="zyro-v15-contacts"></div>
+          <button id="journeyStart" type="button" class="zyro-v15-primary">Avvia Accompagnami</button>
+        </div>
+        <div id="journeyActive" class="hidden zyro-v15-active"><strong id="journeyStatus">Percorso in corso</strong><p id="journeyDetail"></p><div class="zyro-v15-actions"><button id="journeyArrived" type="button" class="zyro-v15-primary">✓ Sono arrivato/a</button><button id="journeyCancel" type="button" class="zyro-v15-secondary">Interrompi percorso</button></div></div>
+        <div id="journeyContactsStatus" class="zyro-v15-feed"></div>
+      </section>
+      <section class="zyro-v15-panel" id="checkinPanel">
+        <div class="zyro-v15-heading"><span class="zyro-v15-symbol">✓</span><div><p class="eyebrow muted">UN CONTROLLO IN PIÙ</p><h2>Check-in intelligente</h2><p>Imposta un orario entro cui confermare che va tutto bene. Se scade, i contatti ricevono una richiesta di verifica, quando le notifiche sono disponibili.</p></div></div>
+        <div id="checkinInactive">
+          <label class="zyro-v15-field">Quando vuoi confermare?<select id="checkinMinutes"><option value="15">Tra 15 minuti</option><option value="30" selected>Tra 30 minuti</option><option value="60">Tra 1 ora</option><option value="120">Tra 2 ore</option><option value="240">Tra 4 ore</option><option value="480">Tra 8 ore</option></select></label>
+          <p class="zyro-v15-subhead">Chi deve essere avvisato in caso di mancata risposta?</p><div id="checkinRecipients" class="zyro-v15-contacts"></div>
+          <button id="checkinStart" type="button" class="zyro-v15-primary">Imposta check-in</button>
+        </div>
+        <div id="checkinActive" class="hidden zyro-v15-active"><strong id="checkinStatus">Check-in in corso</strong><p id="checkinDetail"></p><div class="zyro-v15-actions"><button id="checkinConfirm" type="button" class="zyro-v15-primary">✓ Tutto bene</button><button id="checkinCancel" type="button" class="zyro-v15-secondary">Annulla</button></div></div>
+        <div id="checkinContactsStatus" class="zyro-v15-feed"></div>
+        <p class="zyro-v15-note">⚠ I controlli automatici non sono garantiti sul piano gratuito Render quando il server va in pausa. Non sostituiscono le chiamate personali o i soccorsi.</p>
+      </section>
+      <section class="zyro-v15-panel" id="premiumPanel">
+        <div class="zyro-v15-heading"><span class="zyro-v15-symbol">✦</span><div><p class="eyebrow muted">ABBONAMENTI</p><h2>SOS Premium</h2><p>Notifica ai destinatari scelti, posizione GPS in diretta, strada se disponibile e ascolto audio con consenso.</p></div></div>
+        <div class="zyro-v15-plans"><div><b>ZYRO Premium</b><strong>3,99 € <small>/mese</small></strong></div><div><b>ZYRO Family</b><strong>6,99 € <small>/mese</small></strong></div></div>
+        <p id="premiumStatus" class="zyro-v15-status" role="status">Verifica abbonamento…</p>
+        <label class="zyro-v15-mic"><input id="sosAudioConsent" type="checkbox"> <span><b>Chiedi di attivare il microfono quando premi SOS</b><small>Il browser chiederà l'autorizzazione. Audio in diretta, non registrato dal server; serve l'app aperta e il consenso.</small></span></label>
+        <p class="zyro-v15-note">Per gli utenti, le funzioni Premium richiedono un diritto di accesso verificato dal server. Il creatore autorizzato ha accesso incluso gratuitamente. Gli acquisti Play Store non sono ancora attivi e non vengono elaborati pagamenti in questa versione.</p>
+        <button id="premiumDetails" type="button" class="zyro-v15-secondary">Informazioni su Premium</button>
+        <a class="zyro-v15-emergency" href="tel:112">Emergenza reale? Chiama il 112 — sempre disponibile</a>
+      </section>
+      <section class="panel sos-recipient-panel" aria-labelledby="sosRecipientTitle">
+        <div class="panel-title"><span class="panel-icon">🆘</span><div><p class="eyebrow muted sos-kicker">AVVISO D'EMERGENZA</p><h2 id="sosRecipientTitle">Destinatari SOS</h2><p>Prepara la lista dei destinatari. L’invio SOS Premium richiede un abbonamento verificato; il GPS può essere condiviso solo con i destinatari durante l’allarme.</p></div></div>
+        <div class="sos-section"><div class="sos-section-heading"><span class="sos-section-icon" aria-hidden="true">♧</span><div><strong>Persone da avvisare</strong><small>Solo i contatti che hai scelto riceveranno l'avviso.</small></div></div><div id="sosRecipientList" class="recipient-grid"></div></div>
+        <button id="saveSOSRecipients" class="btn btn-dark btn-wide" type="button">Salva destinatari SOS</button>
+        <p class="setting-description sos-push-note">Quando premi SOS, il server può usare un fornitore di geocodifica per convertire le coordinate GPS in via, eventuale numero civico e città, soltanto se il servizio è attivato. Il civico potrebbe non essere disponibile o esatto. L’indirizzo e la posizione dell’allarme sono comunicati ai destinatari SOS scelti.</p>
+        <p id="sosPushNote" class="setting-description sos-push-note" role="status"></p>
+      </section>
       <div id="activeAlerts" class="hidden"></div>
       <div class="section-head space-top"><div><h2>Le persone della tua cerchia</h2><p>Posizione e aggiornamenti condivisi</p></div></div>
       <div id="contactsList" class="contacts-list"></div>
       <div class="emergency-card"><span>✚</span><div><b>Emergenza immediata?</b><p>Per un pericolo reale contatta sempre i soccorsi.</p></div><a href="tel:112" class="call-button">Chiama 112</a></div>
-      <div class="page-heading"><p class="eyebrow muted">PERSONE SPECIALI</p><h1>Le tue cerchie <span>✧</span></h1><p>Crea un gruppo privato e invita solo persone di fiducia.</p></div>
-      <div class="panel"><div class="panel-title"><span class="panel-icon">＋</span><div><h2>Crea una cerchia</h2><p>Amici, famiglia o persone fidate</p></div></div><form id="createCircleForm" class="inline-form"><input id="circleName" maxlength="48" required placeholder="Es. Famiglia ❤️" aria-label="Nome cerchia"><button class="btn btn-primary" type="submit">Crea</button></form></div>
-      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">⌘</span><div><h2>Hai ricevuto un codice?</h2><p>Entra nella cerchia di qualcuno</p></div></div><form id="joinCircleForm" class="inline-form"><input id="inviteInput" maxlength="28" required placeholder="Codice di invito" aria-label="Codice di invito" autocapitalize="characters"><button class="btn btn-dark" type="submit">Entra</button></form></div>
-      <div class="section-head space-top"><div><h2>I miei gruppi</h2><p>Un invito dura 24 ore e si usa una volta</p></div></div>
-      <div id="circlesList" class="circle-list"></div>
     </section>
 
     <section id="chatsView" class="view hidden zyro-chat-page">
@@ -109,17 +178,20 @@
         <div id="chatRooms" class="chat-rooms" aria-live="polite"></div>
         <div class="chat-private-footnote"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1"/></svg><span>Le conversazioni sono riservate ai membri autorizzati.</span></div>
       </section>
-      <div id="chatConversation" class="panel chat-conversation hidden"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatClose" class="chat-close" aria-label="Chiudi conversazione">✕</button></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
+      <div id="chatConversation" class="panel chat-conversation hidden" role="dialog" aria-modal="true" aria-label="Conversazione"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatClose" class="chat-close" aria-label="Torna alle conversazioni">←</button></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" enterkeyhint="send" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
       <p class="small-disclaimer chat-security-note">Questa versione non usa crittografia end-to-end. Non condividere informazioni particolarmente sensibili.</p>
     </section>
 
     <section id="settingsView" class="view hidden zyro-profile-page">
-      <div class="profile-heading"><span class="mini-overline">IL TUO ACCOUNT</span><h1>Il tuo profilo<span>.</span></h1><p>La tua identità, protetta e riconoscibile da chi ami.</p></div>
+      <div class="profile-heading"><span class="mini-overline">IL TUO ACCOUNT</span><h1>Il tuo profilo<span>.</span></h1><p>La tua identità, protetta e riconoscibile da chi ami.</p>
+        <button type="button" id="profileMore" class="zyro-profile-more" aria-label="Apri impostazioni aggiuntive" aria-controls="profileSettingsDrawer" aria-expanded="false" title="Impostazioni aggiuntive"><span class="zyro-profile-more-label">Impostazioni aggiuntive</span><span class="zyro-profile-more-dots" aria-hidden="true">···</span></button>
+      </div>
       <section class="profile-identity-card">
         <div class="profile-orbit" aria-hidden="true"></div>
         <div class="profile-avatar-wrap"><div class="profile-avatar" id="profileAvatar">S</div><label class="profile-avatar-camera" title="Cambia foto dalla galleria" for="avatarGallery" aria-label="Cambia la tua foto profilo"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h2.5l1.6-2h5.8l1.6 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.3"/></svg></label></div>
-        <div class="profile-id-copy"><span class="profile-id-caption">ACCOUNT PERSONALE <span class="verified-dot">✓</span></span><strong id="profileName">Utente</strong><p id="profileEmail">email</p></div>
+        <div class="profile-id-copy"><span class="profile-id-caption">ACCOUNT PERSONALE <span class="verified-dot">✓</span></span><strong id="profileName">Utente</strong><p id="profileEmail">email</p><span id="profileAccessLabel" class="zyro-profile-access-label">Account personale</span></div>
       </section>
+      <p id="profileStorageStatus" class="setting-description" role="status" aria-live="polite" style="margin:10px 0 14px;padding:11px 14px;border:1px solid #acd9d2;border-radius:14px">Verifica salvataggio del profilo…</p>
       <section class="profile-photo-editor">
         <div class="profile-photo-heading"><span class="profile-photo-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8a2 2 0 0 1 2-2h2.5l1.6-2h5.8l1.6 2H19a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><circle cx="12" cy="13" r="3.3"/></svg></span><div><h2>La tua immagine</h2><p>Un volto familiare per chi fa parte della tua cerchia.</p></div></div>
         <div class="profile-photo-actions">
@@ -129,20 +201,93 @@
         <button type="button" id="avatarRemove" class="avatar-remove-action">Rimuovi la foto attuale</button>
         <div class="photo-privacy-note"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1"/></svg><span>Solo le persone delle tue cerchie vedranno questa foto.</span></div>
       </section>
-      <div class="panel"><div class="panel-title"><span class="panel-icon">♧</span><div><h2>Avvisi SOS</h2><p>Ricevi notifiche se una persona della tua cerchia chiede aiuto</p></div></div><button id="pushButton" class="btn btn-dark btn-wide" type="button">Attiva notifiche</button><p id="pushStatus" class="setting-description">Le notifiche dipendono dal supporto del browser e dalle impostazioni del dispositivo.</p></div>
-      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento.</p></div>
+      <section class="zyro-appearance-panel" aria-labelledby="appearanceTitle">
+        <div class="zyro-appearance-header"><span class="appearance-emblem" aria-hidden="true">◐</span><div><h2 id="appearanceTitle">Aspetto dell'app</h2><p>Scegli il tema di ZYRO 360 e della mappa.</p></div></div>
+        <div class="zyro-theme-choices" role="group" aria-label="Tema dell'app">
+          <button id="themeLight" class="zyro-theme-option" data-theme-choice="light" type="button" aria-pressed="false"><span class="theme-preview theme-preview-light" aria-hidden="true"><span></span><i></i></span><span>☀️ Chiara</span><small>Colori luminosi</small></button>
+          <button id="themeDark" class="zyro-theme-option" data-theme-choice="dark" type="button" aria-pressed="true"><span class="theme-preview theme-preview-dark" aria-hidden="true"><span></span><i></i></span><span>🌙 Scura</span><small>Notte e neon</small></button>
+        </div>
+        <p class="appearance-note">Il tema rimane selezionato su questo dispositivo, anche dopo aver chiuso l'app. La mappa usa dati geografici reali.</p>
+      </section>
+      <div class="panel"><div class="panel-title"><span class="panel-icon">♧</span><div><h2>Avvisi SOS</h2><p>Ricevi notifiche se una persona della tua cerchia chiede aiuto</p></div></div><button id="pushButton" class="btn btn-dark btn-wide" type="button">Attiva notifiche</button><p id="pushStatus" class="setting-description">Le notifiche dipendono dal supporto del browser e dalle impostazioni del dispositivo.</p>
+        <div class="zyro-push-test" aria-label="Notifica non di emergenza">
+          <strong>🔔 Prova notifiche con un contatto</strong>
+          <p>Invia un semplice avviso di verifica. Non avvia SOS, non invia la posizione e non apre il microfono.</p>
+          <label for="pushTestRecipient">Scegli chi deve riceverlo</label>
+          <select id="pushTestRecipient" class="zyro-push-test-select" aria-label="Destinatario della notifica di prova"><option value="">Nessun contatto nella cerchia</option></select>
+          <button id="pushTestButton" class="btn btn-outline btn-wide" type="button">Invia notifica di prova</button>
+          <p id="pushTestStatus" class="setting-description" role="status" aria-live="polite">Richiede due account collegati in una cerchia e le notifiche abilitate sul telefono destinatario.</p>
+        </div>
+      </div>
+      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. Durante un SOS, i destinatari che hai selezionato possono ricevere la posizione. Se il servizio di indirizzi SOS è attivo, le coordinate vengono inviate al fornitore di geocodifica per ricavare via, eventuale numero civico e città; l'indirizzo può essere approssimativo o mancante. In assenza di indirizzo viene indicata la posizione GPS quando disponibile. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento. Per la sicurezza degli account, al login ZYRO 360 registra l’ultimo indirizzo IP per un massimo di 30 giorni; soltanto l’amministratore può consultarlo per verificare segnalazioni e abusi.</p></div>
       <div class="panel"><div class="panel-title"><span class="panel-icon warm">☏</span><div><h2>Numeri di emergenza</h2><p>In Italia e nell'UE il numero unico è 112</p></div></div><a href="tel:112" class="btn btn-outline btn-wide">Chiama il 112</a></div>
+      <section class="panel zyro-report-panel" aria-label="Segnala un uso scorretto">
+        <div class="panel-title"><span class="panel-icon">🛡</span><div><h2>Segnala un abuso</h2><p>Puoi segnalare un membro della tua cerchia per un comportamento scorretto. La segnalazione è riservata all’amministratore.</p></div></div>
+        <label class="field"><span>Utente da segnalare</span><select id="reportUser"><option value="">Seleziona un contatto</option></select></label>
+        <label class="field"><span>Motivo della segnalazione</span><textarea id="reportReason" rows="3" maxlength="400" placeholder="Spiega cosa è successo (senza condividere dati non necessari)"></textarea></label>
+        <button class="btn btn-outline btn-wide" id="reportSubmit" type="button">Invia segnalazione</button>
+      </section>
+      <section id="zyroAdminPanel" class="zyro-admin-panel hidden" aria-label="Gestione riservata amministratore">
+        <div class="zyro-admin-head"><span class="zyro-admin-lock">🔐</span><div><span class="mini-overline">ACCESSO ESCLUSIVO</span><h2>Centro amministratore</h2><p>Gestione privata degli utenti, segnalazioni e regali Premium. Solo per l'account proprietario autorizzato dal server.</p></div></div>
+        <div class="zyro-admin-toolbar"><button id="adminLoad" class="btn btn-dark" type="button">Aggiorna utenti</button><input id="adminFilter" type="search" aria-label="Cerca un account" placeholder="Cerca per nome, email o ID"></div>
+        <p id="adminStatus" class="setting-description" role="status">Il server verifica le tue autorizzazioni a ogni richiesta.</p>
+        <div id="adminReports" class="zyro-admin-reports"></div>
+        <div id="adminUsers" class="zyro-admin-users"></div>
+        <details class="zyro-admin-logs"><summary>Registro attività amministrative</summary><div id="adminAudit"></div></details>
+        <p class="setting-description">Gli indirizzi IP sono riservati, raccolti all'accesso e conservati al massimo 30 giorni per la gestione degli abusi. È necessario un archivio persistente e un'informativa privacy adeguata prima del lancio pubblico.</p>
+      </section>
+      <div class="panel"><div class="panel-title"><span class="panel-icon">🪪</span><div><h2>Il tuo ID account</h2><p>Il codice identificativo del tuo account ZYRO 360.</p></div></div><p id="myAccountId" class="setting-description" style="overflow-wrap:anywhere"></p><button id="copyMyId" type="button" class="btn btn-outline">Copia ID</button></div>
       <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
+      <section class="how-it-works" id="zyroHelp" aria-labelledby="howTitle">
+        <div class="how-heading"><span class="how-icon">?</span><div><p class="eyebrow muted">GUIDA E TRASPARENZA</p><h2 id="howTitle">Come funziona ZYRO 360?</h2><p>Tutto quello che devi sapere su protezione, privacy e uso corretto.</p></div></div>
+        <details><summary>La mappa e la posizione condivisa <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Usa «Trova la mia posizione» per visualizzarti sulla mappa. Solo con «Attiva posizione» autorizzi la condivisione GPS con i membri delle tue cerchie. Puoi disattivarla in ogni momento. La precisione dipende dal GPS, dalla connessione e dai permessi del telefono. Sul web, il tracciamento può interrompersi a schermo spento. Il fornitore della cartografia riceve richieste tecniche come indirizzo IP e area consultata: consulta anche la sua informativa privacy.</p></div></details>
+        <details><summary>Cerchie, inviti e chat <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea una cerchia, genera un codice o link temporaneo e invialo alle persone fidate. Chi riceve l'invito deve accedere all'app e confermare l'ingresso. Le chat private e quelle di gruppo sono destinate ai membri autorizzati. In questo prototipo i messaggi non hanno crittografia end-to-end: non inviare dati particolarmente sensibili.</p></div></details>
+        <details><summary>SOS, notifiche e microfono <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Quando attivi SOS, per avvisare i contatti selezionati il server può chiedere a un servizio esterno di ricavare un indirizzo dal GPS, se tale servizio è stato attivato dall’amministratore. Via, civico e città non sono sempre disponibili o esatti; verifica la mappa. Il tasto SOS Premium richiede un abbonamento verificato; se non è attivo, nessun messaggio SOS viene inviato. Se attivo, condivide la posizione durante l’allarme soltanto con i destinatari selezionati, senza attivare la condivisione generale della cerchia. Se scegli di attivare il microfono durante l'SOS, il browser ti richiede l'autorizzazione per trasmettere audio in diretta; puoi fermarlo in ogni momento. Il flusso audio non viene registrato sul server da questo prototipo. Le notifiche push funzionano solo se il server è configurato e il destinatario ha autorizzato le notifiche. La consegna e la lettura non sono garantite. La via esatta viene mostrata soltanto quando è disponibile un servizio autorizzato di geocodifica; in alternativa sono mostrate le coordinate.</p><p>Se sei in pericolo reale chiama immediatamente il <a href="tel:112">112</a>: ZYRO 360 non sostituisce i soccorsi.</p></div></details>
+        <details><summary>Accompagnami e Check-in <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Con «Accompagnami» scegli una meta, un tempo previsto e i contatti che possono seguire il percorso quando hai abilitato la condivisione GPS. «Sono arrivato/a» conferma l’arrivo; il rilevamento automatico funziona solo se imposti una meta GPS e l’app continua a inviare posizioni. Con Check-in imposti una scadenza e confermi di stare bene. Un ritardo richiede una verifica, non indica automaticamente un pericolo. Su Render gratuito i controlli in background del server possono fermarsi quando il servizio è inattivo.</p></div></details>
+        <details><summary>Modalità Pick Pocket <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Rileva alcuni movimenti bruschi tramite i sensori del browser e prova ad attivare una sirena. Può generare falsi allarmi; non garantisce il rilevamento dei furti, non impedisce di spegnere il telefono e potrebbe smettere di funzionare con schermo bloccato o app in background. Puoi scegliere se avvisare i contatti autorizzati.</p></div></details>
+        <details><summary>Privacy, consenso e riferimenti legali <span aria-hidden="true">＋</span></summary><div class="how-content"><p><strong>Norme di riferimento:</strong> Regolamento UE 2016/679 (GDPR), in particolare principi dell'art. 5, basi giuridiche art. 6, informativa art. 13, sicurezza art. 32 e diritti dell'interessato (artt. 15–22); in Italia anche il D.Lgs. 196/2003, come modificato.</p><p>Per un servizio pubblico occorrono un'informativa privacy completa con identità e contatti del titolare, finalità, basi giuridiche, tempi di conservazione, fornitori, trasferimenti e modalità per esercitare i diritti; autorizzazioni chiare per GPS, notifiche e microfono; misure di sicurezza, verifica degli accessi e valutazione dell'eventuale necessità di una DPIA. La sola presenza di questa guida <strong>non rende automaticamente il servizio conforme alla legge</strong>.</p><p>Condividi posizioni e audio solo con persone autorizzate. Non registrare o diffondere conversazioni altrui senza una base lecita; la liceità dipende dal contesto e dalle norme applicabili.</p><div class="law-links"><a href="https://eur-lex.europa.eu/eli/reg/2016/679/oj?locale=it" target="_blank" rel="noopener noreferrer">Testo ufficiale GDPR</a><a href="https://www.normattiva.it/uri-res/N2Ls?urn:nir:stato:decreto.legislativo:2003-06-30;196" target="_blank" rel="noopener noreferrer">Codice Privacy italiano</a><a href="https://www.garanteprivacy.it/" target="_blank" rel="noopener noreferrer">Garante Privacy</a></div></div></details>
+        <p class="how-caveat">Informazioni orientative, non consulenza legale. Prima di pubblicare ZYRO 360 come servizio di sicurezza è necessaria una verifica tecnica, legale e di protezione dei dati.</p>
+      </section>
       <p class="small-disclaimer">Questa è una versione iniziale da testare. Connessione Internet, autorizzazioni e app aperta possono essere necessari. Non usarla come unico strumento di emergenza.</p>
     </section>
   </main>
-  <nav class="bottom-nav" aria-label="Navigazione principale"><button class="nav-item active" data-view="home" type="button"><span class="nav-icon">⌂</span><span>Home</span></button><button class="nav-item" data-view="circles" type="button"><span class="nav-icon">◎</span><span>Cerchie</span></button><button class="nav-item" data-view="chats" type="button"><span class="nav-icon nav-chat-icon"><svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg></span><span>Chat</span></button><button class="nav-item" data-view="settings" type="button"><span class="nav-icon">⚙</span><span>Profilo</span></button></nav>
+
+  <div id="profileSettingsBackdrop" class="zyro-settings-backdrop" aria-hidden="true"></div>
+  <aside id="profileSettingsDrawer" class="zyro-settings-drawer" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="zyroSettingsTitle" tabindex="-1" inert>
+    <div class="zyro-drawer-top">
+      <div><span class="mini-overline">ZYRO 360</span><h2 id="zyroSettingsTitle">Impostazioni</h2></div>
+      <button id="profileSettingsClose" class="zyro-drawer-icon-button" type="button" aria-label="Chiudi impostazioni">✕</button>
+    </div>
+    <nav id="zyroSettingsMenu" class="zyro-drawer-menu" aria-label="Sezioni impostazioni">
+      <button type="button" data-settings-target="appearance"><span class="zyro-settings-glyph">◐</span><span>Aspetto dell'app<small>Tema chiaro o scuro</small></span><b>›</b></button>
+      <button type="button" data-settings-target="help"><span class="zyro-settings-glyph">?</span><span>Come funziona l'app<small>Guida, privacy e funzionamento</small></span><b>›</b></button>
+      <button type="button" data-settings-target="premium"><span class="zyro-settings-glyph">✦</span><span>Abbonamenti<small>Funzioni e accesso Premium</small></span><b>›</b></button>
+      <button type="button" data-settings-target="emergency"><span class="zyro-settings-glyph">✚</span><span>Numeri di emergenza<small>Chiama il 112</small></span><b>›</b></button>
+      <button type="button" data-settings-target="invitees"><span class="zyro-settings-glyph">♧</span><span>Persone invitate<small>Contatti delle cerchie salvati nell’account</small></span><b>›</b></button>
+      <button type="button" data-settings-target="notifications"><span class="zyro-settings-glyph">♢</span><span>Notifiche e avvisi SOS<small>Preferenze e test</small></span><b>›</b></button>
+      <button type="button" data-settings-target="privacy"><span class="zyro-settings-glyph">◇</span><span>Privacy<small>Posizione, audio e consenso</small></span><b>›</b></button>
+      <button type="button" id="reportMenuItem" data-settings-target="reports"><span class="zyro-settings-glyph">⚑</span><span>Segnala un utente<small>Invia una segnalazione privata</small></span><b>›</b></button>
+      <button type="button" data-settings-target="logout"><span class="zyro-settings-glyph">↪</span><span>Esci dall'account<small>Disconnetti il dispositivo</small></span><b>›</b></button>
+    </nav>
+    <div id="zyroSettingsDetail" class="zyro-settings-detail" hidden>
+      <button id="settingsDrawerBack" type="button" class="zyro-settings-back">‹ Tutte le impostazioni</button>
+      <h3 id="settingsDrawerHeading"></h3>
+      <div id="zyroSettingsPanels"></div>
+    </div>
+  </aside>
+  <nav class="bottom-nav" aria-label="Navigazione principale">
+    <button class="nav-item active" data-view="home" type="button"><span class="nav-icon">⌂</span><span>Home</span></button>
+    <button class="nav-item" data-view="circles" type="button"><span class="nav-icon">◎</span><span>Cerchie</span></button>
+    <button class="nav-item" data-view="modes" type="button"><span class="nav-icon nav-mode-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 20 6v5.7c0 5-3.3 8.2-8 9.8-4.7-1.6-8-4.8-8-9.8V6Z"/><path d="m9 12 2 2 4-4"/></svg></span><span>Modalità</span></button>
+    <button class="nav-item" data-view="chats" type="button"><span class="nav-icon nav-chat-icon"><svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg></span><span>Chat</span></button>
+    <button class="nav-item" data-view="settings" type="button"><span class="nav-icon">⚙</span><span>Profilo</span></button>
+  </nav>
 </div>
 <div id="theftOverlay" class="theft-overlay hidden" role="alertdialog" aria-labelledby="theftTitle" aria-modal="true">
   <div class="theft-content"><div class="theft-symbol">🚨</div><h1 id="theftTitle">ALLARME ANTIFURTO</h1><p id="theftMessage">Movimento sospetto rilevato. Sirena attiva.</p><p id="theftNetwork">Stiamo provando ad avvisare i contatti scelti.</p><label class="field"><span>Password del proprietario</span><input id="theftPassword" type="password" autocomplete="current-password" placeholder="Password del tuo account ZYRO 360"></label><button id="theftStop" class="btn btn-primary btn-wide" type="button">Ferma sirena e allarme</button><p class="theft-subnote">Protezione interna all'app, non blocco Android. Per un pericolo reale chiama il 112.</p><a href="tel:112" class="theft-call">Chiama 112</a></div>
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js" defer></script>
+<script src="/app.js?v=17.1" defer></script>
 </body>
 </html>

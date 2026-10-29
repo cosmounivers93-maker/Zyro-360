@@ -1,6 +1,8 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let current = null;
+let adminUsersCache = [];
+let adminLoaded = false;
 let socket = null;
 let wsRetry = null;
 let watchId = null;
@@ -20,11 +22,108 @@ let lastAlertKey = '';
 const inviteCodes = new Map();
 let chatRoom=null, chatPhotoData=null;
 let sosPending=null;
+const journeySelected=new Set(),checkinSelected=new Set();
+let journeyTarget=null;
 let inviteFromLink=null;
 // Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
 let mapTracking=false, ownCentered=false;
-let zyroMap=null;
+// One 2D map engine; no WebGL or external JavaScript.
+let stableMap=null, stableMapState='idle', stableLoadTimer=null, stableRetryTimer=null;
+let stableAttempts=0, stableBootId=0, stableResizeObserver=null;
+const stableMarkers=new Map();
 let compassHeading = null;
+let gpsCourseActive = false;
+// V14.5 - A single filtered heading controller. Every displayed rotation is animated
+// through the shortest angle, without duplicating or redrawing map tiles.
+const headingMotion = {
+  compass: null, compassAt: 0, gps: null, gpsAt: 0,
+  target: null, display: null, source: null, frame: null, previousFrame: 0,
+  lastSensorAt: 0, lastAccepted: 0, pendingJump: null
+};
+function normalizeHeading(deg){return Number.isFinite(deg)?((deg%360)+360)%360:null;}
+function headingDelta(a,b){return ((b-a+540)%360)-180;}
+function clearHeadingMotion(){
+  if(headingMotion.frame!==null)cancelAnimationFrame(headingMotion.frame);
+  Object.assign(headingMotion,{compass:null,compassAt:0,gps:null,gpsAt:0,target:null,display:null,
+    source:null,frame:null,previousFrame:0,lastSensorAt:0,lastAccepted:0,pendingJump:null});
+  compassHeading=null;gpsCourseActive=false;
+}
+function renderHeadingOnly(){
+  if(!lastCoords)return;
+  const shown=Number.isFinite(headingMotion.display)?headingMotion.display:null;
+  lastCoords.heading=shown;
+  const pin=stableMap?.pinNodes?.get('me');
+  if(pin)updateGlassHeading(pin,shown);
+  else stableMap?.schedule();
+}
+function selectHeadingSource(now=Date.now()){
+  // Orientation of the PHONE comes first; GPS course is not phone orientation.
+  if(Number.isFinite(headingMotion.compass)&&now-headingMotion.compassAt<4000)
+    return {angle:headingMotion.compass,source:'compass'};
+  if(Number.isFinite(headingMotion.gps)&&now-headingMotion.gpsAt<8000)
+    return {angle:headingMotion.gps,source:'gps'};
+  return null;
+}
+function animateHeading(time){
+  headingMotion.frame=null;
+  if(!lastCoords||!Number.isFinite(headingMotion.target)){headingMotion.previousFrame=0;return;}
+  const dt=headingMotion.previousFrame?Math.min(.06,Math.max(.001,(time-headingMotion.previousFrame)/1000)):1/60;
+  headingMotion.previousFrame=time;
+  if(!Number.isFinite(headingMotion.display))headingMotion.display=headingMotion.target;
+  const diff=headingDelta(headingMotion.display,headingMotion.target);
+  // Angular low-pass with a maximum speed: smooth yet responsive to a real turn.
+  const easing=1-Math.exp(-dt*(Math.abs(diff)>35?11:8));
+  const turn=Math.sign(diff)*Math.min(Math.abs(diff*easing),dt*240);
+  if(Math.abs(diff)<.65)headingMotion.display+=diff;
+  else headingMotion.display+=turn;
+  renderHeadingOnly();
+  if(Math.abs(headingDelta(headingMotion.display,headingMotion.target))>.65)
+    headingMotion.frame=requestAnimationFrame(animateHeading);
+  else headingMotion.previousFrame=0;
+}
+function aimHeading(){
+  const choice=selectHeadingSource();
+  if(!choice){
+    headingMotion.target=null;headingMotion.source=null;
+    if(headingMotion.frame!==null){cancelAnimationFrame(headingMotion.frame);headingMotion.frame=null;}
+    headingMotion.previousFrame=0;headingMotion.display=null;renderHeadingOnly();return;
+  }
+  const current=headingMotion.target;
+  // Ignore tiny compass noise, but allow accumulated real rotation to pass.
+  if(Number.isFinite(current)&&headingMotion.source===choice.source&&
+      Math.abs(headingDelta(current,choice.angle))<1.5)return;
+  headingMotion.target=choice.angle;headingMotion.source=choice.source;
+  if(!Number.isFinite(headingMotion.display)){
+    headingMotion.display=choice.angle;renderHeadingOnly();return;
+  }
+  if(headingMotion.frame===null)headingMotion.frame=requestAnimationFrame(animateHeading);
+}
+function acceptCompassReading(raw,now=Date.now()){
+  const angle=normalizeHeading(raw);if(angle===null)return;
+  // Reject isolated jumps typical of magnetic interference; a sustained turn is accepted.
+  const old=headingMotion.compass;
+  if(Number.isFinite(old)&&now-headingMotion.lastAccepted<300&&
+      Math.abs(headingDelta(old,angle))>75){
+    const pending=headingMotion.pendingJump;
+    if(!pending||now-pending.at>900||Math.abs(headingDelta(pending.angle,angle))>25){
+      headingMotion.pendingJump={angle,at:now};return;
+    }
+  }
+  headingMotion.pendingJump=null;
+  headingMotion.lastAccepted=now;
+  if(!Number.isFinite(old))headingMotion.compass=angle;
+  else {
+    const delta=headingDelta(old,angle);
+    // Circular smoothing avoids the 359°->0° jump and filters sensor jitter.
+    if(Math.abs(delta)>=1.5)
+      headingMotion.compass=normalizeHeading(old+delta*(Math.abs(delta)>25?.65:.40));
+  }
+  headingMotion.compassAt=now;
+  compassHeading=headingMotion.compass;
+  aimHeading();
+}
+const ZYRO_THEME_KEY='zyro360-appearance-v8';
+let zyroTheme='dark';
 // Pick Pocket is a foreground browser experiment, not an Android system lock.
 let pickArmed=false, theftTriggered=false, lastMotionAt=0, motionPeaks=0, motionSamples=0, armTime=0;
 const pickSelected = new Set();
@@ -38,7 +137,7 @@ async function api(route, options={}) {
   try {res=await fetch(route,{credentials:'same-origin',headers:{'Content-Type':'application/json'},...options});}
   catch {throw Error('Connessione Internet assente. Riprova quando sei online.');}
   let body;try{body=await res.json();}catch{body={};}
-  if(!res.ok) throw Error(body.error || `Errore di connessione (${res.status}).`);
+  if(!res.ok) {const err=Error(body.error || `Errore di connessione (${res.status}).`);err.status=res.status;throw err;}
   return body;
 }
 const post = (path,data={})=>api(path,{method:'POST',body:JSON.stringify(data)});
@@ -55,6 +154,8 @@ function connectSocket(){
     if(m.type==='state'){setState(m.data);}
     if(m.type==='listen-request') await action(()=>sendOffer(m.from));
     if(m.type==='rtc') await action(()=>handleRTC(m.from,m.signal));
+    if(m.type==='account-banned'){alert(m.notice||'Account sospeso.');location.reload();return;}
+    if(m.type==='admin-new-report' && current?.me?.isAdmin){toast('Nuova segnalazione ricevuta nel Centro amministratore.');void action(adminLoad);}
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
   };
@@ -68,14 +169,135 @@ function setState(data){
   const prev = current;
   current=data;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
-  updateGeo(null, data.me.sharing || (data.me.alertKind==='pickpocket' && data.me.theftShare) || mapTracking || pickArmed);
-  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();
+  updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
+  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
 
   const key = data.alerts.filter(a=>a.userId!==data.me.id).map(a=>a.id).sort().join(',');
   if(prev && key && key !== lastAlertKey) toast('🆘 Nuovo SOS nella tua cerchia.',true);
   lastAlertKey=key;
+}
+// Admin UI is only an interface. Every admin endpoint separately verifies the owner's server-side user ID.
+function renderAdminAccess(){
+ const admin=Boolean(current?.me?.isAdmin);
+ $('zyroAdminPanel').classList.toggle('hidden',!admin);
+ $('myAccountId').textContent=current?.me?.id||'';
+ $('reportMenuItem')?.classList.toggle('hidden',admin);
+ $('premiumPanel')?.classList.toggle('zyro-premium-owner',admin);
+ if(!admin){adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
+}
+function renderReportContacts(){
+ const select=$('reportUser');if(!select)return;
+ const contacts=uniqueContacts(),v=select.value;
+ const signature=contacts.map(u=>`${u.id}:${u.name}`).sort().join('|');
+ if(select.dataset.signature===signature)return;
+ select.dataset.signature=signature;
+ select.innerHTML='<option value="">Seleziona un contatto</option>'+contacts.map(u=>`<option value="${escapeHtml(u.id)}">${escapeHtml(u.name)}</option>`).join('');
+ select.value=contacts.some(u=>u.id===v)?v:'';
+}
+async function submitReport(){
+ const userId=$('reportUser').value,reason=$('reportReason').value.trim();
+ if(!userId)throw Error('Seleziona il contatto da segnalare.');
+ if(reason.length<12)throw Error('Descrivi il motivo in almeno 12 caratteri.');
+ if(!confirm('Inviare una segnalazione privata all’amministratore?'))return;
+ const result=await post('/api/report',{userId,reason});
+ $('reportReason').value='';toast(result.message||'Segnalazione inviata.');
+}
+function fmtAdminDate(n){return n?new Date(n).toLocaleString('it-IT'):'Non disponibile';}
+function renderAdminUsers(){
+ const term=$('adminFilter').value.trim().toLowerCase();
+ const users=adminUsersCache.filter(u=>[u.name,u.email,u.id].some(v=>String(v||'').toLowerCase().includes(term)));
+ $('adminUsers').innerHTML=users.length?users.map(u=>`<article class="zyro-admin-user">
+ <div class="zyro-admin-user-title"><b>${escapeHtml(u.name)}</b><span class="zyro-admin-chip ${u.bannedAt?'is-banned':u.premiumGiftLifetime?'is-gift':''}">${u.bannedAt?'Sospeso':u.premiumGiftLifetime?'Premium a vita':u.premiumActive?'Premium attivo':'Standard'}</span></div>
+ <p>${escapeHtml(u.email)}</p><div class="zyro-admin-meta"><small>ID</small><code>${escapeHtml(u.id)}</code><small>Ultimo IP</small><code>${escapeHtml(u.lastLoginIp||'Non disponibile')}</code><small>Ultimo accesso</small><span>${escapeHtml(fmtAdminDate(u.lastLoginAt))}</span></div>
+ ${u.id===current.me.id?'<small>Account proprietario — non sospendibile.</small>':`<div class="zyro-admin-actions"><button type="button" data-admin-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button><button type="button" data-admin-gift="${escapeHtml(u.id)}">${u.premiumGiftLifetime?'Revoca regalo Premium':'Regala Premium a vita'}</button></div>`}
+ </article>`).join(''):'<p class="setting-description">Nessun account corrispondente alla ricerca.</p>';
+ $('adminUsers').querySelectorAll('[data-admin-ban]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeBan(b.dataset.adminBan))));
+ $('adminUsers').querySelectorAll('[data-admin-gift]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeGift(b.dataset.adminGift))));
+}
+async function adminLoad(){
+ if(!current?.me?.isAdmin)return;
+ $('adminStatus').textContent='Caricamento account e segnalazioni…';
+ const data=await api('/api/admin/users');
+ adminUsersCache=data.users||[];adminLoaded=true;renderAdminUsers();
+ $('adminReports').innerHTML=(data.reports||[]).length?`<h3>Segnalazioni recenti</h3>`+(data.reports||[]).map(r=>`<div class="zyro-admin-report"><b>${escapeHtml(r.reason)}</b><p>ID segnalato: ${escapeHtml(r.userId)} · ID segnalante: ${escapeHtml(r.reporterId)}</p><small>${fmtAdminDate(r.at)} · ${escapeHtml(r.status)}</small>${r.status==='open'?`<button type="button" data-admin-review="${escapeHtml(r.id)}">Segna come esaminata</button>`:''}</div>`).join(''):'';
+ $('adminReports').querySelectorAll('[data-admin-review]').forEach(b=>b.addEventListener('click',()=>action(()=>adminReview(b.dataset.adminReview))));
+ $('adminAudit').innerHTML=(data.audit||[]).map(a=>`<p><b>${escapeHtml(a.kind)}</b> · ${escapeHtml(a.for||'')} · ${escapeHtml(fmtAdminDate(a.at))}</p>`).join('')||'<p>Nessuna azione registrata.</p>';
+ $('adminStatus').textContent=`${adminUsersCache.length} account registrati. Dati visibili esclusivamente al proprietario.`;
+}
+/* V17.1: native browser confirm()/prompt() may be cancelled by Android WebView.
+   Use accessible DOM dialogs; all privileged actions still require server-side
+   account ownership AND owner password verification. */
+function zyroOwnerDialog({title,description='',kind='confirm',submitLabel='Conferma',defaultValue=''}) {
+ return new Promise(resolve=>{
+  const veil=document.createElement('div');veil.className='zyro-owner-dialog-backdrop';
+  const form=document.createElement('form');form.className='zyro-owner-dialog';
+  form.setAttribute('role','dialog');form.setAttribute('aria-modal','true');
+  const heading=document.createElement('h3');heading.textContent=title;
+  const explanation=document.createElement('p');explanation.className='zyro-owner-dialog-description';explanation.textContent=description;
+  form.setAttribute('aria-label',title);
+  form.append(heading,explanation);
+  let field=null;
+  if(kind==='reason'||kind==='password'){
+   const label=document.createElement('label');label.textContent=kind==='password'?'Password del proprietario':'Motivazione della sospensione';
+   field=document.createElement(kind==='reason'?'textarea':'input');
+   field.className='zyro-owner-dialog-input';field.required=true;
+   if(kind==='password'){
+    field.type='password';field.autocomplete='current-password';field.maxLength=200;
+   }else{
+    field.rows=3;field.minLength=8;field.maxLength=300;
+   }
+   field.value=defaultValue;
+   label.append(field);form.append(label);
+  }
+  const actions=document.createElement('div');actions.className='zyro-owner-dialog-actions';
+  const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Annulla';
+  const submit=document.createElement('button');submit.type='submit';submit.className='zyro-owner-dialog-ok';submit.textContent=submitLabel;
+  actions.append(cancel,submit);form.append(actions);veil.append(form);
+  const previousFocus=document.activeElement;
+  let done=false;
+  const onKey=(event)=>{if(event.key==='Escape'){event.preventDefault();finish(null);}else if(event.key==='Tab'){
+    const allowed=[...(field?[field]:[]),cancel,submit];
+    if(event.shiftKey&&document.activeElement===allowed[0]){event.preventDefault();allowed[allowed.length-1].focus();}
+    else if(!event.shiftKey&&document.activeElement===allowed[allowed.length-1]){event.preventDefault();allowed[0].focus();}
+  }};
+  const finish=(value)=>{if(done)return;done=true;document.removeEventListener('keydown',onKey,true);veil.remove();try{previousFocus?.focus?.();}catch{}resolve(value);};
+  cancel.addEventListener('click',()=>finish(null));
+  veil.addEventListener('click',e=>{if(e.target===veil)finish(null);});
+  form.addEventListener('submit',e=>{e.preventDefault();if(field){const value=field.value.trim();if(!value||kind==='reason'&&value.length<8){field.focus();field.setCustomValidity(kind==='reason'?'Scrivi almeno 8 caratteri.':'Inserisci la password.');field.reportValidity();return;}finish(value);}else finish(true);});
+  field?.addEventListener('input',()=>field.setCustomValidity(''));
+  document.body.append(veil);document.addEventListener('keydown',onKey,true);
+  (field||submit).focus();
+ });
+}
+async function adminChangeBan(id){
+ const u=adminUsersCache.find(x=>x.id===id);if(!u)return;
+ const ban=!u.bannedAt;
+ const reason=ban?await zyroOwnerDialog({title:`Sospendi ${u.name}`,description:'Scrivi la motivazione che giustifica la sospensione di questo account.',kind:'reason',submitLabel:'Continua'}):'Rimozione della sospensione';
+ if(reason===null)return;
+ const confirmed=await zyroOwnerDialog({title:ban?'Sospensione account':'Riattivazione account',description:`Vuoi davvero ${ban?'sospendere':'riattivare'} ${u.name}?`,submitLabel:ban?'Sospendi account':'Riattiva account'});
+ if(!confirmed)return;
+ const password=await zyroOwnerDialog({title:'Conferma amministratore',description:'Per sicurezza, inserisci la password del tuo account creatore.',kind:'password',submitLabel:'Conferma'});
+ if(!password)return;
+ await post('/api/admin/ban',{userId:id,banned:ban,reason,password});
+ await adminLoad();toast(ban?'Account sospeso. Accesso revocato.':'Account riattivato.');
+}
+async function adminChangeGift(id){
+ const u=adminUsersCache.find(x=>x.id===id);if(!u)return;
+ const enabled=!u.premiumGiftLifetime;
+ const confirmed=await zyroOwnerDialog({title:enabled?'Regala Premium a vita':'Revoca Premium a vita',description:`${enabled?'Assegnare Premium gratuito a vita a':'Revocare il regalo Premium a'} ${u.name}?`,submitLabel:enabled?'Regala Premium':'Revoca Premium'});
+ if(!confirmed)return;
+ const password=await zyroOwnerDialog({title:'Conferma amministratore',description:'Inserisci la password del tuo account creatore per autorizzare il cambiamento.',kind:'password',submitLabel:'Conferma'});
+ if(!password)return;
+ await post('/api/admin/premium-gift',{userId:id,enabled,password});
+ await adminLoad();toast(enabled?'Premium a vita concesso.':'Regalo Premium revocato.');
+}
+async function adminReview(reportId){
+ const password=await zyroOwnerDialog({title:'Conferma amministratore',description:'Autorizza la revisione della segnalazione con la tua password.',kind:'password',submitLabel:'Segna come esaminata'});
+ if(!password)return;
+ await post('/api/admin/report-resolve',{reportId,password,status:'reviewed'});
+ await adminLoad();toast('Segnalazione esaminata.');
 }
 function uniqueContacts(){const contacts=new Map();for(const c of current?.circles||[])for(const m of c.members)if(m.id!==current.me.id)contacts.set(m.id,m);return [...contacts.values()];}
 function when(ts){if(!ts)return 'Nessuna posizione';const diff=Date.now()-ts;if(diff<60000)return 'Aggiornata ora';if(diff<3600000)return `${Math.round(diff/60000)} min fa`;return `${Math.round(diff/3600000)} ore fa`;}
@@ -86,13 +308,15 @@ function renderHome(){
   $('greetingName').textContent=me.name.split(' ')[0];setAvatar($('myAvatar'),me); 
   $('totalMembers').textContent=contacts.length;$('totalCircles').textContent=current.circles.length;
   $('shareToggle').checked=!!me.sharing; $('shareToggle').disabled=!!me.sos;
+  $('shareToggle').closest('.zyro-command-share')?.classList.toggle('is-sharing',!!me.sharing);
+  $('shareState').textContent=me.sharing?'LIVE':'OFF';
   const liveGPS=me.sharing||(pick&&me.theftShare);
   $('myLocationText').textContent= sos?'SOS attivo. Posizione condivisa solo se già autorizzata.':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
   $('sosCard').classList.toggle('is-active',!!me.sos);
-  $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS inviato ai contatti selezionati':'Hai bisogno di aiuto?';
-  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'Le persone selezionate vedono l’allarme. Premi «Attiva microfono» se vuoi trasmettere audio.':'Nessun contatto nella tua cerchia: il tuo SOS non raggiunge nessuno. In emergenza chiama il 112.'):'Premi SOS per avvisare soltanto i destinatari selezionati. La condivisione GPS è indipendente.';
+  $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS attivo sul server (consegna non garantita)':'Hai bisogno di aiuto?';
+  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'Le persone selezionate vedono l’allarme. Premi «Attiva microfono» se vuoi trasmettere audio.':'Nessun contatto nella tua cerchia: il tuo SOS non raggiunge nessuno. In emergenza chiama il 112.'):'SOS Premium richiede un abbonamento attivo. In caso di pericolo reale chiama il 112.';
   $('sosButton').disabled=!!me.sos;
-  $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Attiva SOS');
+  $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Apri SOS Premium');
   $('sosActiveActions').classList.toggle('hidden',!sos);
   $('sosInactiveNote').classList.toggle('hidden',!!me.sos);
   $('audioButton').textContent=localStream?'🔇 Disattiva microfono':'🎙 Attiva microfono';
@@ -103,7 +327,7 @@ function renderHome(){
   }).join(''):`<div class="empty-state"><div class="empty-symbol">♧</div><strong>La tua cerchia inizia da qui</strong>Aggiungi le persone di cui ti fidi per condividere la posizione e ricevere SOS.</div>`;
   const otherAlerts=current.alerts.filter(a=>a.userId!==me.id);
   $('activeAlerts').classList.toggle('hidden',!otherAlerts.length);
-  $('activeAlerts').innerHTML=otherAlerts.map(a=>`<div class="alert-box"><h3>${a.kind==='pickpocket'?'🚨 Possibile furto:':'🆘'} ${escapeHtml(a.name)} ${a.kind==='pickpocket'?'potrebbe aver subito uno scippo':'chiede aiuto'}</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p><div class="action-row">${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
+  $('activeAlerts').innerHTML=otherAlerts.map(a=>`<div class="alert-box"><h3>${a.kind==='pickpocket'?'🚨 Possibile furto:':'🆘'} ${escapeHtml(a.name)} ${a.kind==='pickpocket'?'potrebbe aver subito uno scippo':'chiede aiuto'}</h3><p>Allarme attivo · ${new Date(a.startedAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}. Contatta i soccorsi se necessario.</p><div class="action-row">${a.address?`<p>📍 ${escapeHtml(a.address)}</p>`:''}${a.location?`<a target="_blank" rel="noopener noreferrer" href="${locationUrl(a.location)}">📍 Apri posizione</a>`:''}${a.hasAudio?`<button type="button" data-listen="${escapeHtml(a.userId)}">🎧 Ascolta microfono</button>`:''}<a href="tel:112">Chiama 112</a></div></div>`).join('');
   document.querySelectorAll('[data-listen]').forEach(btn=>btn.addEventListener('click',()=>action(()=>listenTo(btn.dataset.listen))));
   renderMap();
 }
@@ -136,7 +360,7 @@ function renderSOSRecipients(){
   const contacts=uniqueContacts(), selected=new Set(sosPending===null ? (current.me.sosRecipients||[]) : sosPending);
   const node=$('sosRecipientList');
   node.innerHTML=contacts.length?contacts.map(u=>`<label class="recipient-line"><input type="checkbox" data-sos-to="${escapeHtml(u.id)}" ${selected.has(u.id)?'checked':''}><span>${avatarHTML(u)} ${escapeHtml(u.name)}</span></label>`).join(''):'<p class="setting-description">Invita prima una persona nella cerchia.</p>';
-  $('sosPushNote').textContent=current.pushEnabled?'Le notifiche push richiedono che i destinatari le abilitino sul loro telefono.':'⚠ Notifiche push non configurate su Render: gli allarmi possono essere visualizzati solo nell’app aperta. Non usarli per emergenze reali.';
+  $('sosPushNote').textContent=(current.me.premiumActive?'Premium attivo. ':'Premium non attivo: SOS non inviabile. ')+(current.pushEnabled?'Push configurate; consegna non garantita.':'Push non configurate su Render.');
 }
 async function imageData(file,maxPx=520,maxBytes=105000){
   if(!file?.type?.startsWith('image/'))throw Error('Seleziona una fotografia.');
@@ -169,38 +393,135 @@ function renderChatRooms(){
   $('chatRooms').querySelectorAll('.chat-room').forEach(b=>b.addEventListener('click',()=>openChat(b.dataset.typ,b.dataset.id)));
   $('chatInviteNow')?.addEventListener('click',()=>showView('circles'));
 }
-function openChat(type,id){chatRoom={type,id};showView('chats');$('chatsView').classList.add('is-conversation');$('chatConversation').classList.remove('hidden');const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);$('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';$('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · membri della cerchia':'Chat privata · solo voi due';loadChat().catch(e=>toast(e.message,true));}
-async function loadChat(){
+// ZYRO 360 V15.3: full-screen chat and paginated history without deleting older messages.
+let chatHistory={room:'',messages:[],nextBefore:null};
+function closeChat(){
+  chatRoom=null;
+  chatHistory={room:'',messages:[],nextBefore:null};
+  $('chatConversation').classList.add('hidden');
+  $('chatsView').classList.remove('is-conversation');
+  document.body.classList.remove('zyro-chat-full');
+}
+function openChat(type,id){
+  closeChat();
+  chatRoom={type,id};
+  chatHistory={room:`${type}:${id}`,messages:[],nextBefore:null};
+  showView('chats');
+  $('chatsView').classList.add('is-conversation');
+  $('chatConversation').classList.remove('hidden');
+  document.body.classList.add('zyro-chat-full');
+  const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);
+  $('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';
+  $('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · accesso riservato':'Chat privata · non cifrata end-to-end';
+  $('chatMessages').innerHTML='<p class="chat-empty">Caricamento messaggi…</p>';
+  loadChat().catch(e=>toast(e.message,true));
+}
+function renderChatHistory({stickToBottom=false,preserveTop=false}={}){
+  const node=$('chatMessages');
+  const oldHeight=node.scrollHeight,oldTop=node.scrollTop;
+  const bubbles=chatHistory.messages.map(m=>`<article class="chat-bubble ${m.from===current.me.id?'mine':''}"><small>${escapeHtml(m.name)} · ${new Date(m.at).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})}</small>${m.text?`<p>${escapeHtml(m.text)}</p>`:''}${m.image?`<img loading="lazy" src="${m.image}" alt="Foto nella conversazione">`:''}</article>`).join('');
+  node.innerHTML=(chatHistory.nextBefore!==null?'<button type="button" id="chatOlder" class="chat-older">↑ Carica messaggi precedenti</button>':'')+(bubbles||'<p class="chat-empty">Nessun messaggio. Inizia tu la conversazione!</p>');
+  $('chatOlder')?.addEventListener('click',()=>loadChat(true).catch(e=>toast(e.message,true)));
+  if(stickToBottom) node.scrollTop=node.scrollHeight;
+  else if(preserveTop)node.scrollTop=oldTop+node.scrollHeight-oldHeight;
+  else node.scrollTop=oldTop;
+}
+async function loadChat(older=false){
   const r=chatRoom;if(!r||!current)return;
-  const response=await api(`/api/chat/${encodeURIComponent(r.type)}/${encodeURIComponent(r.id)}`);
-  if(chatRoom!==r)return;
-  const node=$('chatMessages');node.innerHTML=response.messages.length?response.messages.map(m=>`<article class="chat-bubble ${m.from===current.me.id?'mine':''}"><small>${escapeHtml(m.name)} · ${new Date(m.at).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}</small>${m.text?`<p>${escapeHtml(m.text)}</p>`:''}${m.image?`<img loading="lazy" src="${m.image}" alt="Foto nella conversazione">`:''}</article>`).join(''):'<p class="chat-empty">Nessun messaggio. Inizia tu la conversazione!</p>';
-  node.scrollTop=node.scrollHeight;
+  const roomKey=`${r.type}:${r.id}`;
+  if(older && (chatHistory.room!==roomKey||chatHistory.nextBefore===null))return;
+  const before=older?`?before=${chatHistory.nextBefore}`:'';
+  const node=$('chatMessages');
+  const wasNearBottom=!older && (node.scrollHeight-node.scrollTop-node.clientHeight<105 || chatHistory.messages.length===0);
+  const response=await api(`/api/chat/${encodeURIComponent(r.type)}/${encodeURIComponent(r.id)}${before}`);
+  if(chatRoom!==r||chatHistory.room!==roomKey)return;
+  const byId=new Map(chatHistory.messages.map(m=>[m.id,m]));
+  for(const m of response.messages)byId.set(m.id,m);
+  chatHistory.messages=[...byId.values()].sort((a,b)=>a.at-b.at || a.id.localeCompare(b.id));
+  if(older||chatHistory.messages.length===response.messages.length)chatHistory.nextBefore=response.nextBefore;
+  renderChatHistory({stickToBottom:wasNearBottom&&!older,preserveTop:older});
 }
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
-function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';}
-function showView(view){activeView=view;for(const v of ['home','circles','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='home'){requestAnimationFrame(()=>{renderMap();zyroMap?.invalidateSize();});}}
+function renderSettings(){if(!current)return;$('profileName').textContent=current.me.name;$('profileEmail').textContent=current.me.email;$('profileAccessLabel').textContent=current.me.isAdmin?'Creatore · Premium incluso':'Account personale';setAvatar($('profileAvatar'),current.me);$('avatarRemove').disabled=!current.me.avatar;$('avatarRemove').classList.toggle('is-disabled',!current.me.avatar);$('pushButton').disabled=!current.pushEnabled;$('pushButton').textContent=current.pushEnabled?'Attiva notifiche SOS':'Notifiche push non configurate';const status=$('profileStorageStatus');if(status){status.textContent=current.persistentStorage?'✓ Profilo collegato al database persistente. Non serve registrarsi nuovamente a ogni accesso.':'⚠️ Archivio temporaneo: i profili potrebbero sparire dopo il riavvio del server. Configura DATABASE_URL su Render.';status.style.borderColor=current.persistentStorage?'#86cbb8':'#e9b3a4';}renderPushTestContacts();}
+function renderPushTestContacts(){
+  const select=$('pushTestRecipient'), button=$('pushTestButton');
+  if(!select||!button)return;
+  const previous=select.value, contacts=uniqueContacts();
+  const signature=contacts.map(x=>x.id+'|'+x.name).join(';');
+  if(select.dataset.signature!==signature){
+    select.dataset.signature=signature;
+    select.replaceChildren();
+    if(!contacts.length){const option=document.createElement('option');option.value='';option.textContent='Nessun contatto nella cerchia';select.append(option);}
+    else for(const u of contacts){const option=document.createElement('option');option.value=u.id;option.textContent=u.name;select.append(option);}
+    if(contacts.some(c=>c.id===previous))select.value=previous;
+  }
+  select.disabled=!contacts.length||!current?.pushEnabled;
+  button.disabled=!contacts.length||!current?.pushEnabled;
+}
+async function sendPushTest(){
+  const recipientId=$('pushTestRecipient').value;
+  if(!recipientId)throw Error('Scegli prima un contatto nella tua cerchia.');
+  const button=$('pushTestButton');button.disabled=true;
+  try{
+    const result=await post('/api/push/test',{recipientId});
+    $('pushTestStatus').textContent=result.notice||'Invio di prova completato.';
+    toast(result.notice||'Test inviato.',result.accepted===0);
+  }finally{button.disabled=false;}
+}
+function showView(view){if(view!=='settings')closeProfileSettings();if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'smooth'});if(view==='settings' && current?.me?.isAdmin && !adminLoaded)void action(adminLoad);if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
 function updateGeo(oldOn,newOn){
-  if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;geolocationError='';renderMap();return;}
+  if(!newOn){if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();geolocationError='';renderMap();return;}
   if(watchId!==null)return;
   if(!navigator.geolocation){geolocationError='GPS non disponibile su questo browser';toast(geolocationError,true);return;}
   geolocationError='';
   watchId=navigator.geolocation.watchPosition(async(p)=>{
-    lastCoords={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy,heading:Number.isFinite(p.coords.heading)?p.coords.heading:compassHeading};geolocationError='';
-    const canShare=!!current?.me?.sharing || (current?.me?.alertKind==='pickpocket' && !!current.me.theftShare);
+    // GPS heading is a COURSE of travel, not the direction the phone faces.
+    // Use it only while moving reliably and if a fresh compass is unavailable.
+    const speed=p.coords.speed;
+    const gpsBearing=normalizeHeading(p.coords.heading);
+    gpsCourseActive=gpsBearing!==null&&Number.isFinite(speed)&&speed>=1.5&&
+      Number.isFinite(p.coords.accuracy)&&p.coords.accuracy<=50;
+    headingMotion.gps=gpsCourseActive?gpsBearing:null;
+    headingMotion.gpsAt=gpsCourseActive?Date.now():0;
+    lastCoords={lat:p.coords.latitude,lon:p.coords.longitude,accuracy:p.coords.accuracy,
+      heading:Number.isFinite(headingMotion.display)?headingMotion.display:null};
+    aimHeading();geolocationError='';
+    const canShare=!!current?.me?.sharing || !!current?.me?.sos;
     if(canShare && Date.now()-sentAt > 3500){sentAt=Date.now();try{await post('/api/position',lastCoords);}catch(e){if(e.message!=='Condivisione non attiva.')console.warn(e.message);}}
     renderHome();
   },err=>{geolocationError=`GPS: ${err.message||'permesso negato'}`;renderHome();toast(geolocationError,true);},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
 }
 async function refresh(){if(!current)return;const data=await api('/api/state');setState(data);}
 async function startSOS(){
-  // Send the alarm first: microphone access must not delay the emergency alert.
-  await post('/api/sos/start');await refresh();
-  toast('Allerta SOS inviata al server ai contatti selezionati. Le notifiche push non sono garantite.');
-  toast(current.pushEnabled?'Se vuoi trasmettere l’audio premi «Attiva microfono».':'Attenzione: push non configurate sul server. Avvisa la persona anche con una chiamata.',!current.pushEnabled);
+ if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS Premium non attivo: nessun allarme è stato inviato. In emergenza chiama il 112.',true);return;}
+ // Try to include a fresh GPS fix, without indefinitely delaying a request for help.
+ if(!lastCoords && navigator.geolocation){try{
+   const pos=await Promise.race([new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,maximumAge:10000,timeout:2400})),new Promise((_,reject)=>setTimeout(()=>reject(Error('GPS non disponibile')),2600))]);
+   lastCoords={lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy,heading:null};
+ }catch{/* SOS can still start without a fix. */}}
+ const result=await post('/api/sos/start',{location:lastCoords?{lat:lastCoords.lat,lon:lastCoords.lon,accuracy:lastCoords.accuracy}:null});
+ await refresh();mapTracking=true;updateGeo(null,true);
+ if(result.serverRecorded){
+   const pushCount=Number(result.pushAccepted||0);
+   if(!result.pushConfigured)toast('SOS registrato, ma Firebase non risulta configurato su Render. Chiama il 112 in caso di emergenza.',true);
+   else if(!pushCount)toast('SOS attivo sulla mappa, ma nessuna notifica push è stata accettata. Controlla i dispositivi dei destinatari.',true);
+   else toast(`SOS attivato. ${pushCount} invii accettati dal provider; consegna e lettura non confermate.`);
+ }
+ if($('sosAudioConsent').checked){try{await startAudio();toast('Microfono attivo: i contatti possono richiedere ascolto in diretta.');}catch(err){toast('Allarme attivo, ma microfono non disponibile: '+err.message,true);}}
 }
-async function stopSOS(){if(!confirm('Confermi di voler terminare l’allarme SOS?'))return;await post('/api/sos/stop');stopAudio();await refresh();toast('SOS terminato.');}
+async function stopSOS(){
+  const confirmed=await zyroOwnerDialog({
+    title:'Termina allarme SOS',
+    description:'Vuoi davvero interrompere la richiesta di aiuto? Le persone selezionate non vedranno più l’allarme attivo.',
+    submitLabel:'Termina SOS'
+  });
+  if(!confirmed)return;
+  await post('/api/sos/stop');
+  stopAudio();
+  await refresh();
+  toast('Allarme SOS terminato.');
+}
 async function startAudio(){
   if(localStream || micBusy || !current?.me?.sos)return;
   if(!navigator.mediaDevices?.getUserMedia)throw Error('Serve HTTPS e un browser con accesso al microfono.');
@@ -250,8 +571,11 @@ async function handleRTC(remoteId,signal){
 async function flushIce(remoteId){const p=peers.get(remoteId);for(const item of pendingIce.get(remoteId)||[])await p?.addIceCandidate(new RTCIceCandidate(item)).catch(()=>{});pendingIce.delete(remoteId);}
 function stopListening(){if(listeningTo){const p=peers.get(listeningTo);if(p){p.close();peers.delete(listeningTo);}pendingIce.delete(listeningTo);}listeningTo=null;const a=$('remoteAudio');a.pause();a.srcObject=null;$('audioDock').classList.add('hidden');}
 async function enablePush(){
-  if(!current?.pushEnabled)return;
-  if(!('serviceWorker'in navigator) || !('PushManager'in window))throw Error('Notifiche push non supportate da questo browser.');
+  if(!current?.pushEnabled)throw Error('Le notifiche Web Push non sono ancora configurate sul server.');
+  if(!('serviceWorker'in navigator) || !('PushManager'in window)) {
+    const nativeAndroid=/\bwv\b|; wv\)/i.test(navigator.userAgent);
+    throw Error(nativeAndroid?'Questa versione Android usa una WebView, che non supporta Web Push. Le notifiche Android native richiedono Firebase Cloud Messaging (FCM), non ancora configurato.':'Il browser non supporta Web Push. Verifica i requisiti del browser e della connessione sicura.');
+  }
   if(Notification.permission==='denied')throw Error('Notifiche bloccate nelle impostazioni del dispositivo.');
   const permission=await Notification.requestPermission();if(permission!=='granted')throw Error('Consenso alle notifiche non concesso.');
   const reg=await navigator.serviceWorker.ready;
@@ -262,228 +586,261 @@ async function enablePush(){
 }
 function base64ToBytes(base64){const padding='='.repeat((4-base64.length%4)%4);const binary=atob((base64+padding).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(binary,x=>x.charCodeAt(0));}
 function setMode(m){authMode=m;document.querySelectorAll('.auth-tab').forEach(b=>{const yes=b.dataset.mode===m;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));});$('nameField').classList.toggle('hidden',m==='login');$('name').required=m==='register';$('password').autocomplete=m==='register'?'new-password':'current-password';$('authSubmit').innerHTML=m==='login'?'Entra nella tua cerchia <span>→</span>':'Crea il mio account <span>→</span>';}
-// Google Maps is optional and requires a Google Cloud API key restricted to the site.
-// Without a key, the on-screen free map remains functional using independent providers.
-let googleMap=null,googleMarkers=[],googleInitAttempted=false,googleMapLoading=false;
-async function maybeInitGoogleMap(){
-  if(googleInitAttempted||googleMapLoading||!current)return;
-  googleInitAttempted=true;googleMapLoading=true;
-  try{
-    const config=await api('/api/map-config');
-    if(!config.googleMapsKey){googleMapLoading=false;return;}
-    await new Promise((resolve,reject)=>{
-      if(window.google?.maps?.Map){resolve();return;}
-      const tag=document.createElement('script');tag.async=true;
-      tag.src=`https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(config.googleMapsKey)}&v=weekly&language=it`;
-      tag.onload=()=>window.google?.maps?.Map?resolve():reject(Error('Google Maps non è stato caricato'));
-      tag.onerror=()=>reject(Error('Rete o chiave Google Maps non disponibile'));
-      document.head.append(tag);
-    });
-    const native=zyroMap;
-    googleMap=new window.google.maps.Map($('googleMap'),{
-      center:{lat:native?.center.lat??41.65,lng:native?.center.lon??12.48},zoom:native?.zoom??6,
-      disableDefaultUI:true,zoomControl:true,gestureHandling:'greedy',clickableIcons:false,
-      fullscreenControl:false,streetViewControl:false,mapTypeControl:false,
-      styles:[{featureType:'poi',stylers:[{visibility:'off'}]},{featureType:'transit',stylers:[{visibility:'off'}]}]
-    });
-    $('googleMap').classList.remove('hidden');
-    $('mapTiles').classList.add('hidden');$('mapPins').classList.add('hidden');
-    $('mapAttribution').classList.add('hidden');$('mapUnavailable').classList.add('hidden');
-    document.querySelector('.map-top-label').lastChild.textContent=' GOOGLE MAPS · LIVE';
-    syncGoogleMap();
-  }catch(error){console.warn('Google Maps non disponibile. Cartografia alternativa attiva.',error);}
-  finally{googleMapLoading=false;}
+// ZYRO 360 V14.2 — simple 2D cartography for browsers without WebGL or external JS libraries.
+// Real raster tiles, requested via the existing authenticated /api/map-tile route.
+// Map location is read from GPS; it is only sent to the server when the user opts into sharing.
+const TILE_SIZE=256, DEFAULT_CENTER={lat:41.9,lon:12.5};
+const ZYRO_MAP_MAX_ZOOM=18;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const mapValidPoint=p=>p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon))&&Math.abs(Number(p.lat))<=85&&Math.abs(Number(p.lon))<=180;
+const mapSafePoint=p=>[Number(p.lon),Number(p.lat)];
+const worldWidth=z=>TILE_SIZE*2**z;
+function toWorld(lat,lon,z){
+  const safeLat=clamp(Number(lat),-85.051128,85.051128),f=Math.PI/180,s=Math.sin(safeLat*f);
+  return {x:(Number(lon)+180)/360*worldWidth(z),y:(.5-Math.log((1+s)/(1-s))/(4*Math.PI))*worldWidth(z)};
 }
-function googlePinIcon(isMe,heading){
-  const arrow=Number.isFinite(heading)?`<path d="M26 10L35 30L26 26L17 30Z" fill="#1b72dd" transform="rotate(${Number(heading)} 26 28)"/>`:'';
-  const svg=isMe?`<svg xmlns="http://www.w3.org/2000/svg" width="52" height="52" viewBox="0 0 52 52"><circle cx="26" cy="26" r="23" fill="#148ee9" fill-opacity=".14"/>${arrow}<circle cx="26" cy="26" r="11" fill="white"/><circle cx="26" cy="26" r="7" fill="#1688ef"/></svg>`:`<svg xmlns="http://www.w3.org/2000/svg" width="48" height="54" viewBox="0 0 48 54"><path d="M24 3c-10 0-18 8-18 18c0 14 18 29 18 29s18-15 18-29C42 11 34 3 24 3Z" fill="#13bfa4" stroke="white" stroke-width="3"/><circle cx="24" cy="21" r="7" fill="white" opacity=".9"/></svg>`;
-  return {url:'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent(svg),scaledSize:new google.maps.Size(isMe?52:48,isMe?52:54),anchor:new google.maps.Point(isMe?26:24,isMe?26:50)};
+function fromWorld(x,y,z){const w=worldWidth(z);return {lat:Math.atan(Math.sinh(Math.PI*(1-2*clamp(y,0,w)/w)))*180/Math.PI,lon:(((x/w)%1+1)%1)*360-180};}
+function mapStatus(message){const el=$('mapStatus');if(el)el.textContent=message;}
+function mapLink(){const link=$('mapOpenGoogle');if(!link)return;link.href=mapValidPoint(lastCoords)?`https://www.openstreetmap.org/?mlat=${encodeURIComponent(lastCoords.lat)}&mlon=${encodeURIComponent(lastCoords.lon)}#map=16/${encodeURIComponent(lastCoords.lat)}/${encodeURIComponent(lastCoords.lon)}`:'https://www.openstreetmap.org/';}
+function mapShowFailure(message){$('mapUnavailable')?.classList.remove('hidden');if($('mapFailureText'))$('mapFailureText').textContent=message;mapStatus('Cartografia non raggiungibile. Il GPS continua a funzionare.');mapLink();}
+function mapHideFailure(){$('mapUnavailable')?.classList.add('hidden');}
+function clearMapTimers(){clearTimeout(stableLoadTimer);clearTimeout(stableRetryTimer);stableLoadTimer=null;stableRetryTimer=null;}
+function removeStableMap(){stableBootId++;clearMapTimers();try{stableMap?.remove();}catch{}stableMap=null;stableMapState='idle';stableMarkers.clear();$('zyroVectorMap')?.replaceChildren();}
+// One translucent glass arrow represents the actual GPS/course or permitted compass bearing.
+// The translucent ring remains visible when heading is not supported by the device.
+function updateGlassHeading(pin,heading){
+ const arrow=pin.querySelector('.zyro-gl-arrow');if(!arrow)return;
+ const valid=typeof heading==='number'&&Number.isFinite(heading);
+ pin.classList.toggle('zyro-heading-unknown',!valid);
+ // The angle is intentionally NOT wrapped: a 359°->1° turn must move only 2°.
+ if(valid)arrow.style.transform=`rotate(${heading}deg)`;
 }
-function syncGoogleMap(){
-  if(!googleMap||!current)return;
-  for(const marker of googleMarkers)marker.setMap(null);
-  googleMarkers=[];
-  const make=(lat,lon,title,isMe,heading)=>{
-    const marker=new google.maps.Marker({map:googleMap,position:{lat:Number(lat),lng:Number(lon)},title,icon:googlePinIcon(isMe,heading),zIndex:isMe?10:2});
-    googleMarkers.push(marker);
+// V15.1: the public profile photo is shown only for authenticated users and
+// contacts whose locations the server has authorized in /api/state.
+function usableMapAvatar(user){
+ const s=user?.avatar;
+ return typeof s==='string'&&s.length<=150000&&/^data:image\/jpeg;base64,[A-Za-z0-9+/=]+$/.test(s)?s:null;
+}
+function updateMapAvatar(pin,user,isSelf){
+ const src=usableMapAvatar(user),name=String(user?.name||'Contatto');
+ const holder=pin.querySelector(isSelf?'.zyro-gl-core':'.zyro-atlas-initial');
+ if(!holder)return;
+ // Moving the map must not rebuild the photo; update only after profile changes.
+ if(pin._zyroAvatar===src && pin._zyroAvatarName===name)return;
+ pin._zyroAvatar=src;pin._zyroAvatarName=name;
+ holder.replaceChildren();
+ holder.classList.toggle('zyro-map-has-avatar',!!src);
+ if(src){
+  const img=document.createElement('img');img.className='zyro-map-profile-photo';
+  img.src=src;img.alt='';img.draggable=false;img.decoding='async';
+  holder.append(img);
+ }else{
+  const initial=document.createElement('b');initial.className='zyro-map-profile-initial';
+  initial.textContent=initials(name);holder.append(initial);
+ }
+ pin.title=isSelf?`${name} — il tuo GPS`:`${name} — posizione condivisa`;
+ pin.setAttribute('aria-label',pin.title);
+}
+function stableMarker(isSelf,heading,user,alert=false){
+ const name=String(user?.name|| (isSelf?'Tu':'Contatto'));
+ const el=document.createElement('div');el.className=isSelf?'zyro-gl-location':'zyro-gl-contact';
+ if(alert)el.classList.add('zyro-contact-alert');
+ if(isSelf){
+  const ring=document.createElement('span'),arrow=document.createElement('span'),core=document.createElement('span');
+  ring.className='zyro-gl-ring';arrow.className='zyro-gl-arrow';core.className='zyro-gl-core';
+  arrow.setAttribute('aria-hidden','true');
+  arrow.innerHTML=`<svg viewBox="0 0 72 72" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+   <linearGradient id="zyroGlassNavFill" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e6ffff" stop-opacity=".72"/><stop offset=".48" stop-color="#5cd8ff" stop-opacity=".32"/><stop offset="1" stop-color="#098acc" stop-opacity=".17"/></linearGradient>
+   <linearGradient id="zyroGlassNavFacet" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#bff8ff" stop-opacity=".65"/><stop offset="1" stop-color="#24b8ff" stop-opacity=".08"/></linearGradient>
+  </defs>
+  <path d="M36 3 L55 56 Q56 60 52 58 L36 49 L20 58 Q16 60 17 56 Z" fill="url(#zyroGlassNavFill)" stroke="#e2ffff" stroke-opacity=".86" stroke-width="1.8" stroke-linejoin="round"/>
+  <path d="M36 7 L36 48 L20 55 Z" fill="url(#zyroGlassNavFacet)"/>
+  <path d="M36 8 L50 51" stroke="#ccfbff" stroke-opacity=".5" stroke-width="1.2" stroke-linecap="round"/>
+  </svg>`;
+  el.append(ring,arrow,core);updateGlassHeading(el,heading);
+ }else{
+  const badge=document.createElement('span'),tag=document.createElement('span');
+  badge.className='zyro-atlas-initial';tag.className='zyro-atlas-contact-name';
+  tag.textContent=name.slice(0,22);el.append(badge,tag);
+ }
+ updateMapAvatar(el,user,isSelf);
+ return el;
+}
+class ZyroRasterMap{
+ constructor(container,center,zoom,onTile,onError){
+  this.el=container;this.zoom=zoom;this.center={...center};this.tiles=new Map();this.onTile=onTile;this.onError=onError;
+  this.failed=0;this.loaded=0;this.removed=false;this.pending=null;this.pointers=new Map();this.pinNodes=new Map();this.pinchStart=0;
+  this.layer=document.createElement('div');this.layer.className='zyro-raster-tiles';
+  this.pinLayer=document.createElement('div');this.pinLayer.className='zyro-raster-markers';
+  this.el.replaceChildren(this.layer,this.pinLayer);
+  this.onDown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(this.pointers.size===2)this.pinchStart=0;try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
+  this.onMove=e=>{
+   if(!this.pointers.has(e.pointerId))return;
+   const prev=this.pointers.get(e.pointerId),next={x:e.clientX,y:e.clientY};this.pointers.set(e.pointerId,next);
+   if(this.pointers.size===1){this.shift(next.x-prev.x,next.y-prev.y);}
+   else if(this.pointers.size===2){
+    const arr=[...this.pointers.values()],dist=Math.hypot(arr[0].x-arr[1].x,arr[0].y-arr[1].y);
+    if(!this.pinchStart){this.pinchStart=dist;return;}
+    if(dist>this.pinchStart*1.4){this.zoomTo(this.zoom+1);this.pinchStart=dist;}
+    else if(dist<this.pinchStart/1.4){this.zoomTo(this.zoom-1);this.pinchStart=dist;}
+   }
+   e.preventDefault();
   };
-  for(const user of uniqueContacts().filter(u=>u.location&&Number.isFinite(Number(u.location.lat))&&Number.isFinite(Number(u.location.lon))))make(user.location.lat,user.location.lon,user.name,false);
-  if(lastCoords)make(lastCoords.lat,lastCoords.lon,'La tua posizione GPS',true,lastCoords.heading);
-  const native=zyroMap;
-  if(native && !googleMap.centerInitialized){
-    googleMap.setCenter({lat:native.center.lat,lng:native.center.lon});googleMap.setZoom(native.zoom);googleMap.centerInitialized=true;
-  }
-}
-function focusGoogleMap(lat,lon,zoom=16){if(googleMap){googleMap.panTo({lat:Number(lat),lng:Number(lon)});googleMap.setZoom(zoom);googleMap.centerInitialized=true;}}
-
-// Map tiles are loaded only for the visible viewport. No third-party JS dependency.
-// OpenStreetMap standard tiles: © OpenStreetMap contributors. Internet required.
-const MAP_TILE_SIZE=256, MIN_MAP_ZOOM=3, MAX_MAP_ZOOM=18;
-function clampLatitude(lat){return Math.min(85.05112878,Math.max(-85.05112878,lat));}
-function worldPoint(lat,lon,zoom){
-  const size=MAP_TILE_SIZE*2**zoom, phi=clampLatitude(lat)*Math.PI/180;
-  return {x:(lon+180)/360*size,y:(1-Math.log(Math.tan(phi)+1/Math.cos(phi))/Math.PI)/2*size};
-}
-function geoPoint(x,y,zoom){
-  const size=MAP_TILE_SIZE*2**zoom;
-  return {lat:Math.atan(Math.sinh(Math.PI*(1-2*Math.max(0,Math.min(size,y))/size)))*180/Math.PI,
-    lon:((x/size*360+180)%360+360)%360-180};
-}
-class ZyroNativeMap {
-  constructor(element){
-    this.element=element;this.tiles=$('mapTiles');this.pins=$('mapPins');
-    this.center={lat:41.65,lon:12.48};this.zoom=6;this.tilesByKey=new Map();
-    this.pointerStart=null;this.fingers=new Map();this.pinchStart=null;
-    this.loaded=0;this.failed=0;this.drawQueued=false;
-    this.lastTap=0;this.own=null;this.contacts=[];
-    element.addEventListener('pointerdown',e=>this.onDown(e));
-    element.addEventListener('pointermove',e=>this.onMove(e));
-    element.addEventListener('pointerup',e=>this.onUp(e));
-    element.addEventListener('pointercancel',e=>this.onUp(e));
-    element.addEventListener('wheel',e=>{if(!e.ctrlKey && !e.shiftKey)return;e.preventDefault();this.setZoom(this.zoom+(e.deltaY<0?1:-1));},{passive:false});
-    this.resizeObserver=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>this.invalidateSize()):null;
-    this.resizeObserver?.observe(element);
-    window.addEventListener('resize',()=>this.invalidateSize());
-    this.invalidateSize();
-  }
-  onDown(e){
-    // Don't intercept links or buttons in the map overlays.
-    if(e.target.closest('a,button,.map-attribution'))return;
-    this.element.setPointerCapture?.(e.pointerId);
-    this.fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(this.fingers.size===1)this.pointerStart={x:e.clientX,y:e.clientY,center:{...this.center}};
-    if(this.fingers.size===2){
-      const [a,b]=[...this.fingers.values()];this.pinchStart={distance:Math.hypot(a.x-b.x,a.y-b.y),zoom:this.zoom};this.pointerStart=null;
-    }
-  }
-  onMove(e){
-    if(!this.fingers.has(e.pointerId))return;
-    this.fingers.set(e.pointerId,{x:e.clientX,y:e.clientY});
-    if(this.fingers.size===2 && this.pinchStart){
-      const [a,b]=[...this.fingers.values()];const dist=Math.hypot(a.x-b.x,a.y-b.y);
-      if(dist>0 && this.pinchStart.distance>0){
-        const next=this.pinchStart.zoom+Math.round(Math.log2(dist/this.pinchStart.distance)*1.5);
-        this.setZoom(next);
-      }
-      return;
-    }
-    if(!this.pointerStart)return;
-    const p=worldPoint(this.pointerStart.center.lat,this.pointerStart.center.lon,this.zoom);
-    this.center=geoPoint(p.x+this.pointerStart.x-e.clientX,p.y+this.pointerStart.y-e.clientY,this.zoom);
-    this.queueDraw();
-  }
-  onUp(e){
-    if(!this.fingers.has(e.pointerId))return;
-    this.fingers.delete(e.pointerId);
-    if(this.fingers.size===0){
-      this.pointerStart=null;this.pinchStart=null;
-      if(e.type==='pointerup'){
-        const now=Date.now();if(now-this.lastTap<310){this.setZoom(this.zoom+1);this.lastTap=0;}else this.lastTap=now;
-      }
-    }else if(this.fingers.size===1){
-      const a=[...this.fingers.values()][0];this.pointerStart={x:a.x,y:a.y,center:{...this.center}};this.pinchStart=null;
-    }
-  }
-  setZoom(zoom){
-    const value=Math.max(MIN_MAP_ZOOM,Math.min(MAX_MAP_ZOOM,Math.round(zoom)));
-    if(value===this.zoom)return;
-    this.zoom=value;this.queueDraw();
-  }
-  focusOn(lat,lon,zoom=16){
-    if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return;
-    this.center={lat:clampLatitude(lat),lon};this.zoom=Math.max(MIN_MAP_ZOOM,Math.min(MAX_MAP_ZOOM,Math.round(zoom)));
-    this.queueDraw();
-  }
-  reset(){this.own=null;this.contacts=[];this.center={lat:41.65,lon:12.48};this.zoom=6;this.queueDraw();}
-  invalidateSize(){this.queueDraw();}
-  queueDraw(){if(this.drawQueued)return;this.drawQueued=true;requestAnimationFrame(()=>{this.drawQueued=false;this.draw();});}
-  draw(){
-    const w=this.element.clientWidth,h=this.element.clientHeight;
-    if(!w || !h)return;
-    const z=this.zoom, n=2**z, size=MAP_TILE_SIZE*n, center=worldPoint(this.center.lat,this.center.lon,z);
-    const left=center.x-w/2,top=center.y-h/2;
-    const colMin=Math.floor(left/MAP_TILE_SIZE),colMax=Math.floor((left+w)/MAP_TILE_SIZE);
-    const rowMin=Math.max(0,Math.floor(top/MAP_TILE_SIZE)),rowMax=Math.min(n-1,Math.floor((top+h)/MAP_TILE_SIZE));
-    const seen=new Set();
-    for(let col=colMin;col<=colMax;col++)for(let row=rowMin;row<=rowMax;row++){
-      const normalizedX=((col%n)+n)%n, key=`${z}/${normalizedX}/${row}/${col}`;
-      seen.add(key);
-      let img=this.tilesByKey.get(key);
-      if(!img){
-        img=document.createElement('img');img.className='zyro-map-tile';img.alt='';img.draggable=false;
-        img.decoding='async';img.loading='eager';
-        const route=`${z}/${normalizedX}/${row}.png`;
-        let source=0;
-        img.addEventListener('load',()=>{this.loaded++;this.updateTileStatus();});
-        img.addEventListener('error',()=>{
-          source++;
-          if(source===1){img.src=`https://tile.openstreetmap.org/${route}`;return;}
-          if(source===2){img.src=`/api/map-tile/${route}`;return;}
-          this.failed++;this.updateTileStatus();
-        });
-        img.src=`https://a.basemaps.cartocdn.com/light_all/${route}`;
-        this.tilesByKey.set(key,img);this.tiles.append(img);
-      }
-      img.style.transform=`translate3d(${Math.round(col*MAP_TILE_SIZE-left)}px,${Math.round(row*MAP_TILE_SIZE-top)}px,0)`;
-    }
-    for(const [key,tile] of this.tilesByKey){if(!seen.has(key)){tile.remove();this.tilesByKey.delete(key);}}
-    // Real GPS and live shared contacts are drawn above the map raster.
-    this.pins.replaceChildren();
-    const pinAt=(lat,lon,markerClass,label,heading,accuracy)=>{
-      if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return;
-      const p=worldPoint(lat,lon,z);
-      let dx=p.x-center.x;if(dx>size/2)dx-=size;else if(dx<-size/2)dx+=size;
-      const x=w/2+dx,y=h/2+p.y-center.y;
-      if(x < -150||x > w+150 || y < -150||y > h+150)return;
-      if(accuracy){
-        const metersPerPixel=156543.03392*Math.cos(lat*Math.PI/180)/(2**z);
-        const diameter=Math.min(480,Math.max(22,2*accuracy/metersPerPixel));
-        const circle=document.createElement('div');circle.className='zyro-gps-accuracy';
-        circle.style.left=`${x}px`;circle.style.top=`${y}px`;circle.style.width=`${diameter}px`;circle.style.height=`${diameter}px`;
-        this.pins.append(circle);
-      }
-      const marker=document.createElement('div');marker.className=markerClass;marker.style.left=`${x}px`;marker.style.top=`${y}px`;
-      marker.title=label;marker.setAttribute('aria-label',label);
-      if(markerClass.includes('you')){
-        if(Number.isFinite(heading)){const dir=document.createElement('span');dir.className='zyro-heading';dir.style.transform=`translateX(-50%) rotate(${heading}deg)`;marker.append(dir);}
-        const dot=document.createElement('span');dot.className='zyro-you-dot';marker.append(dot);
-      }else{marker.textContent=label.trim().charAt(0).toUpperCase()||'•';}
-      this.pins.append(marker);
+  this.onUp=e=>{this.pointers.delete(e.pointerId);if(this.pointers.size<2)this.pinchStart=0;};
+  this.onWheel=e=>{e.preventDefault();this.zoomTo(this.zoom+(e.deltaY<0?1:-1));};
+  this.el.addEventListener('pointerdown',this.onDown);
+  this.el.addEventListener('pointermove',this.onMove);
+  this.el.addEventListener('pointerup',this.onUp);this.el.addEventListener('pointercancel',this.onUp);
+  this.el.addEventListener('wheel',this.onWheel,{passive:false});
+  this.resize();
+ }
+ getZoom(){return this.zoom;}
+ zoomTo(newZoom){
+  const z=clamp(Math.round(newZoom),2,ZYRO_MAP_MAX_ZOOM);
+  if(z===this.zoom)return;
+  this.zoom=z;
+  // Keep the preceding tiles until the new zoom level is ready.
+  // Clearing them immediately caused the white flashes visible on Android.
+  this.schedule();
+ }
+ easeTo(opts){
+  if(opts.center&&opts.center.length===2)this.center={lon:Number(opts.center[0]),lat:Number(opts.center[1])};
+  if(Number.isFinite(opts.zoom))this.zoom=clamp(Math.round(opts.zoom),2,ZYRO_MAP_MAX_ZOOM);
+  this.schedule();
+ }
+ setStyle(){this.schedule();}
+ shift(dx,dy){
+  const p=toWorld(this.center.lat,this.center.lon,this.zoom),n=fromWorld(p.x-dx,p.y-dy,this.zoom);
+  this.center=n;this.schedule();
+ }
+ resize(){this.schedule();}
+ schedule(){if(this.removed||this.pending!==null)return;this.pending=requestAnimationFrame(()=>{this.pending=null;this.draw();});}
+ clearTiles(){for(const img of this.tiles.values())img.remove();this.tiles.clear();}
+ positionTile(img,left,top,w,h){
+  const tileZoom=Number(img.dataset.zyroZ),scale=2**(this.zoom-tileZoom);
+  if(scale<.25||scale>4)return false;
+  const size=TILE_SIZE*scale;
+  const world=worldWidth(this.zoom);
+  let wx=Number(img.dataset.zyroX)*size;
+  // Keep the projection close to the viewport across the date line.
+  wx+=Math.round(((left+w/2)-(wx+size/2))/world)*world;
+  const px=Math.round(wx-left),py=Math.round(Number(img.dataset.zyroY)*size-top);
+  img.style.width=`${size}px`;img.style.height=`${size}px`;
+  img.style.transform=`translate3d(${px}px,${py}px,0)`;
+  return px+size>-256&&px<w+256&&py+size>-256&&py<h+256;
+ }
+ draw(){
+  if(this.removed)return;
+  const w=this.el.clientWidth,h=this.el.clientHeight;if(w<20||h<20)return;
+  const center=toWorld(this.center.lat,this.center.lon,this.zoom),count=2**this.zoom;
+  const left=center.x-w/2,top=center.y-h/2;
+  const startX=Math.floor(left/TILE_SIZE)-1,endX=Math.floor((left+w)/TILE_SIZE)+1;
+  const startY=Math.max(0,Math.floor(top/TILE_SIZE)-1),endY=Math.min(count-1,Math.floor((top+h)/TILE_SIZE)+1);
+  const currentKeys=new Set();
+  let required=0,ready=0;
+  for(let yy=startY;yy<=endY;yy++)for(let xx=startX;xx<=endX;xx++){
+   const key=`${this.zoom}/${xx}/${yy}`;currentKeys.add(key);
+   let img=this.tiles.get(key);
+   if(!img){
+    img=document.createElement('img');img.className='zyro-raster-tile';img.alt='';img.draggable=false;img.decoding='async';
+    img.dataset.zyroZ=String(this.zoom);img.dataset.zyroX=String(xx);img.dataset.zyroY=String(yy);
+    img.dataset.zyroReady='0';img.style.visibility='hidden';
+    img.onload=()=>{
+     if(this.removed||!this.tiles.has(key))return;
+     img.dataset.zyroReady='1';img.style.visibility='visible';
+     this.loaded++;this.onTile?.();this.schedule();
     };
-    for(const c of this.contacts){pinAt(Number(c.location.lat),Number(c.location.lon),'zyro-map-pin zyro-pin-contact',c.name,null,null);}
-    if(this.own)pinAt(this.own.lat,this.own.lon,'zyro-map-pin zyro-pin-you','Tu — posizione GPS',this.own.heading,this.own.accuracy);
+    img.onerror=()=>{
+     if(this.removed||!this.tiles.has(key))return;
+     img.dataset.zyroReady='error';img.style.visibility='hidden';
+     this.failed++;
+     if(this.loaded===0&&this.failed>=3)this.onError?.('Le immagini della mappa non arrivano dal server. Riprova o verifica Render.');
+    };
+    this.tiles.set(key,img);this.layer.appendChild(img);
+    img.src=`/api/map-tile/${this.zoom}/${((xx%count)+count)%count}/${yy}.png`;
+   }
+   required++;
+   if(img.dataset.zyroReady==='1')ready++;
+   this.positionTile(img,left,top,w,h);
   }
-  updateTileStatus(){
-    const fail=$('mapUnavailable');
-    if(googleMap){fail.classList.add('hidden');return;}
-    if(this.loaded>0){fail.classList.add('hidden');return;}
-    if(this.failed>=3)fail.classList.remove('hidden');
+  // Previous level remains underneath until the replacement is ready.
+  // Remove only off-screen/out-of-scale images while the new ones load.
+  const canPrune=required>0&&ready===required;
+  for(const [key,img] of this.tiles){
+   if(currentKeys.has(key))continue;
+   const inRange=this.positionTile(img,left,top,w,h);
+   if(canPrune||!inRange||this.tiles.size>180){img.remove();this.tiles.delete(key);}
   }
+  this.drawPins(w,h,center);
+ }
+ drawPins(w,h,center){
+  if(!current)return;
+  const places=[];for(const c of uniqueContacts())if(mapValidPoint(c.location))places.push({id:'contact:'+c.id,p:c.location,user:c,alert:!!c.sos,own:false});
+  if(mapValidPoint(lastCoords))places.push({id:'me',p:lastCoords,user:current.me,own:true});
+  const present=new Set();
+  for(const p of places){
+   const pos=toWorld(p.p.lat,p.p.lon,this.zoom);let dx=pos.x-center.x;const world=worldWidth(this.zoom);
+   if(dx>world/2)dx-=world;if(dx< -world/2)dx+=world;
+   const x=w/2+dx,y=h/2+pos.y-center.y;present.add(p.id);
+   let pin=this.pinNodes.get(p.id);if(!pin){pin=stableMarker(p.own,p.p.heading,p.user,p.alert);pin.classList.add('zyro-raster-pin');this.pinNodes.set(p.id,pin);this.pinLayer.appendChild(pin);}
+   pin.style.transform=`translate3d(${Math.round(x)}px,${Math.round(y)}px,0) ${p.own?'translate(-50%,-50%)':'translate(-50%,-22px)'}`;
+   pin.style.display=(x< -70||x>w+70||y< -70||y>h+70)?'none':'';
+   pin.classList.toggle('zyro-contact-alert',!!p.alert);
+   updateMapAvatar(pin,p.user,p.own);
+   if(p.own)updateGlassHeading(pin,p.p.heading);
+  }
+  for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
+ }
+ remove(){this.removed=true;if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
+}
+function syncStableMarkers(){stableMap?.schedule();}
+function focusStableMap(lat,lon,zoom=16){if(!stableMap||!mapValidPoint({lat,lon}))return;stableMap.easeTo({center:[Number(lon),Number(lat)],zoom});}
+function applyZyroTheme(next,persist=true){
+ zyroTheme=next==='light'?'light':'dark';document.documentElement.dataset.theme=zyroTheme;
+ document.querySelector('meta[name="theme-color"]')?.setAttribute('content',zyroTheme==='dark'?'#071626':'#e8f5f7');
+ for(const btn of document.querySelectorAll('[data-theme-choice]')){const selected=btn.dataset.themeChoice===zyroTheme;btn.classList.toggle('is-selected',selected);btn.setAttribute('aria-pressed',String(selected));}
+ if(persist)try{localStorage.setItem(ZYRO_THEME_KEY,zyroTheme);}catch{}
+ stableMap?.setStyle(zyroTheme);
+}
+function ensureStableMap(){
+ if(!current||$('homeView').classList.contains('hidden'))return;
+ if(stableMap){stableMap.resize();return;}
+ const el=$('zyroVectorMap');if(!el||el.clientWidth<20||el.clientHeight<20)return;
+ stableMapState='loading';mapHideFailure();mapStatus('Caricamento strade...');
+ const initial=mapValidPoint(lastCoords)?{lat:lastCoords.lat,lon:lastCoords.lon}:DEFAULT_CENTER;
+ const boot=++stableBootId;
+ stableMap=new ZyroRasterMap(el,initial,mapValidPoint(lastCoords)?15:5,()=>{
+  if(boot!==stableBootId)return;
+  if(stableMapState!=='ready'){stableMapState='ready';mapHideFailure();mapStatus('Cartografia caricata. Attiva il GPS per localizzarti.');renderMap();}
+ },message=>{if(boot===stableBootId)mapShowFailure(message);});
+ stableLoadTimer=setTimeout(()=>{if(stableMapState!=='ready'&&boot===stableBootId)mapShowFailure('Non arrivano le strade. Controlla la rete e il servizio su Render.');},14000);
 }
 function renderMap(){
-  if(!current || $('homeView').classList.contains('hidden'))return;
-  if(!zyroMap)zyroMap=new ZyroNativeMap($('liveMap'));
-  const contacts=uniqueContacts().filter(m=>m.location && Number.isFinite(Number(m.location.lat)) && Number.isFinite(Number(m.location.lon)));
-  zyroMap.own=lastCoords;zyroMap.contacts=contacts;
-  if(lastCoords){
-    if(!ownCentered){zyroMap.focusOn(lastCoords.lat,lastCoords.lon,16);focusGoogleMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
-    $('mapStatus').textContent=`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`;
-  }else if(contacts.length && !ownCentered){
-    zyroMap.focusOn(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);focusGoogleMap(Number(contacts[0].location.lat),Number(contacts[0].location.lon),14);ownCentered=true;
-    $('mapStatus').textContent='Mappa della tua cerchia · attiva il GPS per localizzarti';
-  }else $('mapStatus').textContent=geolocationError||'Tocca «Trova la mia posizione» per localizzarti';
-  const googLink=$('mapOpenGoogle');
-  if(googLink && lastCoords)googLink.href='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(lastCoords.lat+','+lastCoords.lon);
-  if(googleMap)syncGoogleMap();
-  else {zyroMap.queueDraw();void maybeInitGoogleMap();}
+ if(!current||$('homeView').classList.contains('hidden'))return;
+ mapLink();ensureStableMap();if(!stableMap)return;
+ syncStableMarkers();
+ if(mapValidPoint(lastCoords)){
+  if(!ownCentered){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
+  if(stableMapState==='ready')mapStatus(`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`);
+ }else if(!ownCentered){const c=uniqueContacts().find(u=>mapValidPoint(u.location));if(c){focusStableMap(c.location.lat,c.location.lon,14);ownCentered=true;}if(stableMapState==='ready')mapStatus(geolocationError||'Attiva il GPS per localizzarti');}
+ else if(stableMapState==='ready')mapStatus(geolocationError||'Posizione non attiva');
 }
 function onOrientation(e){
-  let direction=Number.isFinite(e.webkitCompassHeading)?e.webkitCompassHeading:Number.isFinite(e.alpha)?(360-e.alpha)%360:null;
-  if(direction===null)return;
-  compassHeading=direction;
-  if(lastCoords && !Number.isFinite(lastCoords.heading)){
-    lastCoords.heading=direction;renderMap();
+  // Do not use relative alpha as magnetic north: Android often reports it as unstable.
+  let raw=null;
+  if(Number.isFinite(e.webkitCompassHeading)){
+    if(Number.isFinite(e.webkitCompassAccuracy)&&e.webkitCompassAccuracy>45)return;
+    raw=e.webkitCompassHeading;
+  }else if((e.absolute===true||e.type==='deviceorientationabsolute')&&Number.isFinite(e.alpha)){
+    // Account for screen rotation (portrait/landscape), if exposed by the browser.
+    raw=360-e.alpha+(Number.isFinite(screen?.orientation?.angle)?screen.orientation.angle:0);
   }
+  if(raw===null)return;
+  const now=Date.now();
+  if(now-headingMotion.lastSensorAt<45)return; // Cap incoming sensor updates (~22 Hz).
+  headingMotion.lastSensorAt=now;
+  acceptCompassReading(raw,now);
 }
 async function orientationPermission(){
   try{
@@ -491,7 +848,9 @@ async function orientationPermission(){
       const granted=await window.DeviceOrientationEvent.requestPermission();if(granted!=='granted')return;
     }
     window.removeEventListener('deviceorientation',onOrientation);
+    window.removeEventListener('deviceorientationabsolute',onOrientation);
     window.addEventListener('deviceorientation',onOrientation);
+    window.addEventListener('deviceorientationabsolute',onOrientation);
   }catch{ /* Compass is optional. */ }
 }
 function renderPickControls(){
@@ -596,16 +955,164 @@ async function previewSiren(){
   startSiren();toast('Test sirena locale di 2 secondi, nessun avviso inviato.');
   setTimeout(()=>{if(!theftTriggered)stopSiren();},2000);
 }
+
+function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
+ return contacts.length?contacts.map(u=>`<label class="zyro-v15-contact"><input data-${tag}="${escapeHtml(u.id)}" type="checkbox" ${selected.has(u.id)?'checked':''}><span>${escapeHtml(u.name)}</span></label>`).join(''):'<p class="zyro-v15-note">Invita prima almeno una persona nella sezione Cerchie.</p>';
+}
+function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
+function renderV15(){if(!current)return;
+ const me=current.me;
+ $('premiumStatus').textContent=me.creatorPremium?'Account creatore verificato: tutte le funzioni Premium sono incluse gratuitamente. Nessun abbonamento richiesto.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`Premium attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Abbonamento Premium non attivo. Acquisti Play Store non ancora configurati: non è possibile inviare SOS Premium.';
+ $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
+ for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
+  const root=$(container);const members=uniqueContacts();const signature=members.map(x=>x.id).join(',');
+  if(root.dataset.members!==signature){root.dataset.members=signature;root.innerHTML=v15ContactsHtml(selected,tag);}
+ }
+ const j=me.journey,onJ=j&&['active','late'].includes(j.status);
+ $('journeyInactive').classList.toggle('hidden',!!onJ);$('journeyActive').classList.toggle('hidden',!onJ);
+ if(onJ){$('journeyStatus').textContent=j.status==='late'?'Orario previsto superato: contatta i tuoi familiari':'Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination} · Previsto entro ${v15Time(j.dueAt)}${j.autoArrival?' · Rilevamento GPS attivo':''}`;}
+ const c=me.checkin,onC=c&&['pending','late'].includes(c.status);
+ $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
+ if(onC){$('checkinStatus').textContent=c.status==='late'?'Orario scaduto: conferma appena puoi':'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.`;}
+ const others=(current.journeys||[]).filter(x=>x.userId!==me.id);
+ $('journeyContactsStatus').innerHTML=others.map(x=>`<p class="zyro-v15-contact-status">🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)} · ${x.status==='late'?'In ritardo':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso annullato':'Arrivo previsto '+v15Time(x.dueAt)}</p>`).join('');
+ const checks=(current.checkins||[]).filter(x=>x.userId!==me.id);
+ $('checkinContactsStatus').innerHTML=checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join('');
+}
+async function v15JourneyStart(){
+ const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
+ const auto=$('journeyAuto').checked;
+ if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
+ const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:auto?journeyTarget:null});
+ await refresh();toast(result.ok?'Accompagnami attivo. I contatti scelti vedono il percorso se hai attivato la posizione.':'Percorso non avviato.');
+}
+async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere il percorso?'))return;await post('/api/journey/end',{arrived});journeyTarget=null;$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato.');}
+async function v15CheckinStart(){if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
+async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
+
+// ZYRO V16: one right-side settings drawer for every account. Existing controls
+// are MOVED (not cloned), preserving all event handlers and behavior.
+let activeSettingsPane=null;
+let profileMenuLastFocus=null;
+function setupProfileSettings(){
+ const host=$('zyroSettingsPanels');
+ const candidates={
+  appearance:document.querySelector('#settingsView .zyro-appearance-panel'),
+  help:$('zyroHelp'), premium:$('premiumPanel'),
+  emergency:[...document.querySelectorAll('#settingsView .panel')].find(x=>x.querySelector('h2')?.textContent.trim()==='Numeri di emergenza'),
+  notifications:$('pushButton')?.closest('.panel'),
+  privacy:[...document.querySelectorAll('#settingsView .panel')].find(x=>x.querySelector('h2')?.textContent.trim()==='La tua privacy'),
+  reports:document.querySelector('#settingsView .zyro-report-panel'),
+  logout:$('logoutButton')?.closest('.panel')
+ };
+ const titles={appearance:"Aspetto dell'app",help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',logout:'Esci dall’account'};
+ for(const [key,title] of Object.entries(titles)){
+   const pane=document.createElement('section');pane.className='zyro-settings-pane';pane.dataset.pane=key;pane.hidden=true;
+   if(key==='invitees'){
+      const info=document.createElement('p');info.className='setting-description';
+      info.textContent='Queste persone hanno accettato un invito e sono membri delle tue cerchie. I collegamenti restano associati al tuo account nel database, finché qualcuno lascia o elimina la cerchia.';
+      pane.append(info);
+      const list=document.createElement('div');list.id='savedInvitees';list.className='zyro-saved-invitees';pane.append(list);
+   } else if(candidates[key])pane.append(candidates[key]);
+   host.append(pane);
+ }
+ // The personal ID is a central part of the profile, not buried in settings.
+ const idCard=$('copyMyId')?.closest('.panel');
+ const photoEditor=document.querySelector('#settingsView .profile-photo-editor');
+ if(idCard && photoEditor)photoEditor.after(idCard);
+ $('profileMore').addEventListener('click',()=>openProfileSettings());
+ $('profileSettingsClose').addEventListener('click',closeProfileSettings);
+ $('profileSettingsBackdrop').addEventListener('click',closeProfileSettings);
+ $('settingsDrawerBack').addEventListener('click',()=>showProfileSettingsMenu());
+ document.querySelectorAll('[data-settings-target]').forEach(button=>button.addEventListener('click',()=>showProfileSettingsPane(button.dataset.settingsTarget)));
+ document.addEventListener('keydown',e=>{
+   if(e.key==='Escape' && $('profileSettingsDrawer').classList.contains('is-open')){e.preventDefault();closeProfileSettings();}
+   if(e.key==='Tab' && $('profileSettingsDrawer').classList.contains('is-open')){
+      const focusables=[...$('profileSettingsDrawer').querySelectorAll('button:not([disabled]):not(.hidden),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled])')].filter(x=>x.getClientRects().length);
+      if(!focusables.length)return;
+      const first=focusables[0],last=focusables[focusables.length-1];
+      if(e.shiftKey && document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey && document.activeElement===last){e.preventDefault();first.focus();}
+   }
+ });
+}
+function openProfileSettings(pane){
+ if(!current)return;
+ if(activeView!=='settings')showView('settings');
+ profileMenuLastFocus=document.activeElement;
+ const d=$('profileSettingsDrawer');d.inert=false;d.classList.add('is-open');d.setAttribute('aria-hidden','false');
+ $('profileSettingsBackdrop').classList.add('is-open');$('profileMore').setAttribute('aria-expanded','true');
+ document.body.classList.add('zyro-settings-open');
+ if(pane)showProfileSettingsPane(pane);else showProfileSettingsMenu();
+ $('profileSettingsClose').focus();
+}
+function showProfileSettingsMenu(){
+ activeSettingsPane=null;$('zyroSettingsMenu').hidden=false;$('zyroSettingsDetail').hidden=true;
+ document.querySelectorAll('.zyro-settings-pane').forEach(x=>x.hidden=true);
+}
+function showProfileSettingsPane(name){
+ if(name==='reports' && current?.me?.isAdmin)return;
+ const pane=document.querySelector('.zyro-settings-pane[data-pane="'+name+'"]');if(!pane)return;
+ activeSettingsPane=name;$('zyroSettingsMenu').hidden=true;$('zyroSettingsDetail').hidden=false;
+ document.querySelectorAll('.zyro-settings-pane').forEach(x=>x.hidden=x!==pane);
+ const selected=document.querySelector('[data-settings-target="'+name+'"]');
+ $('settingsDrawerHeading').textContent=selected?.querySelector('span:nth-child(2)')?.firstChild?.textContent?.trim()||'Impostazioni';
+ $('profileSettingsDrawer').scrollTop=0;
+}
+function closeProfileSettings(){
+ const d=$('profileSettingsDrawer');if(!d?.classList.contains('is-open'))return;
+ d.classList.remove('is-open');d.setAttribute('aria-hidden','true');d.inert=true;
+ $('profileSettingsBackdrop').classList.remove('is-open');$('profileMore').setAttribute('aria-expanded','false');
+ document.body.classList.remove('zyro-settings-open');
+ if(profileMenuLastFocus?.isConnected)profileMenuLastFocus.focus();
+}
+function renderInvitedPeople(){
+ const root=$('savedInvitees');if(!root || !current)return;
+ const byId=new Map();
+ for(const circle of current.circles||[]){
+   for(const member of circle.members||[]){
+     if(member.id===current.me.id)continue;
+     if(!byId.has(member.id))byId.set(member.id,{member,circles:new Set()});
+     byId.get(member.id).circles.add(circle.name);
+   }
+ }
+ root.replaceChildren();
+ if(!byId.size){const p=document.createElement('p');p.className='zyro-invitees-empty';p.textContent='Nessuna persona collegata. Genera un invito in Cerchie e condividilo con chi vuoi aggiungere.';root.append(p);return;}
+ for(const {member,circles} of byId.values()){
+   const card=document.createElement('div');card.className='zyro-invitee-row';
+   const avatar=document.createElement('span');avatar.className='zyro-invitee-avatar';avatar.textContent=initials(member.name);
+   const content=document.createElement('div');
+   const title=document.createElement('strong');title.textContent=member.name;
+   const meta=document.createElement('small');meta.textContent='Cerchie: '+[...circles].join(', ');
+   content.append(title,meta);
+   const flag=document.createElement('span');flag.className='zyro-invitee-flag';flag.textContent=member.invitedByMe?'Invitato da te':'Collegato';
+   card.append(avatar,content,flag);root.append(card);
+ }
+}
+async function copyAccountId(id){
+ if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(id);return;}catch{}}
+ const control=document.createElement('textarea');control.value=id;control.readOnly=true;control.style.position='fixed';control.style.top='-9999px';document.body.append(control);
+ try{control.select();if(!document.execCommand('copy'))throw Error('Copy blocked');}finally{control.remove();}
+}
+
 async function init(){
+  let storedTheme=null;try{storedTheme=localStorage.getItem(ZYRO_THEME_KEY);}catch{}
+  applyZyroTheme(storedTheme||'dark',false);
+  for(const button of document.querySelectorAll('[data-theme-choice]'))button.addEventListener('click',()=>applyZyroTheme(button.dataset.themeChoice));
+  $('mapRetry')?.addEventListener('click',()=>{stableAttempts=0;removeStableMap();mapHideFailure();ensureStableMap();});
+  window.addEventListener('online',()=>{if(current){stableAttempts=0;removeStableMap();renderMap();}});
   const params=new URLSearchParams(location.search);inviteFromLink=params.get('invite');
   if(inviteFromLink && /^[A-Fa-f0-9]{18}$/.test(inviteFromLink)){history.replaceState(null,'',location.pathname);$('inviteInput').value=inviteFromLink.toUpperCase();}else inviteFromLink=null;
   document.querySelectorAll('.auth-tab').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
   $('authForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{
     const payload={email:$('email').value.trim(),password:$('password').value};if(authMode==='register')payload.name=$('name').value.trim();
-    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
+    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();closeProfileSettings();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else{showView('home');toast('Benvenuto in Zyro 360!');}}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
-  $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;void orientationPermission();updateGeo(null,true);if(lastCoords){zyroMap?.focusOn(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));focusGoogleMap(lastCoords.lat,lastCoords.lon,Math.max(16,zyroMap.zoom));ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
+  setupProfileSettings();
+  $('mapZoomIn').addEventListener('click',()=>{if(stableMap)stableMap.zoomTo(Math.min(18,stableMap.getZoom()+1),{duration:250});});
+  $('mapZoomOut').addEventListener('click',()=>{if(stableMap)stableMap.zoomTo(Math.max(2,stableMap.getZoom()-1),{duration:250});});
+  $('locateMe').addEventListener('click',()=>action(async()=>{mapTracking=true;ownCentered=false;void orientationPermission();updateGeo(null,true);if(lastCoords){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;renderMap();}else toast('Ricerca posizione in corso. Consenti l’accesso al GPS se richiesto.');}));
   $('pickNotify').addEventListener('change',renderPickControls);
   $('pickRecipientsList').addEventListener('change',e=>{if(!e.target.matches('[data-pickcontact]'))return;const id=e.target.dataset.pickcontact;if(e.target.checked)pickSelected.add(id);else pickSelected.delete(id);});
   $('pickArm').addEventListener('click',()=>action(armPick));
@@ -614,6 +1121,16 @@ async function init(){
   $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/circles',{name:$('circleName').value});$('circleName').value='';await refresh();toast('Cerchia creata! Ora puoi generare un invito.');});});
   $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/invites/join',{code:$('inviteInput').value});$('inviteInput').value='';await refresh();inviteFromLink=null;toast('Ora fai parte della cerchia!');});});
   $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
+  $('journeyRecipients').addEventListener('change',e=>{if(e.target.matches('[data-journey-to]')){e.target.checked?journeySelected.add(e.target.dataset.journeyTo):journeySelected.delete(e.target.dataset.journeyTo);}});
+  $('checkinRecipients').addEventListener('change',e=>{if(e.target.matches('[data-checkin-to]')){e.target.checked?checkinSelected.add(e.target.dataset.checkinTo):checkinSelected.delete(e.target.dataset.checkinTo);}});
+  $('journeySetTarget').addEventListener('click',()=>{if(!stableMap){toast('Apri prima la Home e carica la mappa.',true);return;}journeyTarget={lat:stableMap.center.lat,lon:stableMap.center.lon};$('journeyAuto').checked=true;$('journeyTargetInfo').textContent=`Meta impostata: ${journeyTarget.lat.toFixed(5)}, ${journeyTarget.lon.toFixed(5)}`;toast('Meta GPS salvata dal centro della mappa.');});
+  $('journeyStart').addEventListener('click',()=>action(v15JourneyStart));
+  $('journeyArrived').addEventListener('click',()=>action(()=>v15JourneyEnd(true)));
+  $('journeyCancel').addEventListener('click',()=>action(()=>v15JourneyEnd(false)));
+  $('checkinStart').addEventListener('click',()=>action(v15CheckinStart));
+  $('checkinConfirm').addEventListener('click',()=>action(()=>v15CheckinEnd(true)));
+  $('checkinCancel').addEventListener('click',()=>action(()=>v15CheckinEnd(false)));
+  $('premiumDetails').addEventListener('click',()=>toast('Pagamenti Google Play da integrare nell’app Android: al momento non si può acquistare Premium. Non viene inviato alcun SOS a pagamento.'));
   $('sosButton').addEventListener('click',()=>action(startSOS));
   $('stopSOS').addEventListener('click',()=>action(stopSOS));
   $('audioButton').addEventListener('click',()=>action(async()=>{if(localStream){stopAudio();toast('Microfono disattivato. Il tuo SOS rimane attivo.');}else await startAudio();}));
@@ -623,15 +1140,25 @@ async function init(){
   $('avatarRemove').addEventListener('click',()=>action(async()=>{await post('/api/profile/avatar',{avatar:null});await refresh();toast('Foto profilo rimossa.');}));
   document.querySelectorAll('[data-chat-filter]').forEach(b=>b.addEventListener('click',()=>{chatCategory=b.dataset.chatFilter;document.querySelectorAll('[data-chat-filter]').forEach(t=>{const on=t===b;t.classList.toggle('active',on);t.setAttribute('aria-pressed',String(on));});renderChatRooms();}));
   $('chatSearch').addEventListener('input',e=>{chatSearch=e.target.value.trim();renderChatRooms();});
-  $('chatClose').addEventListener('click',()=>{chatRoom=null;$('chatConversation').classList.add('hidden');$('chatsView').classList.remove('is-conversation');});
+  $('chatClose').addEventListener('click',closeChat);
   $('chatForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const text=$('chatText').value.trim();if(!text&&!chatPhotoData)return;await sendChat(text,chatPhotoData);});});
   $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
+  $('reportSubmit').addEventListener('click',()=>action(submitReport));
+  $('adminLoad').addEventListener('click',()=>action(adminLoad));
+  $('adminFilter').addEventListener('input',renderAdminUsers);
+  $('copyMyId').addEventListener('click',async()=>{if(!current)return;try{await copyAccountId(current.me.id);toast('ID account copiato.');}catch{toast('Copia non disponibile. Seleziona il codice e copialo manualmente.',true);}});
   $('pushButton').addEventListener('click',()=>action(enablePush));
+  $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
-  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;mapTracking=false;ownCentered=false;zyroMap?.reset();googleMarkers.forEach(m=>m.setMap(null));googleMarkers=[];googleMap=null;$('googleMap').classList.add('hidden');$('mapTiles').classList.remove('hidden');$('mapPins').classList.remove('hidden');$('mapAttribution').classList.remove('hidden');googleInitAttempted=false;current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js').catch(()=>{});
-  try{const data=await api('/api/state');setState(data);connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}catch{ /* Guest sees login */ }
+  $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=16-profilo').catch(()=>{});
+  try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}
+  catch(err){
+    if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);
+    // 401 indicates a missing/expired session; a returning user signs in
+    // with the same credentials. Never store passwords in localStorage.
+  }
   refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
   window.addEventListener('pagehide',()=>{ /* Browsers may suspend GPS, sensors and audio: never promise background safety. */ });

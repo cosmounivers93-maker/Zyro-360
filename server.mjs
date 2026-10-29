@@ -423,7 +423,7 @@ function hasLiveFcmSession(entry) {
 function fcmEntriesFor(id) {
   return (db.users[id]?.fcmTokens||[]).filter(x=>x && typeof x.token==='string' && hasLiveFcmSession(x));
 }
-async function sendFcm(recipients,title,body) {
+async function sendFcm(recipients,title,body,kind='general') {
   if (!fcmReady) return {attempted:0,accepted:0};
   const targets=[...new Set(recipients)].filter(id=>db.users[id]&&!db.users[id].bannedAt);
   let attempted=0,accepted=0,dirty=false;
@@ -437,8 +437,16 @@ async function sendFcm(recipients,title,body) {
       jobs.push(firebaseAdmin.messaging().send({
         token:entry.token,
         notification:{title:String(title).slice(0,100),body:String(body).slice(0,300)},
-        android:{priority:'high',ttl:120000,notification:{channelId:'zyro_updates',priority:'high',defaultSound:true}},
-        data:{kind:'zyro360',destination:'/'}
+        android:{
+          priority:'high',ttl:kind==='sos'?300000:120000,
+          notification:{
+            channelId:kind==='sos'||kind==='pickpocket'?'zyro_sos_v2':kind==='chat'?'zyro_chat_v2':'zyro_updates',
+            priority:kind==='sos'||kind==='pickpocket'?'high':'default',
+            defaultSound:true,defaultVibrateTimings:true,
+            visibility:'private'
+          }
+        },
+        data:{kind,destination:'/'}
       }).then(()=>{accepted++;}).catch(err=>{
         const code=String(err?.code||'');
         if(code==='messaging/registration-token-not-registered' || code==='messaging/invalid-registration-token') {
@@ -482,18 +490,18 @@ async function notifyContacts(id,name,recipients=null,isTheft=false) {
   const targets=[...(recipients===null?activeRecipients(id):recipients)].filter(x=>x!==id);
   return sendEventPush(targets,isTheft?'🚨 Possibile furto':'🆘 Richiesta SOS',
     isTheft?`${name}: possibile furto rilevato. Verifica e contatta la persona.`
-      :`${name} ha attivato un SOS. Apri Zyro 360.`);
+      :`${name} ha attivato un SOS. Apri Zyro 360.`, isTheft?'pickpocket':'sos');
 }
 // Accepted by FCM/Web Push does not prove the receiver saw the alert.
-async function sendEventPush(recipients,title,body) {
+async function sendEventPush(recipients,title,body,kind='general') {
   const ids=[...new Set(recipients)].filter(id=>db.users[id]&&!db.users[id].bannedAt);
-  const fcm=await sendFcm(ids,title,body);
+  const fcm=await sendFcm(ids,title,body,kind);
   let attempted=fcm.attempted,accepted=fcm.accepted,dirty=false;
   if (configuredPush) {
     const calls=[];
     for(const id of ids)for(const sub of db.users[id]?.pushSubs||[]){
       attempted++;
-      calls.push(webpush.sendNotification(sub,JSON.stringify({title,body,url:'/'}),{TTL:300,urgency:'high'})
+      calls.push(webpush.sendNotification(sub,JSON.stringify({title,body,kind,url:'/'}),{TTL:300,urgency:kind==='sos'?'high':'normal'})
         .then(()=>{accepted++;})
         .catch(err=>{
           if([404,410].includes(err.statusCode)){
@@ -507,16 +515,29 @@ async function sendEventPush(recipients,title,body) {
   if(dirty)save();
   return {configured:fcmReady||configuredPush,accepted,attempted};
 }
+let lastReverseGeocodeAt=0;
 async function sosAddressFor(pos){
  // Opt-in: forwarding GPS coordinates to a geocoder must be disclosed in privacy information.
+ // Explicit opt-in on Render required: reverse geocoding shares the GPS point
+ // with the chosen provider. Disclose this to users in the privacy notice.
  if(!pos || process.env.ZYRO_SOS_GEOCODER_ENABLED!=='true')return null;
+ // The public Nominatim API allows max 1 request/sec. If busy, never delay an SOS.
+ if(Date.now()-lastReverseGeocodeAt<1200)return null;
+ lastReverseGeocodeAt=Date.now();
  try{
   const base=(process.env.ZYRO_SOS_GEOCODER_URL||'https://nominatim.openstreetmap.org/reverse');
   const url=new URL(base);url.searchParams.set('format','jsonv2');url.searchParams.set('addressdetails','1');url.searchParams.set('lat',String(pos.lat));url.searchParams.set('lon',String(pos.lon));url.searchParams.set('zoom','18');
-  const response=await fetch(url,{headers:{'User-Agent':'ZYRO360-SOS-Prototype/1.0 (contact: support@invalid.example)','Accept-Language':'it'},signal:AbortSignal.timeout(2200)});
+  const response=await fetch(url,{headers:{
+    'User-Agent':'ZYRO360/1.0 (+https://zyro-360.onrender.com)',
+    'Referer':'https://zyro-360.onrender.com/',
+    'Accept-Language':'it'
+  },signal:AbortSignal.timeout(2800)});
   if(!response.ok)return null;const data=await response.json(),a=data.address||{};
-  const street=[a.road||a.pedestrian||a.footway||a.residential,a.house_number].filter(Boolean).join(' '),town=a.city||a.town||a.village||a.municipality;
-  return cleanText([street,town].filter(Boolean).join(', '),160)||null;
+  const road=cleanText(a.road||a.pedestrian||a.footway||a.residential||a.path||'',90);
+  const number=cleanText(a.house_number||'',15);
+  const city=cleanText(a.city||a.town||a.village||a.municipality||a.hamlet||'',90);
+  // Geocoders may only return a street or a city; never manufacture a civic number.
+  return cleanText([[road,number].filter(Boolean).join(' '),city].filter(Boolean).join(', '),160)||null;
  }catch{return null;}
 }
 function journeyAudience(userId, ids){const chosen=allowedRecipients(userId,ids);return chosen&&chosen.length===new Set(ids).size&&chosen.length?chosen:null;}
@@ -646,7 +667,8 @@ app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
   for(const id of chat.members)for(const sock of connections(id))sendSocket(sock,{type:'chat-new',chatType:req.params.type,target:req.params.target,from:req.user.id});
   // Keep message contents private on the device lock screen.
   void sendEventPush(chat.members.filter(id=>id!==req.user.id),'💬 Nuovo messaggio Zyro 360',
-    `${req.user.name} ti ha inviato un messaggio.`).catch(err=>console.error('[ZYRO push] chat:',err.message));
+    `${req.user.name} ti ha inviato un messaggio.`,'chat')
+    .catch(err=>console.error('[ZYRO push] chat:',err.message));
   res.json({ok:true,message});
 });
 app.post('/api/sos/start', requireAuth, async (req,res) => {
@@ -657,13 +679,22 @@ app.post('/api/sos/start', requireAuth, async (req,res) => {
  if(!recipients.length&&!alert)return res.status(400).json({error:'Seleziona prima almeno un destinatario SOS nella sezione Modalità.'});
  if(alert?.kind==='pickpocket')return res.status(409).json({error:'Termina prima l’allarme Pick Pocket.'});
  if(alert)return res.json({ok:true,id:alert.id,alreadyActive:true,pushConfigured:configuredPush||fcmReady,serverRecorded:true});
- const pos=validCoords(req.body.location);
+ // Prefer a fresh fix sent with SOS, otherwise a recent GPS already received
+ // from this account. Do not block the alert while waiting for a geocoder.
+ const cached=locations.get(req.user.id);
+ const pos=validCoords(req.body.location) ||
+   (cached && now()-cached.updatedAt<120000 ? cached : null);
  if(pos)locations.set(req.user.id,pos);
  alert={id:token(12),userId:req.user.id,recipients,startedAt:now(),active:true,hasAudio:false,kind:'sos',address:null};db.alerts[alert.id]=alert;save();refreshRelated(req.user.id);
  // An address is attempted only with explicit geocoder configuration; GPS works without it.
  const street=await sosAddressFor(pos);if(street){alert.address=street;save();refreshRelated(req.user.id);}
- const where=street || (pos?`GPS ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`:'Posizione GPS in attesa');
- const push=await sendEventPush(recipients,'🆘 SOS Premium: aiuto richiesto',`${req.user.name} chiede aiuto. ${where}. Apri ZYRO 360 per mappa e audio (se attivo).`);
+ const where=street || (pos
+   ?`Indirizzo non disponibile; GPS ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`
+   :'Posizione GPS non ancora disponibile');
+ const push=await sendEventPush(recipients,`🆘 SOS: ${cleanText(req.user.name,36)} chiede aiuto`,
+   `${cleanText(req.user.name,36)} chiede aiuto! ${where}. Apri Zyro 360 per visualizzare la mappa.`, 'sos');
+ console.info('[ZYRO SOS] Notifiche provider', {recipients:recipients.length,
+   attempted:push.attempted,accepted:push.accepted,geocoded:Boolean(street)});
  res.json({ok:true,id:alert.id,serverRecorded:true,pushConfigured:push.configured,pushAccepted:push.accepted,pushAttempted:push.attempted,recipientCount:recipients.length,address:street});
 });
 app.post('/api/sos/stop', requireAuth, (req,res) => {
