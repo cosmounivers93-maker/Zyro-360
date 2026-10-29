@@ -1482,7 +1482,7 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.creatorPremium?'Account creatore verificato: tutte le funzioni Premium sono incluse gratuitamente. Nessun abbonamento richiesto.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Premium'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Nessun abbonamento attivo. Scegli Premium o Family. Gli acquisti saranno disponibili dopo il collegamento a Google Play.';
+ $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di Family.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Premium'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Nessun piano attivo. Gli acquisti saranno disponibili prossimamente; per ora non viene effettuato alcun addebito.';
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
   const root=$(container);const members=uniqueContacts();const signature=members.map(x=>x.id).join(',');
@@ -1769,7 +1769,7 @@ async function handleZyroPermission(type){
 function showProfileSettingsPane(name){
  if(name==='reports' && current?.me?.isAdmin)return;
  const pane=document.querySelector('.zyro-settings-pane[data-pane="'+name+'"]');if(!pane)return;
- activeSettingsPane=name;$('zyroSettingsMenu').hidden=true;$('zyroSettingsDetail').hidden=false;
+ $('profileSettingsDrawer').dataset.section=name;activeSettingsPane=name;$('zyroSettingsMenu').hidden=true;$('zyroSettingsDetail').hidden=false;
  document.querySelectorAll('.zyro-settings-pane').forEach(x=>x.hidden=x!==pane);
  const selected=document.querySelector('[data-settings-target="'+name+'"]');
  $('settingsDrawerHeading').textContent=selected?.querySelector('span:nth-child(2)')?.firstChild?.textContent?.trim()||'Impostazioni';
@@ -2033,7 +2033,7 @@ async function init(){
   $('checkinStart').addEventListener('click',()=>action(v15CheckinStart));
   $('checkinConfirm').addEventListener('click',()=>action(()=>v15CheckinEnd(true)));
   $('checkinCancel').addEventListener('click',()=>action(()=>v15CheckinEnd(false)));
-  $('premiumDetails').addEventListener('click',()=>toast('Pagamenti Google Play da integrare nell’app Android: al momento non si può acquistare Premium. Non viene inviato alcun SOS a pagamento.'));
+  $('premiumDetails').addEventListener('click',()=>{const panel=$('zyroPlanHelp'),button=$('premiumDetails');panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));button.querySelector('span').textContent=panel.hidden?'＋':'−';});
   $('sosButton').addEventListener('click',()=>action(startSOS));
   $('stopSOS').addEventListener('click',()=>action(stopSOS));
 
@@ -2114,4 +2114,5 @@ init();
 
 // Resume visual map updates when the app returns to the foreground.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeView==='home'){stableMap?.resize();renderHeadingOnly();}});
+
 

@@ -53,6 +53,56 @@ html{scroll-behavior:auto!important}
 }
 
 </style>
+<style>
+/* V44: vertically stacked, readable subscription cards in both themes. */
+#premiumPanel.zyro-plans{padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;color:#183d46;min-width:0}
+#premiumPanel .zyro-plans-intro{display:flex;align-items:center;gap:12px;margin:6px 0 20px}
+#premiumPanel .zyro-plans-mark{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:15px;color:#65e7d4;background:#164955;font-size:25px}
+#premiumPanel .zyro-plans-kicker{font-size:9px;font-weight:750;letter-spacing:1.5px;color:#478c87}
+#premiumPanel .zyro-plans-intro h2{font-size:22px;line-height:1.2;letter-spacing:-.6px;margin:5px 0 7px;color:inherit}
+#premiumPanel .zyro-plans-intro p{font-size:13px;line-height:1.5;margin:0;color:var(--muted,#57747b)}
+#premiumPanel .zyro-plans-free{display:flex;gap:11px;align-items:center;padding:13px 15px;margin-bottom:18px;border:1px solid #83c9c34d;border-radius:17px;background:#61d6c510}
+#premiumPanel .zyro-plans-free>span{color:#129b88;font-size:20px}
+#premiumPanel .zyro-plans-free p{font-size:12px;line-height:1.65;margin:0;color:inherit}
+#premiumPanel .zyro-plan-stack{display:grid;grid-template-columns:minmax(0,1fr);gap:18px}
+#premiumPanel .zyro-plan-card{padding:22px;border:1px solid #a6d5d3;border-radius:25px;background:linear-gradient(145deg,#fff,#effaf8);color:#183f49;min-width:0;box-shadow:0 5px 14px #153e4510}
+#premiumPanel .zyro-plan-top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:15px}
+#premiumPanel .zyro-plan-symbol{font-size:27px;line-height:1;color:#157e77}
+#premiumPanel .zyro-plan-tag{font-size:9px;font-weight:800;letter-spacing:1.3px;background:#168d8010;color:#237b73;border:1px solid #168d8030;padding:7px 10px;border-radius:30px}
+#premiumPanel .zyro-plan-card h3{font-size:23px;line-height:1.2;letter-spacing:-.6px;margin:0 0 7px;color:inherit}
+#premiumPanel .zyro-plan-caption{font-size:12px;line-height:1.5;margin:0;color:#55767d}
+#premiumPanel .zyro-plan-price{display:flex;align-items:baseline;gap:9px;margin:20px 0;padding-bottom:18px;border-bottom:1px solid #72aeb832}
+#premiumPanel .zyro-plan-price strong{font-size:36px;line-height:1.15;font-weight:750;letter-spacing:-1.5px;color:inherit}
+#premiumPanel .zyro-plan-price>span{font-size:12px;color:#55767d}
+#premiumPanel .zyro-plan-card ul{list-style:none;padding:0;margin:0;display:grid;gap:12px}
+#premiumPanel .zyro-plan-card li{position:relative;padding-left:25px;font-size:13px;line-height:1.5;color:inherit}
+#premiumPanel .zyro-plan-card li:before{content:'✓';position:absolute;left:0;color:#119b85;font-weight:800}
+#premiumPanel .zyro-plan-exclusion{font-size:11px;line-height:1.6;color:#58777c;margin:17px 0 0}
+#premiumPanel .zyro-plan-soon{display:block;text-align:center;font-size:11px;font-weight:650;line-height:1.4;margin-top:20px;padding:12px 8px;border-radius:13px;background:#153e4510;color:#496e74}
+#premiumPanel .zyro-plan-family{background:linear-gradient(145deg,#153c4b,#092737);color:#f0fffc;border-color:#45cbb4}
+#premiumPanel .zyro-plan-family .zyro-plan-symbol,#premiumPanel .zyro-plan-family li:before{color:#60e9d0}
+#premiumPanel .zyro-plan-family .zyro-plan-tag{background:#59e4c51a;color:#88f1de;border-color:#59e4c54d}
+#premiumPanel .zyro-plan-family .zyro-plan-caption,#premiumPanel .zyro-plan-family .zyro-plan-price>span{color:#aacfcf}
+#premiumPanel .zyro-plan-family .zyro-plan-soon{background:#74ead51a;color:#a5e8dc}
+#premiumPanel #premiumStatus{background:#5fa5b115!important;border:1px solid #5fa5b135!important;color:inherit!important;border-radius:15px;padding:13px 15px;margin:18px 0;font-size:12px;line-height:1.6}
+#premiumPanel #premiumStatus.ok{background:#25b69512!important;border-color:#25b69550!important}
+#premiumPanel .zyro-plan-info{display:flex;width:100%;justify-content:space-between;align-items:center;gap:10px;border:0;border-bottom:1px solid #7eb9b638;background:transparent;color:inherit;padding:12px 0;font:inherit;font-size:13px;text-align:left;cursor:pointer}
+#premiumPanel .zyro-plan-help{font-size:12px;line-height:1.7;padding:12px 0;color:inherit}
+#premiumPanel .zyro-plan-emergency{display:block!important;margin:17px 0 0!important;padding:14px!important;border-radius:15px!important;background:#bd667110!important;border:1px solid #bd667130!important;color:inherit!important;text-align:center!important;font-size:12px!important;line-height:1.6;text-decoration:none}
+#premiumPanel .zyro-plan-emergency span{display:block;font-size:11px;opacity:.75}
+html[data-theme="dark"] #premiumPanel .zyro-plan-card:not(.zyro-plan-family){background:linear-gradient(145deg,#163646,#102b3b);border-color:#3c6973;color:#e9faf8}
+html[data-theme="dark"] #premiumPanel .zyro-plan-card:not(.zyro-plan-family) .zyro-plan-caption,html[data-theme="dark"] #premiumPanel .zyro-plan-card:not(.zyro-plan-family) .zyro-plan-exclusion,html[data-theme="dark"] #premiumPanel .zyro-plan-card:not(.zyro-plan-family) .zyro-plan-price>span{color:#aac5ca}
+html[data-theme="dark"] #premiumPanel .zyro-plan-card:not(.zyro-plan-family) .zyro-plan-soon{color:#b7ddd9;background:#61d6c515}
+html[data-theme="dark"] #premiumPanel .zyro-plan-tag{color:#8ce8d9}
+@media(max-width:360px){#premiumPanel .zyro-plan-card{padding:18px}#premiumPanel .zyro-plans-intro h2{font-size:20px}}
+</style>
+<style>
+html[data-theme="dark"] #profileSettingsDrawer[data-section="premium"]{background:#0d2533!important;color:#e8faf6!important}
+html[data-theme="dark"] #profileSettingsDrawer[data-section="premium"] #zyroSettingsTitle,
+html[data-theme="dark"] #profileSettingsDrawer[data-section="premium"] #settingsDrawerHeading,
+html[data-theme="dark"] #profileSettingsDrawer[data-section="premium"] #settingsDrawerBack{color:#e8faf6!important}
+html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
+</style>
 </head>
 <body>
 <div id="authScreen" class="auth-shell">
@@ -192,14 +242,30 @@ html{scroll-behavior:auto!important}
         <div id="checkinContactsStatus" class="zyro-v15-feed"></div>
         
       </section>
-      <section class="zyro-v15-panel" id="premiumPanel">
-        <div class="zyro-v15-heading"><span class="zyro-v15-symbol">✦</span><div><p class="eyebrow muted">ABBONAMENTI</p><h2>Scegli il tuo piano</h2><p>Posizione condivisa, cerchie e chat restano gratuite.</p></div></div>
-        <div class="zyro-v15-plans"><div><b>ZYRO Premium</b><strong>3,99 € <small>/mese</small></strong><p>SOS con posizione e indirizzo disponibile. Modalità Pick Pocket. Audio SOS non incluso.</p></div><div><b>ZYRO Family</b><strong>6,99 € <small>/mese</small></strong><p>Tutte le modalità: SOS con posizione e indirizzo, audio live con consenso, Pick Pocket, Accompagnami e Check-in.</p></div></div>
-        <p id="premiumStatus" class="zyro-v15-status" role="status">Verifica abbonamento…</p>
-
-        <p class="zyro-v15-note">Per gli utenti, le funzioni Premium richiedono un diritto di accesso verificato dal server. Il creatore autorizzato ha accesso incluso gratuitamente. Gli acquisti Play Store non sono ancora attivi e non vengono elaborati pagamenti in questa versione.</p>
-        <button id="premiumDetails" type="button" class="zyro-v15-secondary">Informazioni su Premium</button>
-        <a class="zyro-v15-emergency" href="tel:112">Emergenza reale? Chiama il 112 — sempre disponibile</a>
+      <section class="zyro-v15-panel zyro-plans" id="premiumPanel" aria-label="Piani ZYRO 360">
+        <div class="zyro-plans-intro"><span class="zyro-plans-mark" aria-hidden="true">✦</span><div><span class="zyro-plans-kicker">IL TUO SPAZIO DI SICUREZZA</span><h2>Scegli come proteggerti</h2><p>Due piani, le funzioni che ti servono.</p></div></div>
+        <div class="zyro-plans-free"><span aria-hidden="true">✓</span><p><b>Le basi restano gratuite</b><br>Mappa, posizione condivisa, cerchie e chat.</p></div>
+        <div class="zyro-plan-stack">
+          <article class="zyro-plan-card" aria-labelledby="zyroPersonalTitle">
+            <div class="zyro-plan-top"><span class="zyro-plan-symbol" aria-hidden="true">◇</span><span class="zyro-plan-tag">ESSENZIALE</span></div>
+            <h3 id="zyroPersonalTitle">ZYRO Premium</h3><p class="zyro-plan-caption">SOS e protezione antifurto.</p>
+            <div class="zyro-plan-price"><strong>3,99 €</strong><span>/ mese</span></div>
+            <ul><li>SOS ai contatti selezionati</li><li>Posizione GPS e indirizzo disponibile</li><li>Modalità Pick Pocket</li></ul>
+            <p class="zyro-plan-exclusion">Audio SOS, Accompagnami e Check-in sono inclusi nel piano Family.</p>
+            <span class="zyro-plan-soon">Acquisti prossimamente disponibili</span>
+          </article>
+          <article class="zyro-plan-card zyro-plan-family" aria-labelledby="zyroFamilyTitle">
+            <div class="zyro-plan-top"><span class="zyro-plan-symbol" aria-hidden="true">✦</span><span class="zyro-plan-tag">TUTTO INCLUSO</span></div>
+            <h3 id="zyroFamilyTitle">ZYRO Family</h3><p class="zyro-plan-caption">Tutte le modalità, in un unico piano.</p>
+            <div class="zyro-plan-price"><strong>6,99 €</strong><span>/ mese</span></div>
+            <ul><li>Tutte le funzioni di Premium</li><li>Audio SOS in diretta, con il tuo consenso</li><li>Accompagnami</li><li>Check-in intelligente</li></ul>
+            <span class="zyro-plan-soon">Acquisti prossimamente disponibili</span>
+          </article>
+        </div>
+        <p id="premiumStatus" class="zyro-v15-status" role="status" aria-live="polite">Verifica del tuo piano…</p>
+        <button id="premiumDetails" type="button" class="zyro-plan-info" aria-expanded="false" aria-controls="zyroPlanHelp">Informazioni sui piani <span aria-hidden="true">＋</span></button>
+        <div id="zyroPlanHelp" class="zyro-plan-help" hidden>Gli acquisti non sono ancora disponibili. Nessun addebito viene effettuato. L’audio SOS parte soltanto con il consenso e il permesso microfono. La disponibilità dell’indirizzo dipende dalla posizione e dal servizio di cartografia.</div>
+        <a class="zyro-v15-emergency zyro-plan-emergency" href="tel:112">Emergenza? Chiama il <b>112</b> <span>sempre gratuito ↗</span></a>
       </section>
       <section class="panel sos-recipient-panel" aria-labelledby="sosRecipientTitle">
         <div class="panel-title"><span class="panel-icon">🆘</span><div><p class="eyebrow muted sos-kicker">AVVISO D'EMERGENZA</p><h2 id="sosRecipientTitle">Destinatari SOS</h2><p>Prepara la lista dei destinatari. L’invio SOS Premium richiede un abbonamento verificato; il GPS può essere condiviso solo con i destinatari durante l’allarme.</p></div></div>
@@ -360,9 +426,10 @@ html{scroll-behavior:auto!important}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=43.0" defer></script>
+<script src="/app.js?v=44.0" defer></script>
 </body>
 </html>
+
 
 
 
