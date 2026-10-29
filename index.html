@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#0b1831">
-  <meta name="zyro-ui-build" content="v17.1-home-gradient-admin">
+  <meta name="zyro-ui-build" content="v19.1-proporzioni">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
   <meta name="color-scheme" content="light dark">
   <link rel="manifest" href="/manifest.webmanifest">
@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="/zyro-home-true-glass-v170.css?v=17.0">
   <link rel="stylesheet" href="/zyro-gradient-admin-v171.css?v=17.1">
   <link rel="stylesheet" href="/zyro-permissions-v3.css?v=18.0">
+  <link rel="stylesheet" href="/zyro-settings-final-v19.css?v=19.1">
   <title>Zyro 360 — la tua cerchia</title>
 </head>
 <body>
@@ -264,8 +265,8 @@
       <button type="button" data-settings-target="help"><span class="zyro-settings-glyph">?</span><span>Come funziona l'app<small>Guida, privacy e funzionamento</small></span><b>›</b></button>
       <button type="button" data-settings-target="premium"><span class="zyro-settings-glyph">✦</span><span>Abbonamenti<small>Funzioni e accesso Premium</small></span><b>›</b></button>
       <button type="button" data-settings-target="emergency"><span class="zyro-settings-glyph">✚</span><span>Numeri di emergenza<small>Chiama il 112</small></span><b>›</b></button>
-      <button type="button" data-settings-target="invitees"><span class="zyro-settings-glyph">♧</span><span>Persone invitate<small>Decidi chi vede il tuo GPS e riceve SOS</small></span><b>›</b></button>
-      <button type="button" data-settings-target="permissions"><span class="zyro-settings-glyph">✓</span><span>Abilita permessi<small>GPS, notifiche e microfono Android</small></span><b>›</b></button>
+      <button type="button" data-settings-target="invitees"><span class="zyro-settings-glyph">♧</span><span>Persone invitate<small>Gestisci GPS e destinatari SOS</small></span><b>›</b></button>
+      <button type="button" data-settings-target="permissions"><span class="zyro-settings-glyph">✓</span><span>Abilita permessi<small>Notifiche, GPS, microfono e sensori</small></span><b>›</b></button>
       <button type="button" data-settings-target="notifications"><span class="zyro-settings-glyph">♢</span><span>Notifiche e avvisi SOS<small>Preferenze e test</small></span><b>›</b></button>
       <button type="button" data-settings-target="privacy"><span class="zyro-settings-glyph">◇</span><span>Privacy<small>Posizione, audio e consenso</small></span><b>›</b></button>
       <button type="button" id="reportMenuItem" data-settings-target="reports"><span class="zyro-settings-glyph">⚑</span><span>Segnala un utente<small>Invia una segnalazione privata</small></span><b>›</b></button>
@@ -290,6 +291,6 @@
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=18.0" defer></script>
+<script src="/app.js?v=20.0" defer></script>
 </body>
 </html>

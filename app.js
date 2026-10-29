@@ -504,9 +504,11 @@ async function startSOS(){
  await refresh();mapTracking=true;updateGeo(null,true);
  if(result.serverRecorded){
    const pushCount=Number(result.pushAccepted||0);
-   if(!result.pushConfigured)toast('SOS registrato, ma Firebase non risulta configurato su Render. Chiama il 112 in caso di emergenza.',true);
-   else if(!pushCount)toast('SOS attivo sulla mappa, ma nessuna notifica push è stata accettata. Controlla i dispositivi dei destinatari.',true);
-   else toast(`SOS attivato. ${pushCount} invii accettati dal provider; consegna e lettura non confermate.`);
+   if(!result.pushConfigured)toast('SOS registrato, ma Firebase non risulta configurato su Render. In emergenza chiama il 112.',true);
+   else if(Number(result.recipientCount||0)===0)toast('SOS attivo, ma non hai selezionato destinatari. Apri Persone invitate.',true);
+   else if(Number(result.pushAttempted||0)===0)toast('SOS sulla mappa, ma nessun telefono dei destinatari risulta registrato alle notifiche. Chiedi di aprire Abilita permessi.',true);
+   else if(!pushCount)toast('SOS registrato, ma Firebase non ha accettato l’invio. Il destinatario deve verificare Firebase in Abilita permessi.',true);
+   else toast(`SOS attivato. ${pushCount} invii accettati dal provider; ricezione non garantita.`);
  }
  if($('sosAudioConsent').checked){try{await startAudio();toast('Microfono attivo: i contatti possono richiedere ascolto in diretta.');}catch(err){toast('Allarme attivo, ma microfono non disponibile: '+err.message,true);}}
 }
@@ -1018,7 +1020,33 @@ function setupProfileSettings(){
  const host=$('zyroSettingsPanels');
  const permissionPanel=document.createElement('section');
  permissionPanel.className='zyro-permission-panel';
- permissionPanel.innerHTML='<p>Per ricevere avvisi SOS, usare la mappa e, se lo scegli, trasmettere audio, Zyro 360 ha bisogno dei permessi del dispositivo. Ogni permesso è facoltativo e puoi gestirlo qui in ogni momento.</p><div id="zyroNativePermissionMount"><p>Su Android usa i pulsanti per notifiche e posizione. Il microfono viene richiesto solo durante un SOS, ogni volta che scegli di attivarlo.</p></div>';
+ permissionPanel.innerHTML=`
+ <p class="zyro-permission-lead">Scegli quali funzioni autorizzare sul tuo telefono. I permessi non attivano automaticamente la condivisione della posizione o del microfono.</p>
+ <div class="zyro-permission-stack">
+  <section class="zyro-permission-card" aria-label="Notifiche">
+   <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">🔔</span><div class="zyro-permission-head"><h4>Notifiche</h4><p>Messaggi, richieste SOS e avvisi importanti.</p></div></div>
+   <p id="zyroNotifState" class="zyro-permission-state" data-state="pending" role="status">Controllo delle notifiche…</p>
+   <button type="button" class="zyro-permission-action" data-zyro-permission="notifications">Verifica notifiche</button>
+   <button type="button" class="zyro-permission-secondary" data-zyro-permission="reconnect">Riprova collegamento Firebase</button>
+   <button type="button" class="zyro-permission-secondary" data-zyro-permission="testpush">🔔 Invia notifica di prova a questo telefono</button>
+  </section>
+  <section class="zyro-permission-card" aria-label="Posizione GPS">
+   <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">📍</span><div class="zyro-permission-head"><h4>Posizione GPS</h4><p>Trova la tua posizione e condividila solo quando decidi tu.</p></div></div>
+   <p id="zyroGpsState" class="zyro-permission-state" data-state="pending" role="status">Permesso GPS da verificare.</p>
+   <button type="button" class="zyro-permission-action" data-zyro-permission="location">Verifica posizione</button>
+  </section>
+  <section class="zyro-permission-card" aria-label="Microfono SOS">
+   <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">🎙️</span><div class="zyro-permission-head"><h4>Microfono SOS</h4><p>Autorizza il microfono. L’audio si avvia solo durante un SOS, con una tua conferma.</p></div></div>
+   <p id="zyroMicState" class="zyro-permission-state" data-state="pending" role="status">Autorizzazione da verificare.</p>
+   <button type="button" class="zyro-permission-action" data-zyro-permission="microphone">Verifica microfono</button>
+  </section>
+  <section class="zyro-permission-card" aria-label="Sensori Pick Pocket">
+   <div class="zyro-permission-top"><span class="zyro-permission-icon" aria-hidden="true">🛡️</span><div class="zyro-permission-head"><h4>Sensori Pick Pocket</h4><p>Controlla se il telefono può rilevare movimenti sospetti con l’app aperta.</p></div></div>
+   <p id="zyroSensorState" class="zyro-permission-state" data-state="pending" role="status">Funzione sperimentale da verificare.</p>
+   <button type="button" class="zyro-permission-action" data-zyro-permission="sensors">Verifica sensori</button>
+  </section>
+ </div>
+ <p class="zyro-permission-footer">Le autorizzazioni sono gestite da Android. Se hai negato un permesso, puoi riattivarlo dalle impostazioni del telefono. Zyro 360 non sostituisce i servizi di emergenza.</p>`;
  const candidates={
   permissions:permissionPanel,
   appearance:document.querySelector('#settingsView .zyro-appearance-panel'),
@@ -1034,7 +1062,7 @@ function setupProfileSettings(){
    const pane=document.createElement('section');pane.className='zyro-settings-pane';pane.dataset.pane=key;pane.hidden=true;
    if(key==='invitees'){
       const info=document.createElement('p');info.className='setting-description';
-      info.textContent='Scegli con precisione quali persone della tua cerchia possono vedere la tua posizione o ricevere un tuo SOS e richiedere l’audio quando lo attivi. Le loro autorizzazioni telefoniche restano sotto il loro controllo.';
+      info.textContent='Scegli chi vede la tua posizione e chi riceve i tuoi SOS. Solo tu puoi avviare GPS e microfono.';
       pane.append(info);
       const list=document.createElement('div');list.id='savedInvitees';list.className='zyro-saved-invitees';pane.append(list);
    } else if(candidates[key])pane.append(candidates[key]);
@@ -1074,6 +1102,171 @@ function showProfileSettingsMenu(){
  activeSettingsPane=null;$('zyroSettingsMenu').hidden=false;$('zyroSettingsDetail').hidden=true;
  document.querySelectorAll('.zyro-settings-pane').forEach(x=>x.hidden=true);
 }
+
+function permissionState(id,value,state='pending'){
+ const node=$(id);if(node){node.textContent=value;node.dataset.state=state;}
+}
+// WebView's navigator.permissions.query('geolocation') may say "prompt"
+// despite Android having granted location. Keep native permission and a
+// real GPS fix as separate signals; never overwrite verified success.
+let zyroLocationFix=null;
+function isNativeZyro(){
+ return window.ZyroAndroidPush?.platform==='android';
+}
+async function refreshPermissionStates(){
+ const hasNative=isNativeZyro();
+ if(hasNative){
+   const granted=window.ZyroAndroidNotificationEnabled===true;
+   const status=window.ZyroFCMStatus||{};
+   const tokenOk=typeof window.ZyroAndroidPush?.token==='string' && window.ZyroAndroidPush.token.length>60;
+   let info=granted?'Android: notifiche abilitate ✓':'Android: notifiche disattivate';
+   if(granted){
+     if(status.connected)info+=' · Firebase collegato ✓';
+     else if(!tokenOk)info+=' · In attesa del token Firebase';
+     else if(status.error)info+=' · '+status.error;
+     else info+=' · Registrazione Firebase da verificare';
+   }
+   permissionState('zyroNotifState',info,granted&&status.connected?'on':granted?'pending':'off');
+   const b=document.querySelector('[data-zyro-permission="notifications"]');
+   if(b)b.textContent=granted?'Notifiche Android attive ✓':'Abilita notifiche';
+   const re=document.querySelector('[data-zyro-permission="reconnect"]');
+   if(re){re.hidden=!granted || !!status.connected || !!status.registering || !tokenOk;re.disabled=!tokenOk;}
+   const test=document.querySelector('[data-zyro-permission="testpush"]');
+   if(test){test.hidden=!granted;test.disabled=!granted || !status.connected;}
+   const mic=window.ZyroAndroidMicrophoneEnabled;
+   permissionState('zyroMicState',mic===true?'Permesso microfono concesso ✓':mic===false?'Permesso microfono non concesso':'Verifica il permesso microfono',mic===true?'on':mic===false?'off':'pending');
+ }else{
+   const permission=typeof Notification!=='undefined'?Notification.permission:'unsupported';
+   permissionState('zyroNotifState',permission==='granted'?'Notifiche browser autorizzate ✓':'Notifiche browser non ancora attive',permission==='granted'?'on':'off');
+   permissionState('zyroMicState','Autorizzazione microfono da verificare','pending');
+   document.querySelector('[data-zyro-permission="reconnect"]')?.setAttribute('hidden','');
+   document.querySelector('[data-zyro-permission="testpush"]')?.setAttribute('hidden','');
+ }
+ if(hasNative){
+   const allowed=window.ZyroAndroidLocationEnabled;
+   const precise=window.ZyroAndroidLocationFineEnabled===true;
+   const gpsButton=document.querySelector('[data-zyro-permission="location"]');
+   if(allowed===true){
+     permissionState('zyroGpsState',
+       zyroLocationFix
+         ? 'GPS autorizzato ✓ · Posizione verificata ✓ (circa '+Math.round(zyroLocationFix.accuracy)+' m).'
+         : 'GPS Android autorizzato ✓'+(precise?' · Posizione precisa':' · Posizione approssimativa')+'. Premi per verificare il rilevamento.',
+       'on');
+     if(gpsButton)gpsButton.textContent='Verifica posizione GPS';
+   }else if(allowed===false){
+     zyroLocationFix=null;
+     permissionState('zyroGpsState','Permesso posizione non concesso. Tocca per autorizzarlo su Android.','off');
+     if(gpsButton)gpsButton.textContent='Abilita posizione';
+   }else{
+     // The updated web app may load inside an older APK before its native
+     // permission bridge is installed. Never trap users on "in corso".
+     permissionState('zyroGpsState',
+       zyroLocationFix
+         ?'GPS verificato ✓ · Posizione rilevata e non condivisa automaticamente.'
+         :'Tocca «Verifica posizione» per controllare GPS e autorizzazione Android.',
+       zyroLocationFix?'on':'pending');
+   }
+ }else if(navigator.permissions?.query){
+   try{
+     const location=await navigator.permissions.query({name:'geolocation'});
+     const granted=location.state==='granted'||Boolean(zyroLocationFix);
+     permissionState('zyroGpsState',granted
+       ?zyroLocationFix?'GPS verificato ✓ · Posizione rilevata.':'Posizione autorizzata ✓'
+       :location.state==='denied'?'Posizione negata: modifica le autorizzazioni del browser.':'Posizione da autorizzare.',
+       granted?'on':location.state==='denied'?'off':'pending');
+   }catch{
+     permissionState('zyroGpsState',zyroLocationFix?'GPS verificato ✓':'Tocca Verifica posizione per controllare il permesso.',zyroLocationFix?'on':'pending');
+   }
+ }else{
+   permissionState('zyroGpsState',zyroLocationFix?'GPS verificato ✓':'Tocca Verifica posizione per controllare il permesso.',zyroLocationFix?'on':'pending');
+ }
+}
+async function handleZyroPermission(type){
+ if(type==='notifications'){
+   if(isNativeZyro()){
+     window.prompt('ZYRO360_REQUEST_NOTIFICATIONS_NATIVE','');
+     await new Promise(resolve=>setTimeout(resolve,400));
+     window.dispatchEvent(new Event('zyro:force-fcm-register'));
+   }else{
+     await enablePush();
+   }
+ }else if(type==='reconnect'){
+   if(!isNativeZyro())return;
+   window.dispatchEvent(new Event('zyro:force-fcm-register'));
+   toast('Verifica della registrazione Firebase richiesta.');
+ }else if(type==='testpush'){
+   if(!isNativeZyro())throw Error('Questa prova è disponibile nell’app Android.');
+   const result=await post('/api/push/android/test-self',{});
+   if(Number(result.accepted||0)>0)
+     toast('Test inviato a Firebase. Controlla la notifica e il suono sul telefono.');
+   else throw Error('La notifica di prova non è stata accettata. Verifica il collegamento Firebase.');
+ }else if(type==='location'){
+   if(!navigator.geolocation)throw Error('GPS non disponibile su questo dispositivo.');
+   const button=document.querySelector('[data-zyro-permission="location"]');
+   if(button){button.disabled=true;button.textContent='Controllo GPS in corso…';}
+   try{
+     const pos=await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(
+       resolve,reject,{enableHighAccuracy:false,timeout:15000,maximumAge:0}));
+     zyroLocationFix={accuracy:Number.isFinite(pos.coords.accuracy)?pos.coords.accuracy:0,at:Date.now()};
+     permissionState('zyroGpsState','Posizione rilevata ✓ · non condivisa automaticamente.','on');
+   }catch(e){
+     zyroLocationFix=null;
+     if(e?.code===1)throw Error('Posizione non autorizzata. Abilitala in Android → Impostazioni → App → Zyro 360 → Autorizzazioni → Posizione.');
+     if(e?.code===3)throw Error('GPS: tempo scaduto. Attiva la posizione del telefono, prova all’aperto e ripeti.');
+     throw Error('Impossibile rilevare la posizione. Controlla il GPS del telefono e riprova.');
+   }finally{
+     if(button){button.disabled=false;button.textContent='Verifica posizione GPS';}
+   }
+ }else if(type==='microphone'){
+   if(isNativeZyro()){
+     const reply=window.prompt('ZYRO360_REQUEST_MIC_PERMISSION_NATIVE','');
+     if(reply!=='zyro-native')throw Error('Aggiorna l’APK per gestire il permesso microfono.');
+     toast('Controlla la richiesta del microfono mostrata da Android.');
+   }else{
+     if(!navigator.mediaDevices?.getUserMedia)throw Error('Microfono non supportato dal browser.');
+     const stream=await navigator.mediaDevices.getUserMedia({audio:true,video:false});
+     stream.getTracks().forEach(t=>t.stop());
+     permissionState('zyroMicState','Microfono autorizzato ✓ — audio SOS non avviato.','on');
+   }
+ }else if(type==='sensors'){
+   if(typeof DeviceMotionEvent==='undefined'){
+     permissionState('zyroSensorState','Sensori movimento non disponibili su questo dispositivo.','off');
+     return;
+   }
+   if(typeof DeviceMotionEvent.requestPermission==='function'){
+     const response=await DeviceMotionEvent.requestPermission();
+     if(response!=='granted'){
+       permissionState('zyroSensorState','Sensori movimento non autorizzati.','off');return;
+     }
+   }
+   permissionState('zyroSensorState','Controllo dei sensori in corso…','pending');
+   const sensorButton=document.querySelector('[data-zyro-permission="sensors"]');
+   if(sensorButton)sensorButton.disabled=true;
+   await new Promise(resolve=>{
+     let finished=false;
+     const onMotion=e=>{
+       if(finished)return;
+       if(e.accelerationIncludingGravity || e.acceleration){
+         finished=true;
+         permissionState('zyroSensorState','Sensori disponibili ✓ — Pick Pocket funziona con l’app aperta.','on');
+         window.removeEventListener('devicemotion',onMotion);
+         clearTimeout(timer);
+         resolve();
+       }
+     };
+     window.addEventListener('devicemotion',onMotion);
+     const timer=setTimeout(()=>{
+       if(finished)return;
+       finished=true;window.removeEventListener('devicemotion',onMotion);
+       permissionState('zyroSensorState','Nessun dato ricevuto: muovi delicatamente il telefono e riprova.','off');
+       resolve();
+     },4500);
+   });
+   if(sensorButton)sensorButton.disabled=false;
+ }
+ await refreshPermissionStates();
+}
+
 function showProfileSettingsPane(name){
  if(name==='reports' && current?.me?.isAdmin)return;
  const pane=document.querySelector('.zyro-settings-pane[data-pane="'+name+'"]');if(!pane)return;
@@ -1082,6 +1275,11 @@ function showProfileSettingsPane(name){
  const selected=document.querySelector('[data-settings-target="'+name+'"]');
  $('settingsDrawerHeading').textContent=selected?.querySelector('span:nth-child(2)')?.firstChild?.textContent?.trim()||'Impostazioni';
  $('profileSettingsDrawer').scrollTop=0;
+ if(name==='permissions'){
+    void refreshPermissionStates();
+    // Refresh the FCM token on opening this pane only if it is missing.
+    window.dispatchEvent(new Event('zyro:request-fcm-status'));
+ }
 }
 function closeProfileSettings(){
  const d=$('profileSettingsDrawer');if(!d?.classList.contains('is-open'))return;
@@ -1108,13 +1306,14 @@ function renderInvitedPeople(){
  }
  const gpsInfo=document.createElement('div');gpsInfo.className='zyro-invitees-intro';
  const description=document.createElement('p');
- description.textContent='Sei tu a scegliere chi può vedere la TUA posizione e chi riceve i TUOI avvisi SOS. Nessun contatto potrà attivare da remoto il tuo microfono o GPS.';
+ description.textContent='Condividi la tua posizione soltanto con i contatti che autorizzi.';
  const gpsButton=document.createElement('button');gpsButton.type='button';gpsButton.id='zyroInviteesGpsGlobal';
  gpsButton.className='btn btn-outline btn-wide';
- gpsButton.textContent=current.me.sharing?'Interrompi condivisione GPS':'Attiva condivisione GPS';
+ gpsButton.textContent=current.me.sharing?'Disattiva GPS LIVE':'Attiva GPS LIVE';
  gpsButton.disabled=!!current.me.sos;
- const hint=document.createElement('small');hint.textContent=current.me.sharing?'GPS condiviso soltanto con i contatti autorizzati qui sotto, mentre il dispositivo invia la posizione.':'La condivisione è spenta. Per mostrare il GPS devi autorizzare un contatto qui sotto e attivare la posizione.';
- gpsInfo.append(description,gpsButton,hint);root.append(gpsInfo);
+ const status=document.createElement('strong');status.className='zyro-access-status';status.textContent=current.me.sharing?'Posizione LIVE attiva':'Posizione LIVE disattivata';
+ const hint=document.createElement('small');hint.textContent='Solo i contatti autorizzati qui sotto possono vedere il tuo GPS mentre LIVE è attivo.';
+ gpsInfo.append(description,status,gpsButton,hint);root.append(gpsInfo);
  const gpsSet=new Set(current.me.gpsRecipients||[]);
  const sosSet=new Set(current.me.sosRecipients||[]);
  for(const {member,circles} of byId.values()){
@@ -1141,11 +1340,10 @@ function renderInvitedPeople(){
      input.setAttribute('aria-label',labelText+' per '+member.name);
      row.append(info,input);card.append(row);
    };
-   addToggle('gps','Mostra la mia posizione',
-       current.me.sharing?'Può vedere il mio GPS in Home quando è attivo':'Consenti la visione, poi attiva il GPS da qui o in Home',
-       gpsSet.has(member.id));
-   addToggle('sos','Ricevi i miei SOS e audio',
-       'Sarà avvisato in caso di SOS. Il mio microfono si attiva solo con il mio consenso.',sosSet.has(member.id));
+   addToggle('gps','Può vedere il mio GPS',
+       'Solo quando attivo la posizione LIVE.',gpsSet.has(member.id));
+   addToggle('sos','Riceve i miei SOS',
+       'Notifiche SOS e audio, solo dopo il mio consenso.',sosSet.has(member.id));
    root.append(card);
  }
  if(current.me.sos){
@@ -1168,7 +1366,7 @@ async function changeContactAccess(target){
  await refresh();
  if(kind==='gps'&&target.checked&&!current.me.sharing)
    toast('Contatto autorizzato. Premi «Attiva condivisione GPS» per iniziare a mostrargli la posizione.');
- else toast('Preferenze del contatto salvate.');
+ else toast('Autorizzazioni del contatto salvate.');
 }
 
 async function copyAccountId(id){
@@ -1192,6 +1390,18 @@ async function init(){
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
   setupProfileSettings();
+  const permissionsHost=document.querySelector('.zyro-permission-panel');
+  permissionsHost?.addEventListener('click',event=>{
+    const type=event.target.closest('button[data-zyro-permission]')?.dataset.zyroPermission;
+    if(type)void action(()=>handleZyroPermission(type));
+  });
+  window.addEventListener('zyro:fcm-status',()=>{void refreshPermissionStates();});
+  window.addEventListener('zyro:android-notification-permission',()=>{void refreshPermissionStates();});
+  window.addEventListener('zyro:android-microphone-permission',()=>{void refreshPermissionStates();});
+  window.addEventListener('zyro:android-location-permission',event=>{
+    if(event?.detail?.granted===false)zyroLocationFix=null;
+    void refreshPermissionStates();
+  });
   $('savedInvitees').addEventListener('change',e=>{
     if(!e.target.matches('input[data-access-user]'))return;
     const input=e.target;input.disabled=true;
