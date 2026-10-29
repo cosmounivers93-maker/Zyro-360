@@ -104,6 +104,25 @@ html[data-theme="dark"] #profileSettingsDrawer[data-section="premium"] #settings
 html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 </style>
 <style>#zyroAdminPanel code{overflow-wrap:anywhere}#zyroAdminPanel .zyro-admin-ip-match{padding:12px;border:1px solid #d5a950;border-radius:12px;background:#d5a91518;font-size:12px;line-height:1.6}</style>
+<style>
+#zyroAdminPanel{padding:16px!important;min-width:0}
+#zyroAdminPanel .zyro-admin-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:18px 0}
+#zyroAdminPanel .zyro-admin-tabs button{padding:13px 8px;min-height:54px;border:1px solid #75b8b5;border-radius:15px;background:transparent;color:inherit;font:inherit;font-size:12px;font-weight:700}
+#zyroAdminPanel .zyro-admin-tabs button[aria-pressed="true"]{background:#194b58;color:#e7fffa;border-color:#40ceb8}
+#zyroAdminPanel .zyro-admin-tabs b{display:inline-block;min-width:20px;padding:3px;border-radius:20px;background:#58c8b825;margin-left:3px}
+#zyroAdminPanel .zyro-admin-report,#zyroAdminPanel .zyro-admin-user{border:1px solid #85b5b84d;border-radius:18px;padding:16px;margin:14px 0;background:#70b9b510;overflow-wrap:anywhere}
+#zyroAdminPanel .zyro-admin-report-top{display:flex;justify-content:space-between;gap:8px;align-items:start}
+#zyroAdminPanel .zyro-admin-report-top>span{font-size:10px;border-radius:12px;padding:5px 8px;background:#48b89e20;white-space:nowrap}
+#zyroAdminPanel .zyro-admin-report-data{display:grid;grid-template-columns:1fr;gap:3px;margin:16px 0;font-size:12px;line-height:1.5}
+#zyroAdminPanel dt{font-size:10px;opacity:.7;margin-top:7px}#zyroAdminPanel dd{margin:0;overflow-wrap:anywhere}
+#zyroAdminPanel .zyro-admin-report-label{font-size:11px;font-weight:750;margin-bottom:6px}
+#zyroAdminPanel .zyro-admin-message{margin:0 0 14px;padding:13px;border-left:3px solid #26baa6;border-radius:0 12px 12px 0;background:#5eada915;white-space:pre-wrap;font-size:13px;line-height:1.6}
+#zyroAdminPanel .zyro-admin-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+#zyroAdminPanel .zyro-admin-actions button{min-height:42px;max-width:100%;white-space:normal}
+#zyroAdminPanel #adminFilter{width:100%;box-sizing:border-box;padding:13px;border:1px solid #78aaa9;border-radius:13px;background:transparent;color:inherit;font:inherit;font-size:13px}
+#zyroAdminPanel .zyro-admin-empty{padding:30px 12px;text-align:center;font-size:13px}
+#zyroAdminPanel [hidden]{display:none!important}
+</style>
 </head>
 <body>
 <div id="authScreen" class="auth-shell">
@@ -343,13 +362,14 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
         <button class="btn btn-outline btn-wide" id="reportSubmit" type="button">Invia segnalazione</button>
       </section>
       <section id="zyroAdminPanel" class="zyro-admin-panel hidden" aria-label="Gestione riservata amministratore">
-        <div class="zyro-admin-head"><span class="zyro-admin-lock">🔐</span><div><span class="mini-overline">ACCESSO ESCLUSIVO</span><h2>Utenti registrati</h2><p>Nuove iscrizioni, accessi e gestione account. Visibile soltanto al proprietario.</p></div></div>
-        <div class="zyro-admin-toolbar"><button id="adminLoad" class="btn btn-dark" type="button">Aggiorna utenti</button><input id="adminFilter" type="search" aria-label="Cerca un account" placeholder="Cerca nome, email, ID o IP"></div>
-        <p id="adminStatus" class="setting-description" role="status">Il server verifica le tue autorizzazioni a ogni richiesta.</p>
-        <div id="adminReports" class="zyro-admin-reports"></div>
-        <div id="adminUsers" class="zyro-admin-users"></div>
+        <div class="zyro-admin-head"><span class="zyro-admin-lock">🔐</span><div><span class="mini-overline">ACCESSO ESCLUSIVO</span><h2>Gestione riservata</h2><p>Nuove iscrizioni, accessi e gestione account. Visibile soltanto al proprietario.</p></div></div>
+        <div class="zyro-admin-tabs" aria-label="Aree amministrazione"><button type="button" data-admin-tab="reports" aria-pressed="true" aria-controls="adminReportsSection">Segnalazioni <b id="adminReportCount">0</b></button><button type="button" data-admin-tab="users" aria-pressed="false" aria-controls="adminUsersSection">Utenti registrati <b id="adminUserCount">0</b></button></div>
+        <div class="zyro-admin-toolbar"><button id="adminLoad" class="btn btn-dark" type="button">Aggiorna elenco</button></div>
+        <p id="adminStatus" class="setting-description" role="status">Caricamento gestione riservata…</p>
+        <section id="adminReportsSection" aria-label="Segnalazioni ricevute"><div id="adminReports" class="zyro-admin-reports"></div></section>
+        <section id="adminUsersSection" aria-label="Utenti registrati" hidden><input id="adminFilter" type="search" aria-label="Cerca un account" placeholder="Cerca nome, email, ID o IP"><div id="adminUsers" class="zyro-admin-users"></div></section>
         <details class="zyro-admin-logs"><summary>Registro attività amministrative</summary><div id="adminAudit"></div></details>
-        <p class="setting-description">Gli indirizzi IP sono riservati, raccolti all'accesso e conservati al massimo 30 giorni per la gestione degli abusi. È necessario un archivio persistente e un'informativa privacy adeguata prima del lancio pubblico.</p>
+        <p class="setting-description">IP di registrazione e ultimo accesso conservati al massimo 30 giorni. Un IP condiviso non prova che due account appartengano alla stessa persona.</p>
       </section>
       <div class="panel"><div class="panel-title"><span class="panel-icon">🪪</span><div><h2>Il tuo ID account</h2><p>Il codice identificativo del tuo account ZYRO 360.</p></div></div><p id="myAccountId" class="setting-description" style="overflow-wrap:anywhere"></p><button id="copyMyId" type="button" class="btn btn-outline">Copia ID</button></div>
       <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
@@ -427,9 +447,10 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=45.0" defer></script>
+<script src="/app.js?v=46.0" defer></script>
 </body>
 </html>
+
 
 
 

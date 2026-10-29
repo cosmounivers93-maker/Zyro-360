@@ -203,7 +203,9 @@ function renderAdminAccess(){
  const admin=Boolean(current?.me?.isAdmin);
  $('zyroAdminPanel').classList.toggle('hidden',!admin);
  $('myAccountId').textContent=current?.me?.id||'';
- $('reportMenuItem')?.classList.toggle('hidden',admin);
+ const adminMenu=$('reportMenuItem');
+ if(adminMenu){adminMenu.classList.remove('hidden');adminMenu.dataset.settingsTarget=admin?'admin':'reports';adminMenu.querySelector('span:nth-child(2)').innerHTML=admin?'Centro amministratore<small>Segnalazioni e utenti registrati</small>':'Segnala un utente<small>Invia una segnalazione privata</small>';}
+
  $('premiumPanel')?.classList.toggle('zyro-premium-owner',admin);
  if(!admin){adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
 }
@@ -237,15 +239,34 @@ function renderAdminUsers(){
  $('adminUsers').querySelectorAll('[data-admin-ban]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeBan(b.dataset.adminBan))));
  $('adminUsers').querySelectorAll('[data-admin-gift]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeGift(b.dataset.adminGift))));
 }
+function showAdminTab(tab){
+ if(!current?.me?.isAdmin)return;
+ const reports=tab==='reports';
+ $('adminReportsSection').hidden=!reports;$('adminUsersSection').hidden=reports;
+ document.querySelectorAll('[data-admin-tab]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.adminTab===tab)));
+}
 let adminRefreshTimer=null;
 function scheduleAdminUsersRefresh(){if(adminRefreshTimer)return;adminRefreshTimer=setTimeout(()=>{adminRefreshTimer=null;if(current?.me?.isAdmin)void action(adminLoad);},350);}
 async function adminLoad(){
  if(!current?.me?.isAdmin)return;
  $('adminStatus').textContent='Caricamento account e segnalazioni…';
+ const expectedAdminId=current.me.id;
  const data=await api('/api/admin/users');
+ if(!current?.me?.isAdmin || current.me.id!==expectedAdminId)return;
  adminUsersCache=data.users||[];adminLoaded=true;renderAdminUsers();
- $('adminReports').innerHTML=(data.reports||[]).length?`<h3>Segnalazioni recenti</h3>`+(data.reports||[]).map(r=>`<div class="zyro-admin-report"><b>${escapeHtml(r.reason)}</b><p>ID segnalato: ${escapeHtml(r.userId)} · ID segnalante: ${escapeHtml(r.reporterId)}</p><small>${fmtAdminDate(r.at)} · ${escapeHtml(r.status)}</small>${r.status==='open'?`<button type="button" data-admin-review="${escapeHtml(r.id)}">Segna come esaminata</button>`:''}</div>`).join(''):'';
+ const reports=data.reports||[];
+ $('adminReportCount').textContent=String(reports.filter(r=>r.status==='open').length);
+ $('adminUserCount').textContent=String(adminUsersCache.length);
+ $('adminReports').innerHTML=reports.length?reports.map(r=>{
+  const u=r.user,reporter=r.reporter;
+  return `<article class="zyro-admin-report"><div class="zyro-admin-report-top"><b>${escapeHtml(u?.name||'Account non disponibile')}</b><span>${r.status==='open'?'Da esaminare':'Esaminata'}</span></div>
+  <dl class="zyro-admin-report-data"><dt>Email</dt><dd>${escapeHtml(u?.email||'Non disponibile')}</dd><dt>ID utente</dt><dd>${escapeHtml(r.userId)}</dd><dt>IP registrazione</dt><dd>${escapeHtml(u?.registrationIp||'Non disponibile')}</dd><dt>Ultimo IP rilevato</dt><dd>${escapeHtml(u?.lastLoginIp||'Non disponibile')}</dd><dt>Ultimo accesso</dt><dd>${escapeHtml(fmtAdminDate(u?.lastLoginAt))}</dd><dt>Ricevuta il</dt><dd>${escapeHtml(fmtAdminDate(r.at))}</dd></dl>
+  <p class="zyro-admin-report-label">Messaggio della segnalazione</p><blockquote class="zyro-admin-message">${escapeHtml(r.reason)}</blockquote>
+  <small>Inviata da ${escapeHtml(reporter?.name||r.reporterId)} · ID ${escapeHtml(r.reporterId)}</small>
+  <div class="zyro-admin-actions">${r.status==='open'?`<button type="button" data-admin-review="${escapeHtml(r.id)}">Segna come esaminata</button>`:''}${u && u.id!==current.me.id?`<button type="button" data-report-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button>`:''}</div></article>`;
+ }).join(''):'<div class="zyro-admin-empty">Nessuna segnalazione ricevuta.</div>';
  $('adminReports').querySelectorAll('[data-admin-review]').forEach(b=>b.addEventListener('click',()=>action(()=>adminReview(b.dataset.adminReview))));
+ $('adminReports').querySelectorAll('[data-report-ban]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeBan(b.dataset.reportBan))));
  $('adminAudit').innerHTML=(data.audit||[]).map(a=>`<p><b>${escapeHtml(a.kind)}</b> · ${escapeHtml(a.for||'')} · ${escapeHtml(fmtAdminDate(a.at))}</p>`).join('')||'<p>Nessuna azione registrata.</p>';
  $('adminStatus').textContent=`${adminUsersCache.length} account registrati. Aggiornamento in tempo reale · dati riservati al proprietario.`;
 }
@@ -1558,9 +1579,10 @@ function setupProfileSettings(){
   notifications:$('pushButton')?.closest('.panel'),
   privacy:[...document.querySelectorAll('#settingsView .panel')].find(x=>x.querySelector('h2')?.textContent.trim()==='La tua privacy'),
   reports:document.querySelector('#settingsView .zyro-report-panel'),
+  admin:$('zyroAdminPanel'),
   logout:$('logoutButton')?.closest('.panel')
  };
- const titles={appearance:"Aspetto dell'app",help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',permissions:'Abilita permessi',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',logout:'Esci dall’account'};
+ const titles={appearance:"Aspetto dell'app",help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',permissions:'Abilita permessi',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',admin:'Centro amministratore',logout:'Esci dall’account'};
  for(const [key,title] of Object.entries(titles)){
    const pane=document.createElement('section');pane.className='zyro-settings-pane';pane.dataset.pane=key;pane.hidden=true;
    if(key==='invitees'){
@@ -1771,7 +1793,9 @@ async function handleZyroPermission(type){
 }
 
 function showProfileSettingsPane(name){
- if(name==='reports' && current?.me?.isAdmin)return;
+ if(name==='admin' && !current?.me?.isAdmin)return;
+ if(name==='reports' && current?.me?.isAdmin)name='admin';
+ if(name==='admin')void action(adminLoad);
  const pane=document.querySelector('.zyro-settings-pane[data-pane="'+name+'"]');if(!pane)return;
  $('profileSettingsDrawer').dataset.section=name;activeSettingsPane=name;$('zyroSettingsMenu').hidden=true;$('zyroSettingsDetail').hidden=false;
  document.querySelectorAll('.zyro-settings-pane').forEach(x=>x.hidden=x!==pane);
@@ -2053,6 +2077,7 @@ async function init(){
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
   $('reportSubmit').addEventListener('click',()=>action(submitReport));
   $('adminLoad').addEventListener('click',()=>action(adminLoad));
+  document.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>showAdminTab(b.dataset.adminTab)));
   $('adminFilter').addEventListener('input',renderAdminUsers);
   $('copyMyId').addEventListener('click',async()=>{if(!current)return;try{await copyAccountId(current.me.id);toast('ID account copiato.');}catch{toast('Copia non disponibile. Seleziona il codice e copialo manualmente.',true);}});
   $('pushButton').addEventListener('click',()=>action(enablePush));
@@ -2118,6 +2143,7 @@ init();
 
 // Resume visual map updates when the app returns to the foreground.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeView==='home'){stableMap?.resize();renderHeadingOnly();}});
+
 
 
 
