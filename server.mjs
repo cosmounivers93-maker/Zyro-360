@@ -245,7 +245,11 @@ function requireAdmin(req,res,next){if(!isAdmin(req.user))return res.status(403)
 function adminPassword(req,res){if(!String(req.body?.password||'') || !verifyPassword(String(req.body.password),req.user)){res.status(403).json({error:'Conferma con la password del tuo account amministratore.'});return false;}return true;}
 function recordAction(kind,actor,target,detail=''){db.adminAudit.push({id:token(8),kind,by:actor,for:target,detail,at:now()});if(db.adminAudit.length>500)db.adminAudit.splice(0,db.adminAudit.length-500);}
 function auditLogin(req,user){ user.lastLoginIp=String(req.ip || '').slice(0,64);user.lastLoginAt=now(); }
-app.get('/api/health', (_, res) => res.json({ ok: true, persistentStorage: storageKind==='postgres' }));
+app.get('/api/health', (_, res) => {
+  res.set('Cache-Control','no-store');
+  res.json({ok:true,persistentStorage:storageKind==='postgres',
+    firebaseConfigured:fcmReady,billingReady:false});
+});
 // Live tiles requested only by logged-in users. A modest in-memory cache protects the community tile service.
 // For a public production launch replace this best-effort upstream with a contracted map provider.
 const mapTileCache = new Map();
@@ -471,7 +475,48 @@ async function sendFcm(recipients,title,body,kind='general') {
   return {attempted,accepted};
 }
 
+// Ordinary self-test notification. Never creates an SOS and never shares GPS.
+// One test per account each minute, with honest "accepted != delivered" result.
+const selfPushTests=new Map();
+app.post('/api/push/android/test-self',requireAuth,limit,async(req,res)=>{
+  if(!fcmReady)return res.status(503).json({error:'Firebase non configurato sul server.'});
+  const registered=fcmEntriesFor(req.user.id);
+  if(!registered.length)return res.status(409).json({error:'Questo account non ha dispositivi Android registrati. Apri Abilita permessi.'});
+  const sid=getCookie(req,'cs_session'),session=sid&&hash(sid);
+  if(!session || !registered.some(x=>x.session===session))
+    return res.status(409).json({error:'Questo dispositivo non è collegato a Firebase. Ricollegalo nelle impostazioni.'});
+  const last=selfPushTests.get(req.user.id)||0;
+  if(now()-last<60000)return res.status(429).json({error:'Attendi un minuto prima di un altro test.'});
+  selfPushTests.set(req.user.id,now());
+  const outcome=await sendFcm([req.user.id],'🔔 Test notifiche Zyro 360',
+    'Questa è una notifica di prova. Nessuna emergenza è stata attivata.','general');
+  res.json({ok:true,attempted:outcome.attempted,accepted:outcome.accepted,
+    deliveryConfirmed:false,
+    notice:outcome.accepted>0
+      ?'Firebase ha accettato la notifica. Verifica sul telefono che appaia e produca un suono.'
+      :'Firebase non ha accettato la notifica. Verifica connessione e permessi.'});
+});
+
 // Only the account owner can inspect its own device registration, no raw tokens.
+// Per-account readiness data; never expose device tokens or other users' GPS.
+// Diagnostic booleans do NOT imply notification delivery or safety guarantees.
+app.get('/api/diagnostics/self',requireAuth,(req,res)=>{
+  const sid=getCookie(req,'cs_session'),session=sid&&hash(sid);
+  const devices=fcmEntriesFor(req.user.id);
+  res.set('Cache-Control','no-store');
+  res.json({
+    ok:true,persistentStorage:storageKind==='postgres',
+    firebaseServerConfigured:fcmReady,
+    currentDeviceRegistered:Boolean(session&&devices.some(x=>x.session===session)),
+    registeredDeviceCount:devices.length,
+    liveLocationSharing:!!req.user.sharing,
+    authorizedGpsContacts:gpsRecipientsFor(req.user).length,
+    sosRecipients:(req.user.sosRecipients||[]).filter(id=>sharedCircle(id,req.user.id)).length,
+    premiumActive:premiumActive(req.user),billingReady:false,
+    gpsBackgroundServiceVerified:false,
+    notificationDeliveryVerified:false
+  });
+});
 app.get('/api/push/android/status',requireAuth,(req,res)=>{
   const sid=getCookie(req,'cs_session'),session=sid&&hash(sid);
   const devices=fcmEntriesFor(req.user.id);
