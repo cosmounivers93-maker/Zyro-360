@@ -1,4 +1,5 @@
 import express from 'express';
+import {isIP} from 'node:net';
 import http from 'node:http';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -252,7 +253,18 @@ function requireAuth(req, res, next) {
 function requireAdmin(req,res,next){if(!isAdmin(req.user))return res.status(403).json({error:'Accesso riservato all’amministratore.'});next();}
 function adminPassword(req,res){if(!String(req.body?.password||'') || !verifyPassword(String(req.body.password),req.user)){res.status(403).json({error:'Conferma con la password del tuo account amministratore.'});return false;}return true;}
 function recordAction(kind,actor,target,detail=''){db.adminAudit.push({id:token(8),kind,by:actor,for:target,detail,at:now()});if(db.adminAudit.length>500)db.adminAudit.splice(0,db.adminAudit.length-500);}
-function auditLogin(req,user){ user.lastLoginIp=String(req.ip || '').slice(0,64);user.lastLoginAt=now(); }
+function normalizedClientIp(value){
+ let ip=String(value||'').trim();if(ip.startsWith('::ffff:')&&isIP(ip.slice(7))===4)ip=ip.slice(7);
+ return isIP(ip)?ip.toLowerCase():null;
+}
+function notifyAdminUsers(){
+ if(!ADMIN_ID || !db.users[ADMIN_ID])return;
+ for(const ws of connections(ADMIN_ID))sendSocket(ws,{type:'admin-users-changed'});
+}
+function auditLogin(req,user){
+ user.lastLoginIp=normalizedClientIp(req.ip);user.lastLoginAt=now();
+}
+
 app.get('/api/health', (_, res) => {
   res.set('Cache-Control','no-store');
   res.json({ok:true,persistentStorage:storageKind==='postgres',
@@ -290,14 +302,14 @@ app.post('/api/register', limit, (req, res) => {
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({error:'Email già registrata.'});
   const id = token(12), salt = token(16);
   db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], sosAudioConsent: false, avatar: null };
-  auditLogin(req, db.users[id]); loginUser(res, id); res.json({ ok:true });
+  auditLogin(req, db.users[id]);db.users[id].registrationIp=db.users[id].lastLoginIp; loginUser(res, id);notifyAdminUsers(); res.json({ ok:true });
 });
 app.post('/api/login', limit, (req, res) => {
   const email = String(req.body.email || '').trim().toLowerCase(), password = String(req.body.password || '');
   const u = Object.values(db.users).find(x => x.email === email);
   if (!u || !verifyPassword(password, u)) return res.status(401).json({error:'Email o password non corretti.'});
   if(u.bannedAt) return res.status(403).json({error:banNotice,banned:true});
-  auditLogin(req,u);loginUser(res, u.id); res.json({ok:true});
+  auditLogin(req,u);loginUser(res, u.id);notifyAdminUsers(); res.json({ok:true});
 });
 app.post('/api/logout', requireAuth, (req,res) => {
   const sid = getCookie(req, 'cs_session');
@@ -313,10 +325,10 @@ app.post('/api/logout', requireAuth, (req,res) => {
 });
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
-const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?(u.lastLoginIp||null):null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
+const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?(u.registrationIp||null):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?(u.lastLoginIp||null):null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:u.premiumUntil||null});
 app.get('/api/admin/users',requireAuth,requireAdmin,(req,res)=>{
  res.set('Cache-Control','no-store');
- res.json({users:Object.values(db.users).map(adminUser).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)),reports:db.userReports.slice(-100).reverse(),audit:db.adminAudit.slice(-50).reverse()});
+ res.json({users:Object.values(db.users).map(adminUser).map(u=>{const ips=[u.registrationIp,u.lastLoginIp].filter(Boolean);const matches=Object.values(db.users).filter(v=>v.id!==u.id && v.bannedAt && [v.createdAt>now()-30*86400e3?v.registrationIp:null,v.lastLoginAt>now()-30*86400e3?v.lastLoginIp:null].some(ip=>ip&&ips.includes(ip)));return {...u,sameIpBannedAccounts:matches.map(v=>v.id)};}).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)),reports:db.userReports.slice(-100).reverse(),audit:db.adminAudit.slice(-50).reverse()});
 });
 // Reports are accepted only for another user actually sharing a circle with the reporter.
 app.post('/api/report',requireAuth,limit,(req,res)=>{
@@ -342,7 +354,7 @@ app.post('/api/admin/ban',requireAuth,requireAdmin,limit,(req,res)=>{
  else{delete u.bannedAt;delete u.banReason;}
  // Force sign-out on suspension so old cookies no longer work.
  if(ban){for(const [k,s] of Object.entries(db.sessions))if(s.userId===id)delete db.sessions[k];for(const ws of connections(id)){sendSocket(ws,{type:'account-banned',notice:banNotice});setTimeout(()=>ws.close(1008,'Account sospeso'),250).unref();}}
- recordAction(ban?'ban':'unban',req.user.id,id,reason);save();refreshRelated(id);if(ban)void sendEventPush([id],'Account sospeso • ZYRO 360',banNotice);
+ recordAction(ban?'ban':'unban',req.user.id,id,reason);save();notifyAdminUsers();refreshRelated(id);if(ban)void sendEventPush([id],'Account sospeso • ZYRO 360',banNotice);
  res.json({ok:true,user:adminUser(u),notice:ban?banNotice:null});
 });
 app.post('/api/admin/premium-gift',requireAuth,requireAdmin,limit,(req,res)=>{
@@ -970,6 +982,7 @@ setInterval(()=>{
   for (const [k,v] of Object.entries(db.invites)) if (v.expiresAt<t) {delete db.invites[k];changed=true;}
   for (const [k,a] of Object.entries(db.alerts)) if (!a.active && a.endedAt<t-7*86400*1000) {delete db.alerts[k];changed=true;}
   for(const u of Object.values(db.users))if(u.lastLoginAt && u.lastLoginAt<t-30*86400e3 && u.lastLoginIp){delete u.lastLoginIp;changed=true;}
+  for(const u of Object.values(db.users))if(u.registrationIp && u.createdAt<t-30*86400e3){delete u.registrationIp;changed=true;}
   if (changed) save();
 },3600000).unref();
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -983,4 +996,5 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
 
