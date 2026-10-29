@@ -1417,9 +1417,9 @@ function renderPickControls(){
     ?'🚨 Movimento sospetto rilevato. Inserisci la password nella schermata di allarme.'
     :pickArmed && isZyroNativeAvailable()
       ?nativeStatus?.running && nativeStatus?.pick
-        ?'🟢 Servizio Android avviato. Premi «Verifica servizio Android» dopo aver bloccato e riaperto lo schermo per controllare i sensori.'
-        :'⚠ Servizio Android non confermato. Premi «Verifica servizio Android»: il semplice tasto Attiva non prova il funzionamento.'
-      :pickArmed?'⚠ Modalità web di prova, non adatta alla protezione in background. Usa l’app Android V24.'
+        ?'Protezione attiva. Monitoraggio Android in esecuzione.'
+        :'Attivazione non confermata. Controlla le autorizzazioni e le impostazioni batteria.'
+      :pickArmed?'Protezione attiva con l’app aperta. Il monitoraggio può interrompersi quando l’app è in background.'
       :'Protezione disattivata. Attiva solo quando serve: il monitoraggio usa batteria e sensori.';
   renderNativeDiagnostic();
 }
@@ -2172,6 +2172,7 @@ init();
 
 // Resume visual map updates when the app returns to the foreground.
 document.addEventListener('visibilitychange',()=>{if(!document.hidden && activeView==='home'){stableMap?.resize();renderHeadingOnly();}});
+
 
 
 

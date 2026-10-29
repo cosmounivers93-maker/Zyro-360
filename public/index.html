@@ -152,6 +152,49 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 @media(max-width:360px){#appScreen>.topbar .brand.zyro-neon-wordmark{font-size:17px!important;padding:10px 20px!important;letter-spacing:2.5px!important}}
 @media(forced-colors:active){#appScreen>.topbar .brand.zyro-neon-wordmark{border:1px solid CanvasText!important;box-shadow:none!important}}
 </style>
+
+<style id="zyro-modes-v52">
+/* Shared spacing and alignment for the Modes screen. */
+#modesView{--mode-gap:18px;--mode-pad:clamp(16px,4vw,24px)}
+#modesView :is(.pick-panel,#journeyPanel,#checkinPanel,.sos-recipient-panel,.circle-location-status){padding:var(--mode-pad)!important;margin:0 0 var(--mode-gap)!important;border-radius:24px!important;box-sizing:border-box}
+#modesView :is(.pick-top,.zyro-v15-heading,.panel-title){display:grid!important;grid-template-columns:44px minmax(0,1fr)!important;align-items:start!important;gap:14px!important;text-align:left!important;margin:0 0 20px!important;padding:0!important}
+#modesView :is(.pick-top,.zyro-v15-heading,.panel-title)>:last-child{min-width:0;text-align:left!important}
+#modesView :is(.pick-symbol,.zyro-v15-symbol,.panel-icon){width:44px!important;height:44px!important;min-width:44px!important;margin:0!important;display:grid!important;place-items:center!important;border-radius:14px!important;font-size:25px!important;line-height:1!important}
+#modesView :is(.pick-top,.zyro-v15-heading,.panel-title) h2{margin:4px 0 8px!important;font-size:clamp(19px,4.8vw,24px)!important;line-height:1.25!important;text-align:left!important;letter-spacing:-.3px}
+#modesView :is(.pick-top,.zyro-v15-heading,.panel-title) p{margin:0!important;line-height:1.55!important;text-align:left!important}
+#modesView .eyebrow{line-height:1.5!important;overflow-wrap:anywhere}
+#modesView :is(.pick-top,.zyro-v15-heading,.panel-title) .eyebrow{font-size:10px!important;letter-spacing:1.5px!important;margin-bottom:7px!important}
+#modesView .pick-settings{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:14px!important;margin:0 0 14px!important}
+#modesView .pick-section{margin:0!important;padding:16px!important;min-width:0;box-sizing:border-box;text-align:left!important}
+#modesView :is(.pick-section-heading,.sos-section-heading){display:grid!important;grid-template-columns:28px minmax(0,1fr)!important;align-items:start!important;gap:10px!important;text-align:left!important;margin-bottom:14px!important}
+#modesView :is(.pick-section-heading,.sos-section-heading) :is(strong,small){display:block;line-height:1.5!important;text-align:left!important}
+#modesView .pick-select-line{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:8px!important;text-align:left!important}
+#modesView :is(.pick-select-line select,.zyro-v15-field input,.zyro-v15-field select){width:100%!important;min-width:0!important;max-width:100%;min-height:48px!important;box-sizing:border-box;margin:0!important;font:inherit}
+#modesView .pick-check-line{display:grid!important;grid-template-columns:22px minmax(0,1fr)!important;gap:10px!important;align-items:start!important;text-align:left!important}
+#modesView .pick-check-line input{margin:3px 0 0!important;width:20px;height:20px}
+#modesView .pick-check-line :is(b,small){display:block;line-height:1.5!important}
+#modesView .pick-status{margin:0 0 16px!important;text-align:left!important;line-height:1.55!important}
+#modesView :is(#pickArm,#pickTest,.zyro-v15-primary,.zyro-v15-secondary,#saveSOSRecipients){width:100%!important;min-height:48px!important;box-sizing:border-box;white-space:normal!important;line-height:1.35!important;text-align:center!important}
+#modesView #pickTest{margin:10px 0 0!important}
+#modesView .pick-limits{margin:16px 0 0!important;text-align:left!important;line-height:1.55!important}
+#modesView .zyro-v15-field{display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:8px!important;margin:0 0 18px!important;text-align:left!important;line-height:1.45!important}
+#modesView .zyro-v15-subhead{margin:18px 0 10px!important;text-align:left!important;line-height:1.45!important}
+#modesView .zyro-v15-contacts{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 18px!important}
+#modesView .zyro-v15-contacts label{display:flex;align-items:center;gap:8px;max-width:100%;overflow-wrap:anywhere;box-sizing:border-box}
+#modesView .zyro-v15-destination{text-align:left!important;margin:0 0 18px!important}
+#modesView .zyro-v15-destination :is(small,#journeyTargetInfo){display:block;margin:8px 0!important;line-height:1.5!important}
+#modesView .zyro-v15-feed:empty{display:none}
+#modesView .circle-location-status .panel-title{margin-bottom:0!important}
+#modesView .sos-section{margin:0 0 18px!important;text-align:left!important}
+#modesView .sos-push-note{margin:14px 0 0!important;line-height:1.55!important;text-align:left!important}
+#modesView .greeting{display:flex!important;align-items:center!important;gap:14px!important;margin:22px 0 18px!important;text-align:left!important}
+#modesView .greeting>div:first-child{flex:1;min-width:0}
+#modesView .greeting h1{color:#183f49!important;font-size:clamp(25px,6vw,34px)!important;line-height:1.25!important;margin:8px 0!important}
+html[data-theme="dark"] #modesView .greeting h1{color:#e9faf8!important}
+#modesView .greeting .avatar{flex:none}
+#modesView .top-cards{margin-bottom:18px!important}
+@media(max-width:360px){#modesView :is(.pick-top,.zyro-v15-heading,.panel-title){grid-template-columns:36px minmax(0,1fr)!important;gap:10px!important}#modesView :is(.pick-symbol,.zyro-v15-symbol,.panel-icon){width:36px!important;height:36px!important;min-width:36px!important;font-size:22px!important}#modesView .pick-section{padding:12px!important}}
+</style>
 </head>
 <body>
 <div id="authScreen" class="auth-shell">
@@ -237,7 +280,7 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
       </div>
       <section class="circle-location-status panel"><div class="panel-title"><span class="panel-icon">⌖</span><div><h2>La mia posizione</h2><p id="myLocationText">Condivisione disattivata</p></div></div></section>
       <section class="pick-panel" id="pickPanel">
-        <div class="pick-top"><div class="pick-symbol">🛡</div><div><p class="eyebrow muted">ANTIFURTO SPERIMENTALE</p><h2>Modalità Pick Pocket</h2><p>Rileva uno strappo brusco con i sensori del telefono e prova ad avviare una sirena.</p></div></div>
+        <div class="pick-top"><div class="pick-symbol">🛡</div><div><p class="eyebrow muted">PROTEZIONE ANTIFURTO</p><h2>Modalità Pick Pocket</h2><p>Rileva uno strappo brusco con i sensori del telefono e prova ad avviare una sirena.</p></div></div>
         <div class="pick-settings" id="pickSettings">
           <div class="pick-section" aria-label="Sensibilità antifurto">
             <div class="pick-section-heading"><span class="pick-section-icon" aria-hidden="true">◉</span><div><strong>Rilevamento</strong><small>Regola la risposta ai movimenti improvvisi.</small></div></div>
@@ -342,7 +385,7 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
         <div class="chat-private-footnote"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1"/></svg><span>Le conversazioni sono riservate ai membri autorizzati.</span></div>
       </section>
       <div id="chatConversation" class="panel chat-conversation hidden" role="dialog" aria-modal="true" aria-label="Conversazione"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatClose" class="chat-close" aria-label="Torna alle conversazioni">←</button></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" enterkeyhint="send" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
-      <p class="small-disclaimer chat-security-note">Questa versione non usa crittografia end-to-end. Non condividere informazioni particolarmente sensibili.</p>
+      <p class="small-disclaimer chat-security-note">Chat riservata ai partecipanti.</p>
     </section>
 
     <section id="settingsView" class="view hidden zyro-profile-page">
@@ -476,9 +519,10 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=49.0" defer></script>
+<script src="/app.js?v=52.0" defer></script>
 </body>
 </html>
+
 
 
 
