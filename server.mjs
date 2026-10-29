@@ -471,6 +471,14 @@ async function sendFcm(recipients,title,body,kind='general') {
   return {attempted,accepted};
 }
 
+// Only the account owner can inspect its own device registration, no raw tokens.
+app.get('/api/push/android/status',requireAuth,(req,res)=>{
+  const sid=getCookie(req,'cs_session'),session=sid&&hash(sid);
+  const devices=fcmEntriesFor(req.user.id);
+  res.json({ok:true,firebaseConfigured:fcmReady,
+    linkedToCurrentSession:Boolean(session&&devices.some(x=>x.session===session)),
+    devices:devices.length});
+});
 // The browser and Android must keep separate device registrations.
 app.post('/api/push/android/register',requireAuth,limit,(req,res)=>{
   if(!fcmReady)return res.status(503).json({error:'Notifiche Firebase non configurate sul server.'});
@@ -487,7 +495,7 @@ app.post('/api/push/android/register',requireAuth,limit,(req,res)=>{
   const registered={token:deviceToken,session,at:now()};
   req.user.fcmTokens=(req.user.fcmTokens||[]).filter(hasLiveFcmSession).slice(-4);
   req.user.fcmTokens.push(registered);
-  save();res.json({ok:true,enabled:true});
+  save();res.json({ok:true,enabled:true,linkedToCurrentSession:true});
 });
 app.post('/api/push/android/unregister',requireAuth,limit,(req,res)=>{
   const t=req.body?.token;
@@ -725,6 +733,8 @@ app.post('/api/sos/start', requireAuth, async (req,res) => {
    `${cleanText(req.user.name,36)} chiede aiuto! ${where}. Apri Zyro 360 per visualizzare la mappa.`, 'sos');
  console.info('[ZYRO SOS] Notifiche provider', {recipients:recipients.length,
    attempted:push.attempted,accepted:push.accepted,geocoded:Boolean(street)});
+ // An SOS visible on the map does not guarantee a push arrived.
+ // The client can distinguish no devices from provider rejection.
  res.json({ok:true,id:alert.id,serverRecorded:true,pushConfigured:push.configured,pushAccepted:push.accepted,pushAttempted:push.attempted,recipientCount:recipients.length,address:street});
 });
 app.post('/api/sos/stop', requireAuth, (req,res) => {
