@@ -560,7 +560,7 @@ function openChat(type,id){
   document.body.classList.add('zyro-chat-full');
   const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);
   $('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';
-  $('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · accesso riservato':'Chat privata · non cifrata end-to-end';
+  $('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · accesso riservato':'Chat riservata ai partecipanti';
   $('chatMessages').innerHTML='<p class="chat-empty">Caricamento messaggi…</p>';
   loadChat().catch(e=>toast(e.message,true));
 }
@@ -2225,5 +2225,6 @@ document.querySelectorAll('[data-billing-open]').forEach(b=>b.addEventListener('
 $('zyroRestorePurchases')?.addEventListener('click',()=>action(openPlayBilling));
 window.addEventListener('zyro:android-ready',renderBillingActions);
 window.addEventListener('focus',()=>{if(current)void action(refresh);});
+
 
 
