@@ -367,9 +367,9 @@ app.post('/api/logout', requireAuth, (req,res) => {
   for (const ws of connections(req.user.id)) ws.close(1008,'Sessione terminata');
   res.json({ok:true});
 });
-const LEGAL_VERSION='2026-10-30-v1';
+const LEGAL_VERSION='2026-10-30-v3';
 function legalConfig(){
- const name=String(process.env.ZYRO_LEGAL_NAME||'').trim(),email=String(process.env.ZYRO_LEGAL_EMAIL||'').trim(),address=String(process.env.ZYRO_LEGAL_ADDRESS||'').trim();
+ const name=String(process.env.ZYRO_LEGAL_NAME||'Antonio Faicchio').trim(),email=String(process.env.ZYRO_LEGAL_EMAIL||'zyro360.admin@gmail.com').trim(),address=String(process.env.ZYRO_LEGAL_ADDRESS||'Via Pablo Neruda 5, 20093 Cologno Monzese').trim();
  const documentsReady=['terms.html','privacy.html','zyro-legal-v59.js'].every(name=>fs.existsSync(path.join(root,'public',name)));
  const ready=documentsReady&&process.env.ZYRO_LEGAL_ENABLED==='true'&&name.length>2&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&address.length>5;
  return {ready,version:LEGAL_VERSION,operator:ready?{name,email,address}:null,termsUrl:'/terms.html',privacyUrl:'/privacy.html'};
@@ -1133,6 +1133,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
 
 
 
