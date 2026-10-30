@@ -2232,6 +2232,13 @@ window.addEventListener('focus',()=>{if(current)void action(refresh);});
 
 
 async function zyroWelcomeBeforeStart(){
+ const welcomeSeenKey='zyro360.welcome.completed';
+ let welcomeSeen=false;
+ try{welcomeSeen=localStorage.getItem(welcomeSeenKey)==='true';}catch{}
+ if(welcomeSeen){
+  window.ZyroStartupReady=true;document.body.classList.remove('zyro-await-intro');
+  return;
+ }
  const screen=document.createElement('section');screen.className='zyro-welcome-screen';screen.setAttribute('aria-label','Benvenuto in ZYRO 360');
  screen.innerHTML=`<div class="zyro-welcome-wrap"><div class="zyro-welcome-content" tabindex="0" aria-label="Le funzioni di ZYRO 360"><header class="zyro-welcome-header"><div class="zyro-welcome-brand">ZYRO <span>360</span></div><p class="zyro-welcome-kicker">IL TUO SPAZIO DI SICUREZZA</p><h1>Più vicini.<br>Più consapevoli.</h1></header><p class="zyro-welcome-intro">Resta in contatto con le persone fidate e chiedi aiuto quando ne hai bisogno.</p>
  <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Avvisa i contatti scelti e condividi la posizione. Con Family puoi attivare l’audio in diretta, con il tuo consenso.</p></div></article>
@@ -2246,6 +2253,7 @@ async function zyroWelcomeBeforeStart(){
  window.ZyroStartupReady=true;document.body.classList.remove('zyro-await-intro');
  const button=screen.querySelector('#zyroWelcomeProceed');
  await new Promise(resolve=>button.addEventListener('click',()=>{
+  try{localStorage.setItem(welcomeSeenKey,'true');}catch{}
   screen.remove();document.body.classList.remove('zyro-welcome-open');
   auth.inert=previousAuthInert;app.inert=previousAppInert;auth.removeAttribute('aria-hidden');app.removeAttribute('aria-hidden');
   resolve();
@@ -2253,5 +2261,6 @@ async function zyroWelcomeBeforeStart(){
 }
 
 init();
+
 
 
