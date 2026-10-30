@@ -367,6 +367,23 @@ app.post('/api/logout', requireAuth, (req,res) => {
   for (const ws of connections(req.user.id)) ws.close(1008,'Sessione terminata');
   res.json({ok:true});
 });
+const LEGAL_VERSION='2026-10-30-v1';
+function legalConfig(){
+ const name=String(process.env.ZYRO_LEGAL_NAME||'').trim(),email=String(process.env.ZYRO_LEGAL_EMAIL||'').trim(),address=String(process.env.ZYRO_LEGAL_ADDRESS||'').trim();
+ const documentsReady=['terms.html','privacy.html','zyro-legal-v59.js'].every(name=>fs.existsSync(path.join(root,'public',name)));
+ const ready=documentsReady&&process.env.ZYRO_LEGAL_ENABLED==='true'&&name.length>2&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)&&address.length>5;
+ return {ready,version:LEGAL_VERSION,operator:ready?{name,email,address}:null,termsUrl:'/terms.html',privacyUrl:'/privacy.html'};
+}
+app.get('/api/legal/status',(req,res)=>{
+ const config=legalConfig(),user=auth(req);
+ res.set('Cache-Control','no-store').json({...config,authenticated:!!user&&!user.bannedAt,accepted:!!user&&!user.bannedAt&&user.termsAcceptance?.version===LEGAL_VERSION});
+});
+app.post('/api/legal/accept',requireAuth,(req,res)=>{
+ if(!legalConfig().ready)return res.status(503).json({error:'Documenti non ancora disponibili.'});
+ if(req.body?.version!==LEGAL_VERSION||req.body?.accepted!==true)return res.status(400).json({error:'Leggi e accetta i termini aggiornati.'});
+ if(req.user.termsAcceptance?.version!==LEGAL_VERSION){req.user.termsAcceptance={version:LEGAL_VERSION,acceptedAt:now()};save();}
+ res.json({ok:true,version:LEGAL_VERSION});
+});
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
 const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
@@ -1116,6 +1133,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
 
 
 
