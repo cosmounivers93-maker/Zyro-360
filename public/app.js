@@ -202,6 +202,7 @@ function setState(data){
   if(!data?.me)return;
   const prev = current;
   current=data;
+  void zyroRecordTermsAcceptance();
   if(data.billingReady&&window.ZyroBillingSupported&&prev?.me?.id!==data.me.id)void zyroNativeRequest('billing-sync').catch(()=>{});
   void syncDeviceInfo();
   // Revoking explicit opt-in stops ongoing live audio locally as well.
@@ -1987,6 +1988,7 @@ async function copyAccountId(id){
 async function init(){
   let storedTheme=null;try{storedTheme=localStorage.getItem(ZYRO_THEME_KEY);}catch{}
   applyZyroTheme(storedTheme||'dark',false);
+  await zyroWelcomeBeforeStart();
   for(const button of document.querySelectorAll('[data-theme-choice]'))button.addEventListener('click',()=>applyZyroTheme(button.dataset.themeChoice));
   $('mapRetry')?.addEventListener('click',()=>{stableAttempts=0;removeStableMap();mapHideFailure();ensureStableMap();});
   window.addEventListener('online',()=>{if(current){stableAttempts=0;removeStableMap();renderMap();}});
@@ -1995,7 +1997,7 @@ async function init(){
   document.querySelectorAll('.auth-tab').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
   $('authForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{
     const payload={email:$('email').value.trim(),password:$('password').value,device:currentDeviceInfo()};if(authMode==='register')payload.name=$('name').value.trim();
-    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();closeProfileSettings();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else{showView('home');toast('Benvenuto in Zyro 360!');}}finally{$('authSubmit').disabled=false;}
+    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');if(zyroLegalAcknowledged&&zyroLegalVersion){await post('/api/legal/accept',{version:zyroLegalVersion,accepted:true});zyroLegalSavedFor=data.me.id;}setState(data);connectSocket();closeProfileSettings();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else{showView('home');toast('Benvenuto in Zyro 360!');}}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
   setupProfileSettings();
@@ -2140,7 +2142,7 @@ async function init(){
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
-    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;zyroLegalAcknowledged=false;zyroLegalVersion=null;zyroLegalSavedFor='';chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');await zyroWelcomeBeforeStart();}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=16-profilo').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}
   catch(err){
@@ -2152,7 +2154,7 @@ async function init(){
   window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
   window.addEventListener('pagehide',()=>{ /* Browsers may suspend GPS, sensors and audio: never promise background safety. */ });
 }
-init();
+// Startup is invoked after onboarding declarations below.
 
 
 
@@ -2228,3 +2230,49 @@ window.addEventListener('focus',()=>{if(current)void action(refresh);});
 
 
 
+
+
+// Terms acknowledgement is separate from the optional GPS/microphone permissions.
+let zyroLegalVersion=null,zyroLegalAcknowledged=false,zyroLegalSavedFor='',zyroLegalSaveBusy=false;
+async function zyroRecordTermsAcceptance(){
+ if(!zyroLegalAcknowledged||!zyroLegalVersion||!current?.me?.id||zyroLegalSavedFor===current.me.id||zyroLegalSaveBusy)return;
+ const userId=current.me.id;
+ zyroLegalSaveBusy=true;
+ try{await post('/api/legal/accept',{version:zyroLegalVersion,accepted:true});zyroLegalSavedFor=userId;}
+ catch{toast('Accettazione non salvata. Controlla la connessione e riapri l’app.',true);}
+ finally{zyroLegalSaveBusy=false;}
+}
+async function zyroWelcomeBeforeStart(){
+ let config;
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),8000);
+ try{config=await api('/api/legal/status',{signal:controller.signal});}
+ catch{return;}
+ finally{clearTimeout(timer);window.ZyroStartupReady=true;document.body.classList.remove('zyro-await-intro');}
+ if(!config.ready||config.accepted)return;
+ zyroLegalVersion=config.version;
+ const screen=document.createElement('section');screen.className='zyro-welcome-screen';screen.setAttribute('aria-label','Benvenuto in ZYRO 360');
+ screen.innerHTML=`<div class="zyro-welcome-wrap"><div class="zyro-welcome-brand">ZYRO <span>360</span></div><p class="zyro-welcome-kicker">BENVENUTO NEL TUO SPAZIO DI SICUREZZA</p><h1>Più vicini.<br>Più consapevoli.</h1><p class="zyro-welcome-intro">ZYRO 360 ti aiuta a restare in contatto con le persone fidate e a chiedere aiuto quando ne hai bisogno.</p>
+ <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Invia un SOS ai contatti scelti e condividi la tua posizione. Con Family puoi attivare anche l’audio in diretta, con il tuo consenso.</p></div></article>
+ <article class="zyro-welcome-card"><span aria-hidden="true">↗</span><div><h2>Pick Pocket</h2><p>Quando attivi Pick Pocket, un movimento sospetto può far partire la sirena e inviare automaticamente un avviso SOS con la posizione in tempo reale ai contatti fidati selezionati, se hai abilitato gli avvisi. I destinatari possono seguire gli aggiornamenti con servizio attivo, permessi concessi e connessione disponibile.</p></div></article>
+ <article class="zyro-welcome-card"><span aria-hidden="true">◎</span><div><h2>Accompagnami e Check-in</h2><p>Condividi un percorso o scegli quando confermare che va tutto bene. I tuoi contatti possono ricevere un avviso in caso di ritardo.</p></div></article>
+ <p class="zyro-welcome-note">Non riconosce automaticamente ogni emergenza. In caso di pericolo immediato chiama il <a href="tel:112">112</a>.</p>
+ <div class="zyro-welcome-consent"><label><input type="checkbox" id="zyroAcceptTerms"><span>Ho letto e accetto i Termini di servizio.</span></label><p><a href="/terms.html" target="_blank" rel="noopener">Termini di servizio</a><span> · </span><a href="/privacy.html" target="_blank" rel="noopener">Informativa privacy</a></p><p class="zyro-welcome-privacy-note">La presa visione dell’informativa non attiva GPS, microfono o notifiche: li autorizzi separatamente.</p><button id="zyroAcceptContinue" type="button" disabled>Accetta e continua</button><p id="zyroAcceptError" role="status"></p></div></div>`;
+ const auth=$('authScreen'),app=$('appScreen');
+ const previousAuthInert=auth.inert,previousAppInert=app.inert;
+ auth.inert=true;app.inert=true;auth.setAttribute('aria-hidden','true');app.setAttribute('aria-hidden','true');
+ document.body.append(screen);document.body.classList.add('zyro-welcome-open');
+ const box=screen.querySelector('#zyroAcceptTerms'),button=screen.querySelector('#zyroAcceptContinue'),error=screen.querySelector('#zyroAcceptError');
+ box.addEventListener('change',()=>{button.disabled=!box.checked;});
+ await new Promise(resolve=>button.addEventListener('click',async()=>{
+  if(!box.checked)return;button.disabled=true;error.textContent='';
+  try{
+   if(config.authenticated)await post('/api/legal/accept',{version:config.version,accepted:true});
+   zyroLegalAcknowledged=true;
+   screen.remove();document.body.classList.remove('zyro-welcome-open');
+   auth.inert=previousAuthInert;app.inert=previousAppInert;auth.removeAttribute('aria-hidden');app.removeAttribute('aria-hidden');
+   resolve();
+  }catch(e){error.textContent=e.message;button.disabled=!box.checked;}
+ }));
+}
+
+init();
