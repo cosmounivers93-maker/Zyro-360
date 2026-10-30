@@ -1634,9 +1634,10 @@ function setupProfileSettings(){
   privacy:[...document.querySelectorAll('#settingsView .panel')].find(x=>x.querySelector('h2')?.textContent.trim()==='La tua privacy'),
   reports:document.querySelector('#settingsView .zyro-report-panel'),
   admin:$('zyroAdminPanel'),
+  deletion:$('deleteAccountPanel'),
   logout:$('logoutButton')?.closest('.panel')
  };
- const titles={appearance:"Aspetto dell'app",help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',permissions:'Abilita permessi',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',admin:'Centro amministratore',logout:'Esci dall’account'};
+ const titles={appearance:"Aspetto dell'app",help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',permissions:'Abilita permessi',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',admin:'Centro amministratore',deletion:'Elimina account',logout:'Esci dall’account'};
  for(const [key,title] of Object.entries(titles)){
    const pane=document.createElement('section');pane.className='zyro-settings-pane';pane.dataset.pane=key;pane.hidden=true;
    if(key==='invitees'){
@@ -2139,6 +2140,25 @@ async function init(){
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
+  $('deleteAccountForm').addEventListener('submit',event=>{
+    event.preventDefault();
+    void action(async()=>{
+      if(!current)return;
+      if(theftTriggered)throw Error('Prima ferma l’antifurto con la tua password.');
+      if(!confirm('Eliminare definitivamente account e dati ZYRO 360? Posizione, SOS e protezioni si interromperanno. Questa operazione non può essere annullata.'))return;
+      const button=event.currentTarget?.querySelector('button')||$('deleteAccountForm').querySelector('button');button.disabled=true;
+      try{
+        await post('/api/account/delete',{email:current.me.email,password:$('deleteAccountPassword').value,confirmation:$('deleteAccountConfirmation').value});
+        stopListening();stopAudio();stopSiren();
+        try{if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});}catch{}
+        pickArmed=false;window.removeEventListener('devicemotion',motionListener);
+        if(watchId!==null)navigator.geolocation?.clearWatch(watchId);
+        watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;
+        current=null;socket?.close();socket=null;clearTimeout(wsRetry);clearInterval(refreshTimer);
+        location.replace('/');
+      }finally{button.disabled=false;$('deleteAccountPassword').value='';}
+    });
+  });
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
@@ -2261,6 +2281,7 @@ async function zyroWelcomeBeforeStart(){
 }
 
 init();
+
 
 
 

@@ -537,6 +537,19 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
         <p class="setting-description">IP di registrazione e ultimo accesso conservati al massimo 30 giorni. Un IP condiviso non prova che due account appartengano alla stessa persona.</p>
       </section>
       <div class="panel"><div class="panel-title"><span class="panel-icon">🪪</span><div><h2>Il tuo ID account</h2><p>Il codice identificativo del tuo account ZYRO 360.</p></div></div><p id="myAccountId" class="setting-description" style="overflow-wrap:anywhere"></p><button id="copyMyId" type="button" class="btn btn-outline">Copia ID</button></div>
+      <div id="deleteAccountPanel" class="panel">
+        <h2>Elimina account</h2>
+        <p>Elimina definitivamente il tuo account e i dati associati dal servizio ZYRO 360. I messaggi diretti che ti riguardano e i tuoi messaggi nei gruppi saranno rimossi. Le cerchie con altre persone restano disponibili e la proprietà viene trasferita a un membro.</p>
+        <p>La cancellazione interrompe posizione, SOS e protezioni dell’account. Non annulla il rinnovo di un abbonamento Google Play: <a href="https://play.google.com/store/account/subscriptions" target="_blank" rel="noopener noreferrer">gestisci gli abbonamenti</a>.</p>
+        <form id="deleteAccountForm">
+          <label for="deleteAccountPassword">Conferma la password di ZYRO 360</label>
+          <input id="deleteAccountPassword" type="password" autocomplete="current-password" required maxlength="128">
+          <label for="deleteAccountConfirmation">Scrivi ELIMINA per confermare</label>
+          <input id="deleteAccountConfirmation" autocomplete="off" required pattern="ELIMINA">
+          <button class="btn btn-logout btn-wide" type="submit">Elimina definitivamente il mio account</button>
+        </form>
+        <p><a href="/elimina-account.html" target="_blank" rel="noopener noreferrer">Eliminazione dal web e assistenza</a></p>
+      </div>
       <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
       <section class="how-it-works" id="zyroHelp" aria-labelledby="howTitle">
         <div class="how-heading zyro-heading-v55"><span class="how-icon" aria-hidden="true">?</span><div class="zyro-heading-copy"><p class="eyebrow muted">LA TUA GUIDA</p><h2 id="howTitle">Scopri ZYRO 360</h2></div><p class="zyro-heading-description">Ogni funzione, spiegata passo dopo passo.</p></div>
@@ -574,6 +587,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
       <button type="button" data-settings-target="notifications"><span class="zyro-settings-glyph">♢</span><span>Notifiche e avvisi SOS<small>Gestisci le notifiche</small></span><b>›</b></button>
       <button type="button" data-settings-target="privacy"><span class="zyro-settings-glyph">◇</span><span>Privacy<small>Posizione, audio e consenso</small></span><b>›</b></button>
       <button type="button" id="reportMenuItem" data-settings-target="reports"><span class="zyro-settings-glyph">⚑</span><span>Segnala un utente<small>Invia una segnalazione privata</small></span><b>›</b></button>
+      <button type="button" data-settings-target="deletion"><span class="zyro-settings-glyph">×</span><span>Elimina account<small>Cancella account e dati associati</small></span><b>›</b></button>
       <button type="button" data-settings-target="logout"><span class="zyro-settings-glyph">↪</span><span>Esci dall'account<small>Disconnetti il dispositivo</small></span><b>›</b></button>
     </nav>
     <div id="zyroSettingsDetail" class="zyro-settings-detail" hidden>
@@ -618,9 +632,10 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=65.0" defer></script>
+<script src="/app.js?v=66.0" defer></script>
 </body>
 </html>
+
 
 
 
