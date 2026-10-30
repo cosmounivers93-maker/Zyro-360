@@ -1,0 +1,20 @@
+/* Compact welcome: the description can scroll, the primary action stays in view. */
+.zyro-welcome-open{overflow:hidden!important}
+.zyro-welcome-screen{position:fixed;inset:0;z-index:30000;display:flex;align-items:center;justify-content:center;overflow:hidden;box-sizing:border-box;padding:calc(18px + env(safe-area-inset-top)) 20px calc(14px + env(safe-area-inset-bottom));background:radial-gradient(ellipse at 100% 0,#124756 0,transparent 40%),radial-gradient(ellipse at 0 100%,#10414d 0,transparent 35%),#081725;color:#e7f8fa;font-family:Inter,system-ui,sans-serif;-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.zyro-welcome-wrap{display:flex;flex-direction:column;width:100%;max-width:440px;height:100%;max-height:820px;min-height:0;box-sizing:border-box;margin:0 auto}
+.zyro-welcome-header{flex:0 0 auto;padding:0 0 12px}
+.zyro-welcome-brand{font-size:23px;font-weight:650;line-height:1.2;letter-spacing:1.5px;margin:0 0 14px}.zyro-welcome-brand span{color:#39e0ce}
+.zyro-welcome-kicker{font-size:9px;font-weight:700;letter-spacing:1.5px;line-height:1.5;color:#78cbd5;margin:0 0 7px}
+.zyro-welcome-screen h1{font-size:clamp(25px,7vw,30px);letter-spacing:-.6px;line-height:1.14;color:#f1fcff;margin:0}
+.zyro-welcome-content{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#427581 transparent;-webkit-overflow-scrolling:touch;padding:0 2px 4px}
+.zyro-welcome-intro{font-size:13px;line-height:1.5;margin:0 0 13px;color:#c4dce2}
+.zyro-welcome-card{display:grid;grid-template-columns:30px minmax(0,1fr);gap:10px;padding:12px;margin:0 0 9px;border:1px solid #29c9d866;border-radius:16px;background:#0b2834;box-sizing:border-box;min-width:0}
+.zyro-welcome-card>span{display:grid;place-items:center;box-sizing:border-box;border:1px solid #28c9d599;width:30px;height:30px;border-radius:11px;color:#43e0dd;font-size:20px;line-height:1}
+.zyro-welcome-card>div{min-width:0}.zyro-welcome-card h2{font-size:15px;line-height:1.35;margin:0 0 5px;color:#edfbff}.zyro-welcome-card p{font-size:13px;line-height:1.5;margin:0;color:#c5dce1;overflow-wrap:anywhere}
+.zyro-welcome-note{font-size:11px;line-height:1.5;margin:12px 0 4px;color:#b6d1d8}.zyro-welcome-screen a{color:#5ae7de;text-underline-offset:3px}
+.zyro-welcome-actions{flex:0 0 auto;padding:11px 0 0;margin-top:8px;border-top:1px solid #38717e66}
+.zyro-welcome-actions button{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:48px;border:1px solid #5ee8de;border-radius:16px;background:linear-gradient(100deg,#2bbde5,#3bdac0);color:#06232e;font:inherit;font-size:15px;font-weight:750;padding:11px 14px;cursor:pointer;box-sizing:border-box}
+.zyro-welcome-actions button>span{font-size:19px;line-height:1}
+.zyro-welcome-screen :focus-visible{outline:2px solid #6be7dc;outline-offset:2px}
+@media(max-width:340px){.zyro-welcome-screen{padding-inline:14px}.zyro-welcome-card{grid-template-columns:26px minmax(0,1fr);gap:9px;padding:10px}.zyro-welcome-card>span{width:26px;height:26px;font-size:18px}.zyro-welcome-card h2{font-size:14px}}
+@media(max-height:680px){.zyro-welcome-screen{padding-top:calc(12px + env(safe-area-inset-top));padding-bottom:calc(10px + env(safe-area-inset-bottom))}.zyro-welcome-brand{font-size:21px;margin-bottom:9px}.zyro-welcome-header{padding-bottom:10px}.zyro-welcome-screen h1{font-size:25px;line-height:1.1}.zyro-welcome-kicker{font-size:8px;letter-spacing:1.3px}.zyro-welcome-intro{margin-bottom:10px}}

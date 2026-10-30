@@ -2233,12 +2233,12 @@ window.addEventListener('focus',()=>{if(current)void action(refresh);});
 
 async function zyroWelcomeBeforeStart(){
  const screen=document.createElement('section');screen.className='zyro-welcome-screen';screen.setAttribute('aria-label','Benvenuto in ZYRO 360');
- screen.innerHTML=`<div class="zyro-welcome-wrap"><div class="zyro-welcome-brand">ZYRO <span>360</span></div><p class="zyro-welcome-kicker">BENVENUTO NEL TUO SPAZIO DI SICUREZZA</p><h1>Più vicini.<br>Più consapevoli.</h1><p class="zyro-welcome-intro">ZYRO 360 ti aiuta a restare in contatto con le persone fidate e a chiedere aiuto quando ne hai bisogno.</p>
- <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Invia un SOS ai contatti scelti e condividi la tua posizione. Con Family puoi attivare anche l’audio in diretta, con il tuo consenso.</p></div></article>
- <article class="zyro-welcome-card"><span aria-hidden="true">↗</span><div><h2>Pick Pocket</h2><p>Quando attivi Pick Pocket, un movimento sospetto può far partire la sirena e inviare automaticamente un avviso SOS con la posizione in tempo reale ai contatti fidati selezionati, se hai abilitato gli avvisi. I destinatari possono seguire gli aggiornamenti con servizio attivo, permessi concessi e connessione disponibile.</p></div></article>
- <article class="zyro-welcome-card"><span aria-hidden="true">◎</span><div><h2>Accompagnami e Check-in</h2><p>Condividi un percorso o scegli quando confermare che va tutto bene. I tuoi contatti possono ricevere un avviso in caso di ritardo.</p></div></article>
- <p class="zyro-welcome-note">Non riconosce automaticamente ogni emergenza. In caso di pericolo immediato chiama il <a href="tel:112">112</a>.</p>
- <div class="zyro-welcome-actions"><button id="zyroWelcomeProceed" type="button">Prosegui</button></div></div>`;
+ screen.innerHTML=`<div class="zyro-welcome-wrap"><div class="zyro-welcome-content" tabindex="0" aria-label="Le funzioni di ZYRO 360"><header class="zyro-welcome-header"><div class="zyro-welcome-brand">ZYRO <span>360</span></div><p class="zyro-welcome-kicker">IL TUO SPAZIO DI SICUREZZA</p><h1>Più vicini.<br>Più consapevoli.</h1></header><p class="zyro-welcome-intro">Resta in contatto con le persone fidate e chiedi aiuto quando ne hai bisogno.</p>
+ <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Avvisa i contatti scelti e condividi la posizione. Con Family puoi attivare l’audio in diretta, con il tuo consenso.</p></div></article>
+ <article class="zyro-welcome-card"><span aria-hidden="true">↗</span><div><h2>Pick Pocket</h2><p>Se attivo, un movimento sospetto può far partire la sirena e un SOS con posizione in tempo reale ai contatti scelti, quando abiliti gli avvisi.</p></div></article>
+ <article class="zyro-welcome-card"><span aria-hidden="true">◎</span><div><h2>Accompagnami e Check-in</h2><p>Condividi un percorso o conferma che stai bene entro un orario. I contatti possono ricevere un avviso se sei in ritardo.</p></div></article>
+ <p class="zyro-welcome-note">Gli aggiornamenti richiedono servizio attivo, permessi e connessione. L’app non riconosce ogni emergenza: in caso di pericolo chiama il <a href="tel:112">112</a>.</p></div>
+ <footer class="zyro-welcome-actions"><button id="zyroWelcomeProceed" type="button">Prosegui <span aria-hidden="true">→</span></button></footer></div>`;
  const auth=$('authScreen'),app=$('appScreen');
  const previousAuthInert=auth.inert,previousAppInert=app.inert;
  auth.inert=true;app.inert=true;auth.setAttribute('aria-hidden','true');app.setAttribute('aria-hidden','true');
@@ -2253,4 +2253,5 @@ async function zyroWelcomeBeforeStart(){
 }
 
 init();
+
 
