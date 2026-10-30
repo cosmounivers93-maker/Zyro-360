@@ -1,0 +1,16 @@
+.zyro-welcome-open{overflow:hidden!important}
+.zyro-welcome-screen{position:fixed;inset:0;z-index:30000;overflow:auto;overscroll-behavior:contain;background:radial-gradient(ellipse at 100% 0,#124756 0,transparent 34%),radial-gradient(ellipse at 0 100%,#10414d 0,transparent 32%),#081725;color:#e7f8fa;font-family:Inter,system-ui,sans-serif;padding:calc(32px + env(safe-area-inset-top)) 24px calc(28px + env(safe-area-inset-bottom));box-sizing:border-box}
+.zyro-welcome-wrap{max-width:520px;margin:0 auto}
+.zyro-welcome-brand{font-size:29px;font-weight:650;letter-spacing:2px;margin-bottom:30px}.zyro-welcome-brand span{color:#39e0ce}
+.zyro-welcome-kicker{font-size:10px;font-weight:700;letter-spacing:2px;line-height:1.7;color:#64c5d5;margin:0 0 12px}
+.zyro-welcome-screen h1{font-size:clamp(32px,9vw,46px);letter-spacing:-1.1px;line-height:1.15;color:#f1fcff;margin:0 0 22px}
+.zyro-welcome-intro{font-size:15px;line-height:1.65;margin:0 0 24px;color:#c4dce2}
+.zyro-welcome-card{display:grid;grid-template-columns:36px minmax(0,1fr);gap:13px;padding:18px 15px;margin:0 0 12px;border:1px solid #29c9d894;border-radius:19px;background:#0b2834;box-sizing:border-box}
+.zyro-welcome-card>span{display:grid;place-items:center;border:1px solid #28c9d5;width:36px;height:36px;border-radius:50%;color:#43e0dd;font-size:23px}
+.zyro-welcome-card h2{font-size:18px;line-height:1.3;margin:0 0 8px;color:#edfbff}.zyro-welcome-card p{font-size:14px;line-height:1.6;margin:0;color:#c5dce1}
+.zyro-welcome-note{font-size:13px;line-height:1.6;margin:20px 0;color:#c0d8df}.zyro-welcome-screen a{color:#5ae7de;text-underline-offset:3px}
+.zyro-welcome-actions{border-top:1px solid #38717e;padding-top:20px;margin-top:20px}
+.zyro-welcome-actions button{width:100%;min-height:49px;border:1px solid #5ee8de;border-radius:22px;background:linear-gradient(100deg,#2bbde5,#3bdac0);color:#06232e;font:inherit;font-size:15px;font-weight:750;padding:12px;cursor:pointer}
+.zyro-welcome-screen :focus-visible{outline:2px solid #6be7dc;outline-offset:4px}
+@media(max-width:340px){.zyro-welcome-screen{padding-inline:16px}.zyro-welcome-card{grid-template-columns:minmax(0,1fr)}.zyro-welcome-card>span{display:none}}
+
