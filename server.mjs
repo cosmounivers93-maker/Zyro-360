@@ -1,4 +1,5 @@
 import express from 'express';
+import {eraseAccount} from './account-deletion.mjs';
 import {PlayBilling,PlayRepository,GooglePlayApi,createTokenCipher,accountId,PACKAGE} from './play-billing.mjs';
 import {isIP} from 'node:net';
 import http from 'node:http';
@@ -39,6 +40,7 @@ let db = structuredClone(initial);
 let pgPool = null;
 let playBilling=null;
 const billingReady=()=>playBilling?.ready===true;
+const deletingAccounts=new Set();
 const paidReceipt=user=>user?playBilling?.entitlement(user.id):null;
 const premiumExpiry=user=>Math.max(Number(user?.premiumUntil||0),paidReceipt(user)?.expiresAt||0)||null;
 let persistenceQueue = Promise.resolve();
@@ -136,7 +138,7 @@ function save() {
 function passwordHash(p, salt) { return crypto.scryptSync(p, salt, 64).toString('hex'); }
 function verifyPassword(p, u) { const stored = Buffer.from(u.passwordHash, 'hex'); const calc = Buffer.from(passwordHash(p, u.salt), 'hex'); return stored.length === calc.length && crypto.timingSafeEqual(stored, calc); }
 function getCookie(req, key) { const raw = req.headers.cookie || ''; const part = raw.split(';').map(x => x.trim()).find(x => x.startsWith(`${key}=`)); return part ? decodeURIComponent(part.slice(key.length + 1)) : null; }
-function auth(req) { const sid = getCookie(req, 'cs_session'); const s = sid && db.sessions[hash(sid)]; return s && s.expiresAt > now() ? db.users[s.userId] : null; }
+function auth(req) { const sid = getCookie(req, 'cs_session'); const s = sid && db.sessions[hash(sid)]; return s && s.expiresAt > now() && !deletingAccounts.has(s.userId) ? db.users[s.userId] : null; }
 function setCookie(res, sid) { res.cookie('cs_session', sid, { httpOnly: true, secure: prod, sameSite: 'lax', path: '/', maxAge: SESSION_MAX_AGE }); }
 function loginUser(res, id) { const sid = token(32); db.sessions[hash(sid)] = { userId: id, expiresAt: now() + SESSION_MAX_AGE }; setCookie(res, sid); save(); }
 function memberIds(circleId) { return db.memberships.filter(m => m.circleId === circleId).map(m => m.userId); }
@@ -353,6 +355,7 @@ app.post('/api/login', limit, (req, res) => {
   const u = Object.values(db.users).find(x => x.email === email);
   if (!u || !verifyPassword(password, u)) return res.status(401).json({error:'Email o password non corretti.'});
   if(u.bannedAt) return res.status(403).json({error:banNotice,banned:true});
+  if(deletingAccounts.has(u.id))return res.status(409).json({error:'Eliminazione account in corso.'});
   auditLogin(req,u);loginUser(res, u.id);notifyAdminUsers(); res.json({ok:true});
 });
 app.post('/api/logout', requireAuth, (req,res) => {
@@ -366,6 +369,28 @@ app.post('/api/logout', requireAuth, (req,res) => {
   res.clearCookie('cs_session', {path:'/'}); save();
   for (const ws of connections(req.user.id)) ws.close(1008,'Sessione terminata');
   res.json({ok:true});
+});
+// Password confirmation is required even for a signed-in session. The web page
+// accepts the same credentials, including suspended accounts, without installing the APK.
+app.post('/api/account/delete',limit,async(req,res,next)=>{
+ const email=String(req.body.email||'').trim().toLowerCase(),password=String(req.body.password||'');
+ const user=Object.values(db.users).find(u=>u.email===email);
+ if(!user||password.length>128||!verifyPassword(password,user))return res.status(401).json({error:'Email o password non corretti.'});
+ if(req.body.confirmation!=='ELIMINA')return res.status(400).json({error:'Scrivi ELIMINA per confermare la cancellazione definitiva.'});
+ if(deletingAccounts.has(user.id))return res.status(409).json({error:'Eliminazione già in corso.'});
+ deletingAccounts.add(user.id);
+ try{
+  if(playBilling)await playBilling.deleteUser(user.id);
+  const affected=[...activeRecipients(user.id)];
+  eraseAccount(db,user.id);locations.delete(user.id);throttle.delete(`chat:${user.id}`);
+  sosAudioRelaySubscribers.delete(user.id);
+  for(const listeners of sosAudioRelaySubscribers.values())for(const ws of listeners)if(ws.userId===user.id)listeners.delete(ws);
+  save();await persistenceQueue;
+  for(const ws of connections(user.id))ws.close(1008,'Account eliminato');
+  res.clearCookie('cs_session',{path:'/'});
+  for(const id of affected)if(db.users[id])pushState(id);
+  notifyAdminUsers();res.json({ok:true});
+ }catch(err){next(err);}finally{deletingAccounts.delete(user.id);}
 });
 const LEGAL_VERSION='2026-10-30-v3';
 function legalConfig(){
@@ -1018,6 +1043,7 @@ wss.on('connection', ws => {
     let m; try {m=JSON.parse(data.toString());}catch{return;}
     if (!m || typeof m.type !== 'string') return;
     const self=ws.userId;
+    if(!db.users[self]||deletingAccounts.has(self)){ws.close(1008,'Account non disponibile');return;}
     if(db.users[self]?.bannedAt){ws.close(1008,'Account sospeso');return;}
     if (m.type==='audio-ready') {
       const a=currentAlert(self); if (!a) return;
@@ -1133,6 +1159,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   });
 }
 export { app, server, initializeStorage };
+
 
 
 

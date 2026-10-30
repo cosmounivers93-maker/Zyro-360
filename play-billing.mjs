@@ -26,6 +26,7 @@ export class PlayRepository{
  async get(hash){return this.row((await this.pool.query('SELECT * FROM zyro_play_receipts WHERE token_hash=$1',[hash])).rows[0]);}
  async put(r){const result=await this.pool.query(`INSERT INTO zyro_play_receipts VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(token_hash) DO UPDATE SET encrypted_token=EXCLUDED.encrypted_token,product_id=EXCLUDED.product_id,plan=EXCLUDED.plan,state=EXCLUDED.state,expires_at=EXCLUDED.expires_at,checked_at=EXCLUDED.checked_at,auto_renew=EXCLUDED.auto_renew,active=EXCLUDED.active WHERE zyro_play_receipts.user_id=EXCLUDED.user_id RETURNING token_hash`,[r.tokenHash,r.userId,r.encryptedToken,r.productId,r.plan,r.state,r.expiresAt,r.checkedAt,r.autoRenew,r.active]);if(!result.rowCount)throw new Error('Acquisto già associato a un altro account.');}
  async user(id){return (await this.pool.query('SELECT * FROM zyro_play_receipts WHERE user_id=$1',[id])).rows.map(r=>this.row(r));}
+ async deleteUser(id){await this.pool.query('DELETE FROM zyro_play_receipts WHERE user_id=$1',[id]);}
  async due(time){return (await this.pool.query('SELECT * FROM zyro_play_receipts WHERE checked_at<$1 AND expires_at>$2 ORDER BY checked_at LIMIT 20',[time-300000,time-60*86400000])).rows.map(r=>this.row(r));}
  async all(){return (await this.pool.query('SELECT * FROM zyro_play_receipts WHERE expires_at>$1',[Date.now()])).rows.map(r=>this.row(r));}
 }
@@ -62,13 +63,20 @@ export class PlayBilling{
  async init(){await this.repo.init();for(const r of await this.repo.all()){const list=this.cache.get(r.userId)||[];list.push(r);this.cache.set(r.userId,list);}}
  entitlement(userId){const time=this.clock();const rows=(this.cache.get(userId)||[]).filter(r=>r.active&&r.expiresAt>time&&r.checkedAt+900000>time);rows.sort((a,b)=>(b.plan==='family')-(a.plan==='family')||b.expiresAt-a.expiresAt);return rows[0]||null;}
  async refreshUser(id){this.cache.set(id,await this.repo.user(id));this.onChange(id);}
+ async deleteUser(id){
+  this.deletedUsers ||= new Set();this.deletedUsers.add(id);
+  await Promise.allSettled([...this.locks.values()]);
+  try{await this.repo.deleteUser(id);this.cache.delete(id);}catch(error){this.deletedUsers.delete(id);throw error;}
+ }
  async verify(userId,token){
+  if(this.deletedUsers?.has(userId))throw Error('Account eliminato.');
   if(typeof token!=='string'||token.length<16||token.length>4096)throw new Error('Ricevuta Google Play non valida.');
   const key=digest(token);const previous=this.locks.get(key)||Promise.resolve();
   const job=previous.catch(()=>{}).then(()=>this.verifyUnlocked(userId,token,key));this.locks.set(key,job);
   try{return await job;}finally{if(this.locks.get(key)===job)this.locks.delete(key);}
  }
  async verifyUnlocked(userId,token,key){
+  if(this.deletedUsers?.has(userId))throw Error('Account eliminato.');
   const existing=await this.repo.get(key);if(existing&&existing.userId!==userId)throw new Error('Acquisto già associato a un altro account.');
   let purchase;
   try{purchase=await this.google.get(token);}catch(error){
@@ -88,3 +96,4 @@ export class PlayBilling{
  }
  async sweep(){if(this.sweeping)return;this.sweeping=true;try{for(const row of await this.repo.due(this.clock())){if((this.retryAt.get(row.tokenHash)||0)>this.clock())continue;try{await this.verify(row.userId,this.cipher.decrypt(row.encryptedToken));this.retryAt.delete(row.tokenHash);}catch{this.retryAt.set(row.tokenHash,this.clock()+300000);}}}finally{this.sweeping=false;}}
 }
+
