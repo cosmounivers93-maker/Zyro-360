@@ -49,7 +49,9 @@ function badge(count){
  b.setAttribute('aria-label',count+' messaggi non letti');return b;
 }
 function decorate(){
- const id=account(),list=rooms();if(!id||!list)return;
+ const id=account(),list=rooms();
+ if(!id){document.querySelector('.nav-item[data-view="chats"] .zyro-chat-total')?.remove();return;}
+ if(!list)return;
  const wrappers=[...list.querySelectorAll('.zyro-chat-line')];
  for(const wrapper of wrappers)updateLine(wrapper);
  let total=0;
@@ -61,8 +63,10 @@ function decorate(){
   if(!total){marker?.remove();}
   else{
    if(!marker){marker=document.createElement('span');marker.className='zyro-chat-total';marker.setAttribute('aria-label','Messaggi non letti');nav.append(marker);}
-   marker.textContent=total>99?'99+':String(total);
-   marker.setAttribute('aria-label',total+' messaggi non letti');
+   const rendered=total>99?'99+':String(total);
+   if(marker.textContent!==rendered)marker.textContent=rendered;
+   const label=total+' messaggi non letti';
+   if(marker.getAttribute('aria-label')!==label)marker.setAttribute('aria-label',label);
   }
  }
 }
@@ -74,21 +78,31 @@ function updateLine(wrapper){
  const search=typeof chatSearch!=='undefined'?String(chatSearch||'').trim():'';
  wrapper.hidden=hidden&&!search;
  wrapper.classList.toggle('has-unread',unread>0);
- wrapper.querySelector('.zyro-chat-badge')?.remove();
+ // Update badge in place: rebuilding it would repeatedly trigger MutationObserver.
+ let marker=item.querySelector('.zyro-chat-badge');
  const chevron=item.querySelector('.chat-room-chevron');
- if(unread){
-  const b=badge(unread);
-  if(chevron)chevron.before(b);else item.append(b);
+ if(!unread)marker?.remove();
+ else{
+  if(!marker){
+   marker=badge(unread);
+   if(chevron)chevron.before(marker);else item.append(marker);
+  }
+  const rendered=unread>99?'99+':String(unread);
+  if(marker.textContent!==rendered)marker.textContent=rendered;
+  const label=unread+' messaggi non letti';
+  if(marker.getAttribute('aria-label')!==label)marker.setAttribute('aria-label',label);
  }
  const text=item.querySelector('.chat-room-text');
  if(text){
   let snippet=text.querySelector('.zyro-chat-preview');
   if(info?.lastAt){
    if(!snippet){snippet=document.createElement('small');snippet.className='zyro-chat-preview';text.append(snippet);}
-   snippet.textContent=(info.lastName||'Contatto')+': '+(info.preview||'Nuovo messaggio');
+   const value=(info.lastName||'Contatto')+': '+(info.preview||'Nuovo messaggio');
+   if(snippet.textContent!==value)snippet.textContent=value;
   }else snippet?.remove();
  }
- item.setAttribute('aria-label',nodeName(type,roomId)+(unread?' · '+unread+' messaggi non letti':'')+' · tocca per aprire, tieni premuto per eliminare');
+ const label=nodeName(type,roomId)+(unread?' · '+unread+' messaggi non letti':'')+' · tocca per aprire, tieni premuto per eliminare';
+ if(item.getAttribute('aria-label')!==label)item.setAttribute('aria-label',label);
 }
 function askToClear(type,id){
  if(modal||!account())return;
@@ -176,6 +190,8 @@ function start(){
  });
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
  window.addEventListener('focus',()=>void refresh());
+ window.addEventListener('zyro:android-resume',()=>void refresh());
+ window.ZyroChatRefreshBadges=()=>void refresh();
  window.addEventListener('online',()=>void refresh());
  // Room opening acknowledges reading on the server via normal chat GET.
  document.addEventListener('click',e=>{
