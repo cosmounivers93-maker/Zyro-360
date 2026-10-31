@@ -1,5 +1,6 @@
 import express from 'express';
 import {eraseAccount} from './account-deletion.mjs';
+import {normalizeChatView,summarizeChat,chatPage} from './chat-view-core.mjs';
 import {PlayBilling,PlayRepository,GooglePlayApi,createTokenCipher,accountId,PACKAGE} from './play-billing.mjs';
 import {isIP} from 'node:net';
 import http from 'node:http';
@@ -16,7 +17,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
 fs.mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 const dbPath = path.join(dataDir, 'zyro360.json');
-const initial = { users: {}, circles: {}, memberships: [], invites: {}, sessions: {}, alerts: {}, messages: {}, journeys: {}, checkins: {} };
+const initial = { users: {}, circles: {}, memberships: [], invites: {}, sessions: {}, alerts: {}, messages: {}, chatViews: {}, journeys: {}, checkins: {} };
 
 // Firebase Admin is server-only. Add FIREBASE_SERVICE_ACCOUNT_JSON as a secret
 // on Render; never upload its JSON key, private_key or access tokens to GitHub.
@@ -382,7 +383,7 @@ app.post('/api/account/delete',limit,async(req,res,next)=>{
  try{
   if(playBilling)await playBilling.deleteUser(user.id);
   const affected=[...activeRecipients(user.id)];
-  eraseAccount(db,user.id);locations.delete(user.id);throttle.delete(`chat:${user.id}`);
+  eraseAccount(db,user.id);if(db.chatViews)delete db.chatViews[user.id];locations.delete(user.id);throttle.delete(`chat:${user.id}`);
   sosAudioRelaySubscribers.delete(user.id);
   for(const listeners of sosAudioRelaySubscribers.values())for(const ws of listeners)if(ws.userId===user.id)listeners.delete(ws);
   save();await persistenceQueue;
@@ -898,21 +899,69 @@ function chatAccess(viewer,type,target){
   if(type==='direct' && target!==viewer && db.users[target] && sharedCircle(viewer,target))return {key:`direct:${[viewer,target].sort().join(':')}`, members:[viewer,target]};
   return null;
 }
+// Per-user chat markers are private. Clearing a conversation never deletes the
+// shared message history, and new incoming messages appear after the cleared index.
+function chatView(userId, key) {
+  const mine=db.chatViews?.[userId];
+  const view=mine?.[key];
+  return normalizeChatView(db.messages?.[key]||[],view);
+}
+function setChatView(userId,key,change) {
+  db.chatViews ||= {};
+  db.chatViews[userId] ||= {};
+  const current=chatView(userId,key);
+  db.chatViews[userId][key]={...current,...change};
+  save();
+}
+function chatSummaryFor(userId) {
+  const seen=new Set(),rooms=[];
+  const selections=userCircles(userId).map(c=>({type:'circle',id:c.id}))
+    .concat([...new Set(userCircles(userId).flatMap(c=>memberIds(c.id)))]
+      .filter(id=>id!==userId&&!!db.users[id])
+      .map(id=>({type:'direct',id})));
+  for(const room of selections){
+    const chat=chatAccess(userId,room.type,room.id);
+    if(!chat||seen.has(chat.key))continue;
+    seen.add(chat.key);
+    const all=db.messages?.[chat.key]||[];
+    const view=chatView(userId,chat.key);
+    rooms.push({type:room.type,id:room.id,key:chat.key,
+      ...summarizeChat(all,userId,view)});
+  }
+  return rooms;
+}
+app.get('/api/chat/summary', requireAuth,(req,res)=>{
+  res.set('Cache-Control','no-store');
+  res.json({rooms:chatSummaryFor(req.user.id)});
+});
+app.post('/api/chat/:type/:target/clear',requireAuth,(req,res)=>{
+  const chat=chatAccess(req.user.id,req.params.type,req.params.target);
+  if(!chat)return res.status(403).json({error:'Non hai accesso a questa conversazione.'});
+  const n=(db.messages?.[chat.key]||[]).length;
+  setChatView(req.user.id,chat.key,{cleared:n,read:n,dismissed:true});
+  res.set('Cache-Control','no-store').json({ok:true,clearedForMe:true});
+});
+app.post('/api/chat/:type/:target/read',requireAuth,(req,res)=>{
+  const chat=chatAccess(req.user.id,req.params.type,req.params.target);
+  if(!chat)return res.status(403).json({error:'Non hai accesso a questa conversazione.'});
+  const n=(db.messages?.[chat.key]||[]).length;
+  setChatView(req.user.id,chat.key,{read:n});
+  res.set('Cache-Control','no-store').json({ok:true});
+});
 app.get('/api/chat/:type/:target', requireAuth,(req,res)=>{
   const chat=chatAccess(req.user.id,req.params.type,req.params.target);
   if(!chat)return res.status(403).json({error:'Non hai accesso a questa conversazione.'});
   // Paginated conversation history; older messages remain stored instead of being cut off.
   // Durable history requires DATA_DIR on persistent storage (see LEGGIMI).
   const all=(db.messages||{})[chat.key]||[];
+  const view=chatView(req.user.id,chat.key);
   const rawBefore=req.query.before;
-  let end=all.length;
-  if(rawBefore!==undefined){
-    if(!/^\d{1,10}$/.test(String(rawBefore)))return res.status(400).json({error:'Pagina dello storico non valida.'});
-    end=Math.min(all.length,Number(rawBefore));
-  }
-  const start=Math.max(0,end-80);
+  if(rawBefore!==undefined&&!/^\d{1,10}$/.test(String(rawBefore)))
+    return res.status(400).json({error:'Pagina dello storico non valida.'});
+  if(rawBefore===undefined&&view.read<all.length)
+    setChatView(req.user.id,chat.key,{read:all.length});
   res.set('Cache-Control','no-store');
-  res.json({messages:all.slice(start,end),nextBefore:start>0?start:null,total:all.length});
+  res.json(chatPage(all,view,rawBefore===undefined?undefined:Number(rawBefore)));
 });
 app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
   const chat=chatAccess(req.user.id,req.params.type,req.params.target);
@@ -930,7 +979,7 @@ app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
   // Do not silently erase messages after 60 sends. Data is stored in DATA_DIR,
   // which MUST be backed by persistent storage for survival across deployments.
   save();
-  for(const id of chat.members)for(const sock of connections(id))sendSocket(sock,{type:'chat-new',chatType:req.params.type,target:req.params.target,from:req.user.id});
+  for(const id of chat.members)for(const sock of connections(id))sendSocket(sock,{type:'chat-new',chatType:req.params.type,target:req.params.target,from:req.user.id,fromName:req.user.name,messageId:message.id,at:t});
   // Keep message contents private on the device lock screen.
   void sendEventPush(chat.members.filter(id=>id!==req.user.id),'💬 Nuovo messaggio Zyro 360',
     `${req.user.name} ti ha inviato un messaggio.`,'chat')

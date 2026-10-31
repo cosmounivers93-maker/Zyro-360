@@ -191,6 +191,7 @@ function connectSocket(){
     if(m.type==='admin-users-changed' && current?.me?.isAdmin)scheduleAdminUsersRefresh();
     if(m.type==='admin-new-report' && current?.me?.isAdmin){toast('Nuova segnalazione ricevuta nel Centro amministratore.');void action(adminLoad);}
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
+    if(m.type==='chat-new')window.dispatchEvent(new CustomEvent('zyro:chat-new',{detail:m}));
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
   };
   ws.onclose=()=>{if(socket!==ws)return;socket=null;connection(false);stopAudioRelaySender();if(current)wsRetry=setTimeout(connectSocket,3000);};
@@ -588,6 +589,7 @@ async function loadChat(older=false){
   chatHistory.messages=[...byId.values()].sort((a,b)=>a.at-b.at || a.id.localeCompare(b.id));
   if(older||chatHistory.messages.length===response.messages.length)chatHistory.nextBefore=response.nextBefore;
   renderChatHistory({stickToBottom:wasNearBottom&&!older,preserveTop:older});
+  if(!older)window.dispatchEvent(new Event('zyro:chat-read'));
 }
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
@@ -661,7 +663,8 @@ async function nativeBackgroundSync(options={}){
  const sharing=options.sharing===undefined?Boolean(current?.me?.sharing||current?.me?.sos):!!options.sharing;
  const pick=options.pick===undefined?!!(pickArmed&&!theftTriggered):!!options.pick;
  const recipients=$('pickNotify')?.checked?[...pickSelected]:[];
- const sensitivity=$('pickSensitivity')?.value==='high'?'high':'normal';
+ const selectedSensitivity=$('pickSensitivity')?.value;
+ const sensitivity=['normal','high','ultra'].includes(selectedSensitivity)?selectedSensitivity:'normal';
  const payload={sharing,pick,recipients,sensitivity};
  let result;
  if(hasZyroNativeBridge()){
@@ -1462,14 +1465,17 @@ function motionListener(e){
   const force=Math.hypot(a.x||0,a.y||0,a.z||0);
   const r=e.rotationRate;
   const turn=r?Math.max(Math.abs(r.alpha||0),Math.abs(r.beta||0),Math.abs(r.gamma||0)):0;
-  const high=$('pickSensitivity').value==='high';
-  const strong=force>(high?13:18) && (turn>(high?60:100) || force>(high?20:27));
+  const sensitivity=$('pickSensitivity').value;
+  const high=sensitivity==='high'||sensitivity==='ultra';
+  const ultra=sensitivity==='ultra';
+  const strong=force>(ultra?11:(high?13:18)) &&
+   (turn>(ultra?46:(high?60:100)) || force>(ultra?18:(high?20:27)));
   if(!strong)return;
   const now=Date.now();
   const gap=now-lastMotionAt;
   if(gap>1350)motionPeaks=0;
   if(gap>180){motionPeaks++;lastMotionAt=now;}
-  if(force>(high?25:31) || (motionPeaks>=2 && turn>(high?60:100)))void triggerTheft();
+  if(force>(ultra?23:(high?25:31)) || (motionPeaks>=2 && turn>(ultra?46:(high?60:100))))void triggerTheft();
 }
 function startSiren(){
   try{
@@ -2263,6 +2269,7 @@ async function zyroWelcomeBeforeStart(){
  screen.innerHTML=`<div class="zyro-welcome-wrap"><div class="zyro-welcome-content" tabindex="0" aria-label="Le funzioni di ZYRO 360"><header class="zyro-welcome-header"><div class="zyro-welcome-brand">ZYRO <span>360</span></div><p class="zyro-welcome-kicker">IL TUO SPAZIO DI SICUREZZA</p><h1>Più vicini.<br>Più consapevoli.</h1></header><p class="zyro-welcome-intro">Resta in contatto con le persone fidate e chiedi aiuto quando ne hai bisogno.</p>
  <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Avvisa i contatti scelti e condividi la posizione. Con Family puoi attivare l’audio in diretta, con il tuo consenso.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">↗</span><div><h2>Pick Pocket</h2><p>Se attivo, un movimento sospetto può far partire la sirena e un SOS con posizione in tempo reale ai contatti scelti, quando abiliti gli avvisi.</p></div></article>
+ <article class="zyro-welcome-card"><span aria-hidden="true">➤</span><div><h2>Segui il percorso SOS e possibile furto</h2><p>Con Premium puoi seguire sulla mappa un percorso indicativo verso il contatto che invia un SOS o una segnalazione Pick Pocket. Premi «Portami da» e autorizza l’uso del GPS e del servizio stradale esterno.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">◎</span><div><h2>Accompagnami e Check-in</h2><p>Condividi un percorso o conferma che stai bene entro un orario. I contatti possono ricevere un avviso se sei in ritardo.</p></div></article>
  <p class="zyro-welcome-note">Gli aggiornamenti richiedono servizio attivo, permessi e connessione. L’app non riconosce ogni emergenza: in caso di pericolo chiama il <a href="tel:112">112</a>.</p></div>
  <footer class="zyro-welcome-actions"><button id="zyroWelcomeProceed" type="button">Prosegui <span aria-hidden="true">→</span></button></footer></div>`;
