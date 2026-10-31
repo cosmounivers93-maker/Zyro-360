@@ -191,7 +191,16 @@ function start(){
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
  window.addEventListener('focus',()=>void refresh());
  window.addEventListener('zyro:android-resume',()=>void refresh());
+ window.addEventListener('zyro:chat-read',()=>void refresh());
  window.ZyroChatRefreshBadges=()=>void refresh();
+ const appScreen=$('appScreen');
+ if(appScreen)new MutationObserver(()=>{
+  if(account())void refresh();
+ }).observe(appScreen,{attributes:true,attributeFilter:['class']});
+ const accountNode=$('myAccountId');
+ if(accountNode)new MutationObserver(()=>{
+  if(account())void refresh();
+ }).observe(accountNode,{childList:true,characterData:true,subtree:true});
  window.addEventListener('online',()=>void refresh());
  // Room opening acknowledges reading on the server via normal chat GET.
  document.addEventListener('click',e=>{
