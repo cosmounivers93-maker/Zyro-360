@@ -1,7 +1,7 @@
 // Pure per-user chat state utilities; never mutate or delete shared messages.
 export function normalizeChatView(messages,view={}){
  const count=messages.length,clamp=n=>Number.isSafeInteger(n)?Math.min(count,Math.max(0,n)):0;
- return {cleared:clamp(view?.cleared),read:clamp(view?.read)};
+ return {cleared:clamp(view?.cleared),read:clamp(view?.read),dismissed:view?.dismissed===true};
 }
 export function summarizeChat(messages,viewerId,view={}){
  const {cleared,read}=normalizeChatView(messages,view);
@@ -9,7 +9,7 @@ export function summarizeChat(messages,viewerId,view={}){
  return {
   unread:messages.slice(Math.max(cleared,read)).filter(m=>m.from!==viewerId).length,
   lastAt:latest?.at||null,lastFrom:latest?.from||null,
-  lastName:latest?.name||null,hidden:cleared>0&&!latest,
+  lastName:latest?.name||null,hidden:view?.dismissed===true&&!latest,
   preview:latest?(latest.text?String(latest.text).slice(0,80):'📷 Foto'):''
  };
 }
