@@ -382,7 +382,7 @@ app.post('/api/account/delete',limit,async(req,res,next)=>{
  try{
   if(playBilling)await playBilling.deleteUser(user.id);
   const affected=[...activeRecipients(user.id)];
-  eraseAccount(db,user.id);locations.delete(user.id);throttle.delete(`chat:${user.id}`);
+  eraseAccount(db,user.id);if(db.chatViews)delete db.chatViews[user.id];locations.delete(user.id);throttle.delete(`chat:${user.id}`);
   sosAudioRelaySubscribers.delete(user.id);
   for(const listeners of sosAudioRelaySubscribers.values())for(const ws of listeners)if(ws.userId===user.id)listeners.delete(ws);
   save();await persistenceQueue;
