@@ -1,0 +1,37 @@
+name: ZYRO 360 - Smoke test server safety fallback
+on:
+  push:
+    branches: [fix/billing-failsafe-server-20261031]
+    paths: ['server.mjs','play-billing.mjs','.github/workflows/server-startup.yml']
+  pull_request:
+    paths: ['server.mjs','play-billing.mjs','.github/workflows/server-startup.yml']
+permissions:
+  contents: read
+jobs:
+  test-startup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --no-audit --no-fund
+      - name: Server starts with invalid Google Play credentials but billing remains unavailable
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PORT=18632 GOOGLE_PLAY_BILLING_ENABLED=true
+          export GOOGLE_PLAY_SERVICE_ACCOUNT_JSON='{}' GOOGLE_PLAY_TOKEN_KEY='invalid'
+          export DATA_DIR="$(mktemp -d)"
+          node server.mjs > /tmp/zyro-startup.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; rm -rf "$DATA_DIR"' EXIT
+          for i in {1..35}; do
+            if curl -fsS "http://127.0.0.1:$PORT/api/health" >/tmp/zyro-health.json 2>/dev/null; then break; fi
+            if ! kill -0 "$pid" 2>/dev/null; then cat /tmp/zyro-startup.log; exit 1; fi
+            sleep 1
+          done
+          cat /tmp/zyro-health.json
+          grep -q '"ok":true' /tmp/zyro-health.json
+          grep -q '"billingReady":false' /tmp/zyro-health.json
+          grep -q 'Acquisti non disponibili; servizio sicurezza attivo' /tmp/zyro-startup.log
