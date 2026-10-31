@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 export const PACKAGE='com.zyro360.app';
-export const PRODUCTS={zyro_premium_monthly:{plan:'personal',basePlanId:'monthly'},zyro_family_monthly:{plan:'family',basePlanId:'monthly'}};
+export const PRODUCTS={zyro360_premium:{plan:'personal',basePlanId:'premium-mensile'},zyro360_family:{plan:'family',basePlanId:'family-mensile'}};
 export const accountId=id=>crypto.createHash('sha256').update(`zyro360:${id}`).digest('hex');
 const digest=token=>crypto.createHash('sha256').update(token).digest('hex');
 const allowedStates=new Set(['SUBSCRIPTION_STATE_ACTIVE','SUBSCRIPTION_STATE_IN_GRACE_PERIOD','SUBSCRIPTION_STATE_CANCELED']);
