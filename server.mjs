@@ -1,5 +1,6 @@
 import express from 'express';
 import {eraseAccount} from './account-deletion.mjs';
+import {normalizeChatView,summarizeChat,chatPage} from './chat-view-core.mjs';
 import {PlayBilling,PlayRepository,GooglePlayApi,createTokenCipher,accountId,PACKAGE} from './play-billing.mjs';
 import {isIP} from 'node:net';
 import http from 'node:http';
@@ -903,9 +904,7 @@ function chatAccess(viewer,type,target){
 function chatView(userId, key) {
   const mine=db.chatViews?.[userId];
   const view=mine?.[key];
-  const count=(db.messages?.[key]||[]).length;
-  const clamped=n=>Number.isSafeInteger(n)?Math.max(0,Math.min(count,n)):0;
-  return {cleared:clamped(view?.cleared),read:clamped(view?.read)};
+  return normalizeChatView(db.messages?.[key]||[],view);
 }
 function setChatView(userId,key,change) {
   db.chatViews ||= {};
@@ -925,15 +924,9 @@ function chatSummaryFor(userId) {
     if(!chat||seen.has(chat.key))continue;
     seen.add(chat.key);
     const all=db.messages?.[chat.key]||[];
-    const {cleared,read}=chatView(userId,chat.key);
-    const latest=all.length>cleared?all[all.length-1]:null;
-    const unread=all.slice(Math.max(cleared,read)).reduce((n,m)=>n+(m.from===userId?0:1),0);
-    rooms.push({type:room.type,id:room.id,key:chat.key,unread,
-      lastAt:latest?.at||null,lastFrom:latest?.from||null,
-      lastName:latest?.name||null,
-      hidden:cleared>0&&!latest,
-      preview:latest?(latest.text?String(latest.text).slice(0,80):'📷 Foto'):''
-    });
+    const view=chatView(userId,chat.key);
+    rooms.push({type:room.type,id:room.id,key:chat.key,
+      ...summarizeChat(all,userId,view)});
   }
   return rooms;
 }
@@ -961,21 +954,14 @@ app.get('/api/chat/:type/:target', requireAuth,(req,res)=>{
   // Paginated conversation history; older messages remain stored instead of being cut off.
   // Durable history requires DATA_DIR on persistent storage (see LEGGIMI).
   const all=(db.messages||{})[chat.key]||[];
-  const {cleared}=chatView(req.user.id,chat.key);
+  const view=chatView(req.user.id,chat.key);
   const rawBefore=req.query.before;
-  let end=all.length;
-  if(rawBefore!==undefined){
-    if(!/^\d{1,10}$/.test(String(rawBefore)))return res.status(400).json({error:'Pagina dello storico non valida.'});
-    end=Math.min(all.length,Number(rawBefore));
-  }
-  end=Math.max(cleared,end);
-  const start=Math.max(cleared,end-80);
-  if(rawBefore===undefined){
-    const state=chatView(req.user.id,chat.key);
-    if(state.read<all.length)setChatView(req.user.id,chat.key,{read:all.length});
-  }
+  if(rawBefore!==undefined&&!/^\d{1,10}$/.test(String(rawBefore)))
+    return res.status(400).json({error:'Pagina dello storico non valida.'});
+  if(rawBefore===undefined&&view.read<all.length)
+    setChatView(req.user.id,chat.key,{read:all.length});
   res.set('Cache-Control','no-store');
-  res.json({messages:all.slice(start,end),nextBefore:start>cleared?start:null,total:all.length-cleared});
+  res.json(chatPage(all,view,rawBefore===undefined?undefined:Number(rawBefore)));
 });
 app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
   const chat=chatAccess(req.user.id,req.params.type,req.params.target);
