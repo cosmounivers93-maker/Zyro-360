@@ -1,0 +1,29 @@
+name: ZYRO 360 — Play Billing backend validation
+on:
+  push:
+    branches:
+      - feature/play-billing-premium-family-20261031
+  pull_request:
+    paths:
+      - 'play-billing.mjs'
+      - 'play-billing.test.mjs'
+      - 'app.js'
+      - 'index.html'
+      - '.github/workflows/play-billing-check.yml'
+permissions:
+  contents: read
+jobs:
+  billing-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          node --check play-billing.mjs
+          node --check app.js
+          node --check server.mjs
+      - name: Verify billing logic
+        run: node --test play-billing.test.mjs

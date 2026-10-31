@@ -1480,9 +1480,35 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
  return contacts.length?contacts.map(u=>`<label class="zyro-v15-contact"><input data-${tag}="${escapeHtml(u.id)}" type="checkbox" ${selected.has(u.id)?'checked':''}><span>${escapeHtml(u.name)}</span></label>`).join(''):'<p class="zyro-v15-note">Invita prima almeno una persona nella sezione Cerchie.</p>';
 }
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
+// Google Play Billing runs in Android only, never as a web checkout.
+// The backend supplies a hashed account ID after authenticating the user.
+async function openZyroSubscriptions(){
+ if(!current)throw Error('Accedi prima al tuo account.');
+ if(current.me.creatorPremium||current.me.premiumGiftLifetime)throw Error('Il tuo account ha già accesso gratuito a tutte le funzioni.');
+ if(window.ZyroAndroidBillingSupported!==true)
+   throw Error('Aggiorna Zyro 360 dal Play Store e aprila come app Android per gestire gli abbonamenti.');
+ const config=await api('/api/billing/bootstrap');
+ if(typeof config.accountId!=='string'||!/^[a-f0-9]{64}$/.test(config.accountId))
+   throw Error('Account Google Play non disponibile.');
+ const answer=window.prompt('ZYRO360_BILLING_OPEN_NATIVE',config.accountId);
+ if(answer!=='zyro-native')throw Error('La schermata Google Play non è disponibile. Aggiorna l’app Android.');
+}
+// The native activity passes a receipt to this trusted origin, NOT an entitlement.
+// The server makes the final decision using Google Play purchases.subscriptionsv2.
+window.addEventListener('zyro:billing-purchase',event=>{
+ const token=event?.detail?.purchaseToken;
+ if(!current || typeof token!=='string' || token.length<16 || token.length>4096)return;
+ void action(async()=>{
+   const result=await post('/api/billing/verify',{purchaseToken:token});
+   await refresh();
+   if(result.active)toast('Abbonamento verificato: funzioni aggiornate.');
+   else toast('Pagamento ancora in verifica: le funzioni non sono state sbloccate.');
+ });
+});
+
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.creatorPremium?'Account creatore verificato: tutte le funzioni Premium sono incluse gratuitamente. Nessun abbonamento richiesto.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Premium'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Nessun abbonamento attivo. Scegli Premium o Family. Gli acquisti saranno disponibili dopo il collegamento a Google Play.';
+ $('premiumStatus').textContent=me.creatorPremium?'Account creatore verificato: tutte le funzioni Premium sono incluse gratuitamente. Nessun abbonamento richiesto.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Premium'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):'Nessun abbonamento attivo. Scegli Premium o Family. Per gli acquisti apri Abbonamenti dall’app Android aggiornata.';
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
   const root=$(container);const members=uniqueContacts();const signature=members.map(x=>x.id).join(',');
@@ -2033,7 +2059,7 @@ async function init(){
   $('checkinStart').addEventListener('click',()=>action(v15CheckinStart));
   $('checkinConfirm').addEventListener('click',()=>action(()=>v15CheckinEnd(true)));
   $('checkinCancel').addEventListener('click',()=>action(()=>v15CheckinEnd(false)));
-  $('premiumDetails').addEventListener('click',()=>toast('Pagamenti Google Play da integrare nell’app Android: al momento non si può acquistare Premium. Non viene inviato alcun SOS a pagamento.'));
+  $('premiumDetails').addEventListener('click',()=>action(openZyroSubscriptions));
   $('sosButton').addEventListener('click',()=>action(startSOS));
   $('stopSOS').addEventListener('click',()=>action(stopSOS));
 
