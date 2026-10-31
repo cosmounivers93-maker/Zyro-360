@@ -589,6 +589,7 @@ async function loadChat(older=false){
   chatHistory.messages=[...byId.values()].sort((a,b)=>a.at-b.at || a.id.localeCompare(b.id));
   if(older||chatHistory.messages.length===response.messages.length)chatHistory.nextBefore=response.nextBefore;
   renderChatHistory({stickToBottom:wasNearBottom&&!older,preserveTop:older});
+  if(!older)window.dispatchEvent(new Event('zyro:chat-read'));
 }
 async function sendChat(text,image){if(!chatRoom)return;await post(`/api/chat/${encodeURIComponent(chatRoom.type)}/${encodeURIComponent(chatRoom.id)}`,{text,image});chatPhotoData=null;$('chatPendingPhoto').textContent='';$('chatPhoto').value='';$('chatText').value='';await loadChat();}
 
