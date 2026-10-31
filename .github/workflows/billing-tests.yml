@@ -20,4 +20,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Confirm billing exports and server syntax
+        run: |
+          node --check server.mjs
+          node --input-type=module -e "import {PlayBilling,PlayRepository,GooglePlayApi,createTokenCipher,accountId,PACKAGE} from './play-billing.mjs'; if(!PlayBilling || !PlayRepository || !GooglePlayApi || !createTokenCipher || !accountId || !PACKAGE)process.exit(1);"
       - run: node --test test/play-billing-products.test.mjs
