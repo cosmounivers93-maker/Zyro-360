@@ -13,7 +13,7 @@ test('ogni account vede un numero differente di messaggi non letti',()=>{
 });
 test('lettura e cancellazione non mutano la cronologia comune',()=>{
  const messages=[a,b,c];
- const owner={cleared:3,read:3};
+ const owner={cleared:3,read:3,dismissed:true};
  const viewer={cleared:0,read:0};
  assert.deepEqual(chatPage(messages,owner),{messages:[],nextBefore:null,total:0});
  assert.equal(chatPage(messages,viewer).messages.length,3);
@@ -23,7 +23,7 @@ test('lettura e cancellazione non mutano la cronologia comune',()=>{
 });
 test('una risposta dopo la cancellazione riporta in elenco solo i nuovi messaggi',()=>{
  const messages=[a,b,c,{id:'m4',at:4,from:'bea',name:'Bea',text:'Di nuovo'}];
- const view={cleared:3,read:3};
+ const view={cleared:3,read:3,dismissed:true};
  assert.deepEqual(chatPage(messages,view).messages.map(x=>x.id),['m4']);
  assert.equal(summarizeChat(messages,'alex',view).unread,1);
  assert.equal(summarizeChat(messages,'alex',view).hidden,false);
@@ -40,6 +40,6 @@ test('pagination never crosses cleared boundary',()=>{
  assert.equal(chatPage(messages,view,0).messages.length,0);
 });
 test('invalid persisted counters are clamped and do not unlock old data',()=>{
- assert.deepEqual(normalizeChatView([a,b],{cleared:-5,read:7}),{cleared:0,read:2});
- assert.deepEqual(normalizeChatView([a,b],{cleared:'9999',read:null}),{cleared:0,read:0});
+ assert.deepEqual(normalizeChatView([a,b],{cleared:-5,read:7}),{cleared:0,read:2,dismissed:false});
+ assert.deepEqual(normalizeChatView([a,b],{cleared:'9999',read:null}),{cleared:0,read:0,dismissed:false});
 });
