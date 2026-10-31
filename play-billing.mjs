@@ -1,12 +1,12 @@
 import crypto from 'node:crypto';
 export const PACKAGE='com.zyro360.app';
-export const PRODUCTS={zyro_premium_monthly:{plan:'personal',basePlanId:'monthly'},zyro_family_monthly:{plan:'family',basePlanId:'monthly'}};
+export const PRODUCTS={zyro360_premium:{plan:'personal',basePlanId:'premium-mensile'},zyro360_family:{plan:'family',basePlanId:null}};
 export const accountId=id=>crypto.createHash('sha256').update(`zyro360:${id}`).digest('hex');
 const digest=token=>crypto.createHash('sha256').update(token).digest('hex');
 const allowedStates=new Set(['SUBSCRIPTION_STATE_ACTIVE','SUBSCRIPTION_STATE_IN_GRACE_PERIOD','SUBSCRIPTION_STATE_CANCELED']);
 export function evaluatePurchase(purchase,userId,time=Date.now()){
  if(purchase.externalAccountIdentifiers?.obfuscatedExternalAccountId!==accountId(userId))throw new Error('Acquisto associato a un altro account ZYRO 360.');
- const items=(purchase.lineItems||[]).filter(x=>Object.hasOwn(PRODUCTS,x.productId) && x.offerDetails?.basePlanId===PRODUCTS[x.productId].basePlanId && x.autoRenewingPlan && !x.autoRenewingPlan.installmentDetails && Number.isFinite(Date.parse(x.expiryTime)));
+ const items=(purchase.lineItems||[]).filter(x=>Object.hasOwn(PRODUCTS,x.productId) && typeof x.offerDetails?.basePlanId==='string' && x.offerDetails.basePlanId.length>0 && (PRODUCTS[x.productId].basePlanId===null || x.offerDetails.basePlanId===PRODUCTS[x.productId].basePlanId) && x.autoRenewingPlan && !x.autoRenewingPlan.installmentDetails && Number.isFinite(Date.parse(x.expiryTime)));
  const active=items.filter(x=>Date.parse(x.expiryTime)>time && !x.deferredItemReplacement);
  // A deferred replacement leaves the current item active until its expiry.
  const candidates=active.length?active:items.filter(x=>Date.parse(x.expiryTime)>time);
