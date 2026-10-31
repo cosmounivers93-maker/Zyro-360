@@ -1,0 +1,25 @@
+name: ZYRO 360 - Test descrizioni SOS e Pick Pocket
+on:
+  push:
+    branches: [feat/zyro-theft-navigation-copy-20261031]
+    paths:
+      - 'public/app.js'
+      - 'public/index.html'
+      - '.github/workflows/theft-navigation-copy.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Verify JS syntax, intro, Premium and sensor options
+        run: |
+          node --check public/app.js
+          grep -q 'Segui il percorso SOS e possibile furto' public/app.js
+          grep -q 'value="ultra"' public/index.html
+          grep -q 'Navigazione SOS e possibile furto sulla mappa' public/index.html
+          grep -q 'Per calcolare il percorso' public/index.html
