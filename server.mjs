@@ -1198,7 +1198,16 @@ async function initializeBilling(){
  setInterval(()=>{void playBilling.sweep().catch(()=>{});},60000).unref();
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  initializeStorage().then(initializeBilling).then(()=>{
+  initializeStorage().then(async()=>{
+    // A Play API/credential outage must not take offline GPS, circles, chat or SOS.
+    // Failed billing stays disabled (billingReady=false); never trust a local
+    // purchase or bypass server-side verification.
+    try{await initializeBilling();}
+    catch(err){
+      playBilling=null;
+      console.error('[ZYRO billing] Acquisti non disponibili; servizio sicurezza attivo:',err.message);
+    }
+  }).then(()=>{
     server.listen(PORT,'0.0.0.0',()=>console.log(`Zyro 360: http://localhost:${PORT} (${storageKind})`));
   }).catch(err=>{
     console.error('[ZYRO storage] AVVIO BLOCCATO:',err.message);
