@@ -938,7 +938,7 @@ app.post('/api/chat/:type/:target/clear',requireAuth,(req,res)=>{
   const chat=chatAccess(req.user.id,req.params.type,req.params.target);
   if(!chat)return res.status(403).json({error:'Non hai accesso a questa conversazione.'});
   const n=(db.messages?.[chat.key]||[]).length;
-  setChatView(req.user.id,chat.key,{cleared:n,read:n});
+  setChatView(req.user.id,chat.key,{cleared:n,read:n,dismissed:true});
   res.set('Cache-Control','no-store').json({ok:true,clearedForMe:true});
 });
 app.post('/api/chat/:type/:target/read',requireAuth,(req,res)=>{
