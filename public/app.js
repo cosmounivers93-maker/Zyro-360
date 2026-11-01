@@ -207,6 +207,16 @@ function setState(data){
   void syncDeviceInfo();
   // Revoking explicit opt-in stops ongoing live audio locally as well.
   if((data.me.sosAudioConsent!==true || data.me.features?.sosAudio!==true) && localStream)stopAudio();
+  // A contact who leaves a circle or loses SOS microphone permission cannot
+  // keep an existing P2P audio connection alive after the server update.
+  if(listeningTo && !data.alerts?.some(a=>a.userId===listeningTo &&
+      a.kind==='sos' && a.hasAudio===true))stopListening();
+  if(localStream && peers instanceof Map){
+    const allowed=new Set(data.me.sosAudioRecipients||[]);
+    for(const [id,peer] of peers)if(!allowed.has(id)){
+      peer.close();peers.delete(id);pendingIce.delete(id);
+    }
+  }
   if(window.ZyroAndroidSafetySupported && window.ZyroNativeSafety?.pick===true && !theftTriggered)
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
