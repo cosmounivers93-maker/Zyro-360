@@ -1878,7 +1878,7 @@ function closeProfileSettings(){
 }
 function renderInvitedPeople(){
  const root=$('savedInvitees');if(!root || !current)return;
- const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.premiumPlan,current.me.gpsRecipients,current.me.sosRecipients,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.invitedByMe])])]);
+ const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.premiumPlan,current.me.gpsRecipients,current.me.sosRecipients,current.me.sosAudioRecipients,current.me.pickRemoteRingContacts,current.me.pickRemoteLockContacts,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.invitedByMe])])]);
  if(root._zyroSig===sig&&root.children.length)return;
  root._zyroSig=sig;
  const byId=new Map();
@@ -1896,9 +1896,9 @@ function renderInvitedPeople(){
  micBox.className='zyro-sos-mic-choice';
  const micLabel=document.createElement('label');micLabel.className='zyro-access-toggle zyro-sos-mic-toggle';
  const micCopy=document.createElement('span');
- const micTitle=document.createElement('strong');micTitle.textContent='Condividi audio durante SOS';
+ const micTitle=document.createElement('strong');micTitle.textContent='Abilita microfono durante SOS';
  const micExplanation=document.createElement('small');
- micExplanation.textContent='Se attivo, premendo SOS il microfono può trasmettere audio in diretta esclusivamente ai destinatari selezionati che toccano «Ascolta». Se la connessione diretta fallisce, l’audio può transitare temporaneamente sul server per arrivare al destinatario: non viene registrato né conservato, ma questo percorso non è crittografato end-to-end. Puoi disattivare questa funzione in qualsiasi momento.';
+ micExplanation.textContent='Se attivo, premendo SOS il microfono può trasmettere audio in diretta esclusivamente ai destinatari autorizzati anche all’ascolto audio che toccano «Ascolta». Se la connessione diretta fallisce, l’audio può transitare temporaneamente sul server per arrivare al destinatario: non viene registrato né conservato, ma questo percorso non è crittografato end-to-end. Puoi disattivare questa funzione in qualsiasi momento.';
  micCopy.append(micTitle,micExplanation);
  const micInput=document.createElement('input');micInput.type='checkbox';micInput.id='sosAudioConsent';
  micInput.checked=hasFamilyPlan()&&current.me.sosAudioConsent===true;micInput.disabled=!hasFamilyPlan();
@@ -1932,6 +1932,9 @@ function renderInvitedPeople(){
  gpsInfo.append(description,status,gpsButton,hint);root.append(gpsInfo);
  const gpsSet=new Set(current.me.gpsRecipients||[]);
  const sosSet=new Set(current.me.sosRecipients||[]);
+ const audioSet=new Set(current.me.sosAudioRecipients||[]);
+ const ringSet=new Set(current.me.pickRemoteRingContacts||[]);
+ const lockSet=new Set(current.me.pickRemoteLockContacts||[]);
  for(const {member,circles} of byId.values()){
    const card=document.createElement('article');card.className='zyro-access-card';
    const top=document.createElement('div');top.className='zyro-access-top';
@@ -1952,14 +1955,21 @@ function renderInvitedPeople(){
      const input=document.createElement('input');input.type='checkbox';
      input.dataset.accessUser=member.id;input.dataset.accessType=type;
      input.checked=checked;
-     input.disabled=!!current.me.sos;
+     input.disabled=!!current.me.sos || (type==='audio' && (!hasFamilyPlan()||!sosSet.has(member.id))) ||
+       ((type==='ring'||type==='lock') && !current.me.premiumActive);
      input.setAttribute('aria-label',labelText+' per '+member.name);
      row.append(info,input);card.append(row);
    };
    addToggle('gps','Può vedere il mio GPS',
        'Solo quando attivo la posizione LIVE.',gpsSet.has(member.id));
    addToggle('sos','Riceve i miei SOS',
-       'Notifiche SOS e audio, solo dopo il mio consenso.',sosSet.has(member.id));
+       'Notifiche di emergenza selezionate da te.',sosSet.has(member.id));
+   addToggle('audio','Può ascoltare il mio microfono durante SOS',
+       'Solo Family: richiede anche SOS abilitato, il consenso microfono generale e la mia attivazione SOS.',audioSet.has(member.id));
+   addToggle('ring','Può far squillare il mio telefono',
+       'Solo Premium e Family, durante un vero allarme Pick Pocket, con consenso preventivo.',ringSet.has(member.id));
+   addToggle('lock','Può bloccare il mio telefono da remoto',
+       'Solo Premium e Family, durante un vero allarme Pick Pocket; richiede autorizzazione amministratore Android.',lockSet.has(member.id));
    root.append(card);
  }
  if(current.me.sos){
@@ -1971,18 +1981,32 @@ function renderInvitedPeople(){
 async function changeContactAccess(target){
  if(!current)return;
  const id=target.dataset.accessUser, kind=target.dataset.accessType;
- const gps=new Set(current.me.gpsRecipients||[]), sos=new Set(current.me.sosRecipients||[]);
- (kind==='gps'?gps:sos)[target.checked?'add':'delete'](id);
+ if(!uniqueContacts().some(c=>c.id===id)){
+   await refresh();throw Error('Questo contatto non appartiene più alla tua cerchia.');
+ }
+ const gps=new Set(current.me.gpsRecipients||[]);
+ const sos=new Set(current.me.sosRecipients||[]);
+ const audio=new Set(current.me.sosAudioRecipients||[]);
+ const ring=new Set(current.me.pickRemoteRingContacts||[]);
+ const lock=new Set(current.me.pickRemoteLockContacts||[]);
+ const groups={gps,sos,audio,ring,lock};
+ if(!Object.hasOwn(groups,kind))throw Error('Permesso sconosciuto.');
+ groups[kind][target.checked?'add':'delete'](id);
+ if(!sos.has(id))audio.delete(id);
  const response=await post('/api/settings/contact-access',{
-   userId:id,shareGps:gps.has(id),receiveSos:sos.has(id)
+   userId:id,shareGps:gps.has(id),receiveSos:sos.has(id),
+   listenSosAudio:audio.has(id),remoteRing:ring.has(id),remoteLock:lock.has(id)
  });
  current.me.gpsRecipients=response.gpsRecipients;
  current.me.sosRecipients=response.sosRecipients;
+ current.me.sosAudioRecipients=response.sosAudioRecipients;
+ current.me.pickRemoteRingContacts=response.pickRemoteRingContacts;
+ current.me.pickRemoteLockContacts=response.pickRemoteLockContacts;
  sosPending=null;
  await refresh();
  if(kind==='gps'&&target.checked&&!current.me.sharing)
-   toast('Contatto autorizzato. Premi «Attiva condivisione GPS» per iniziare a mostrargli la posizione.');
- else toast('Autorizzazioni del contatto salvate.');
+   toast('Contatto autorizzato. Premi «Attiva GPS LIVE» per condividere la posizione.');
+ else toast('Permessi del contatto aggiornati.');
 }
 
 async function copyAccountId(id){
