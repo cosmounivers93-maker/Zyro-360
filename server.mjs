@@ -146,6 +146,42 @@ function loginUser(res, id) { const sid = token(32); db.sessions[hash(sid)] = { 
 function memberIds(circleId) { return db.memberships.filter(m => m.circleId === circleId).map(m => m.userId); }
 function userCircles(id) { return db.memberships.filter(m => m.userId === id).map(m => db.circles[m.circleId]).filter(Boolean); }
 function sharedCircle(a, b) { return a === b || userCircles(a).some(c => memberIds(c.id).includes(b)); }
+/** On disconnect, revoke ALL old relationship grants, including pending commands. */
+function pruneDisconnectedPermissions(){
+  const keys=['gpsRecipients','sosRecipients','sosAudioRecipients','pickRemoteContacts',
+    'pickRemoteRingContacts','pickRemoteLockContacts'];
+  for(const owner of Object.values(db.users)){
+    for(const key of keys)if(Array.isArray(owner[key]))
+      owner[key]=owner[key].filter(id=>id!==owner.id&&sharedCircle(owner.id,id));
+    if(!(owner.pickRemoteRingContacts??owner.pickRemoteContacts??[]).length &&
+       !(owner.pickRemoteLockContacts??owner.pickRemoteContacts??[]).length)
+      owner.pickRemoteEnabled=false;
+  }
+  for(const alert of Object.values(db.alerts))
+    if(Array.isArray(alert.recipients))
+      alert.recipients=alert.recipients.filter(id=>sharedCircle(alert.userId,id));
+  for(const [owner,cmd] of Object.entries(db.pickRemoteCommands||{}))
+    if(!db.users[owner]||!db.users[cmd.by]||!sharedCircle(owner,cmd.by)||
+       !db.users[owner]?.pickRemoteEnabled ||
+       !(db.users[owner]?.pickRemoteContacts||[]).includes(cmd.by))
+      delete db.pickRemoteCommands[owner];
+}
+function remoteAccessFor(owner,id){
+  const circle=owner&&id!==owner.id&&sharedCircle(owner.id,id);
+  const legacy=owner?.pickRemoteContacts||[];
+  const ring=owner?.pickRemoteRingContacts??legacy;
+  const lock=owner?.pickRemoteLockContacts??legacy;
+  return {
+    ring:!!circle && owner.pickRemoteEnabled===true && ring.includes(id) && premiumActive(owner),
+    lock:!!circle && owner.pickRemoteEnabled===true && lock.includes(id) && premiumActive(owner)
+  };
+}
+function sosAudioAccessFor(owner,id){
+  return !!owner&&id!==owner.id&&sharedCircle(owner.id,id)&&
+    owner.sosAudioConsent===true&&familyActive(owner)&&
+    Array.isArray(owner.sosAudioRecipients)&&owner.sosAudioRecipients.includes(id)&&
+    (owner.sosRecipients||[]).includes(id);
+}
 // For legacy profiles, preserve previous all-circle-sharing until their owner
 // explicitly customizes contact access. New profiles start with an empty list.
 function gpsRecipientsFor(owner) {
@@ -180,18 +216,25 @@ function stateFor(id) {
       const shared = Boolean(mayViewSharedGps(u,id) || (visibleAlert?.kind === 'pickpocket' && emergencyShare));
       const location = (shared || emergencyShare) && locations.has(x) ? locations.get(x) : null;
       const membership = db.memberships.find(m => m.circleId === c.id && m.userId === x);
-      return { ...publicUser(u), invitedByMe: membership?.invitedBy === id, joinedAt:membership?.joinedAt||null, online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio, kind: alert.kind || 'sos' } : null };
+      return { ...publicUser(u), invitedByMe: membership?.invitedBy === id, joinedAt:membership?.joinedAt||null, online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio && sosAudioAccessFor(u,id), kind: alert.kind || 'sos' } : null };
     })
   }));
   const alerts = Object.values(db.alerts).filter(a => a.active && canSeeAlert(id, a)).map(a => ({
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
-    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio),
-    remoteActionsAuthorized:a.kind==='pickpocket' && id!==a.userId &&
-      db.users[a.userId]?.pickRemoteEnabled===true &&
-      (db.users[a.userId]?.pickRemoteContacts||[]).includes(id) && premiumActive(db.users[a.userId]),
+    startedAt: a.startedAt, kind: a.kind || 'sos',
+    hasAudio:Boolean(a.hasAudio) && (a.userId===id || sosAudioAccessFor(db.users[a.userId],id)),
+    remoteActions:a.kind==='pickpocket'?remoteAccessFor(db.users[a.userId],id):{ring:false,lock:false},
+    remoteActionsAuthorized:a.kind==='pickpocket' &&
+      Object.values(remoteAccessFor(db.users[a.userId],id)).some(Boolean) &&
+      (a.recipients||[]).includes(id),
     address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)),
+  sosAudioRecipients:(me.sosAudioRecipients||[]).filter(x=>sharedCircle(id,x)),
+  pickRemoteContacts:(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)),
+  pickRemoteRingContacts:(me.pickRemoteRingContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)),
+  pickRemoteLockContacts:(me.pickRemoteLockContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)),
+  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -513,7 +556,7 @@ app.post('/api/circles/leave', requireAuth, (req,res) => {
   const circle = db.circles[String(req.body.circleId || '')];
   if (!circle || !memberIds(circle.id).includes(req.user.id)) return res.status(404).json({error:'Cerchia non trovata.'});
   if (circle.ownerId === req.user.id) return res.status(400).json({error:'Il proprietario deve eliminare la cerchia.'});
-  const others = memberIds(circle.id); db.memberships = db.memberships.filter(m => !(m.circleId === circle.id && m.userId === req.user.id)); save();
+  const others = memberIds(circle.id); db.memberships = db.memberships.filter(m => !(m.circleId === circle.id && m.userId === req.user.id)); pruneDisconnectedPermissions(); save();
   for (const id of others) refreshRelated(id);
   res.json({ok:true});
 });
@@ -521,7 +564,7 @@ app.post('/api/circles/remove', requireAuth, (req,res) => {
   const circle = db.circles[String(req.body.circleId || '')], id = String(req.body.userId || '');
   if (!circle || circle.ownerId !== req.user.id || id === req.user.id) return res.status(403).json({error:'Operazione non consentita.'});
   if (!memberIds(circle.id).includes(id)) return res.status(404).json({error:'Membro non trovato.'});
-  const others = memberIds(circle.id); db.memberships = db.memberships.filter(m => !(m.circleId === circle.id && m.userId === id)); save();
+  const others = memberIds(circle.id); db.memberships = db.memberships.filter(m => !(m.circleId === circle.id && m.userId === id)); pruneDisconnectedPermissions(); save();
   for (const u of others) refreshRelated(u);
   res.json({ok:true});
 });
@@ -531,7 +574,7 @@ app.post('/api/circles/delete', requireAuth, (req,res) => {
   const others = memberIds(circle.id);
   db.memberships = db.memberships.filter(m => m.circleId !== circle.id);
   for (const [k,v] of Object.entries(db.invites)) if (v.circleId === circle.id) delete db.invites[k];
-  delete db.circles[circle.id]; save();
+  delete db.circles[circle.id]; pruneDisconnectedPermissions(); save();
   for (const id of others) refreshRelated(id); res.json({ok:true});
 });
 app.post('/api/sharing', requireAuth, (req,res) => {
@@ -852,21 +895,59 @@ app.post('/api/push/test', requireAuth, limit, async (req,res) => {
 // It never enables GPS/microphone on another person's device.
 app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
   const otherId=String(req.body?.userId||'');
-  if(!otherId || otherId===req.user.id || !db.users[otherId] || !sharedCircle(req.user.id,otherId))
+  if(!otherId || otherId===req.user.id || !db.users[otherId] ||
+     !sharedCircle(req.user.id,otherId))
     return res.status(403).json({error:'Puoi modificare solo i contatti della tua cerchia.'});
   if(typeof req.body.shareGps!=='boolean' || typeof req.body.receiveSos!=='boolean')
     return res.status(400).json({error:'Seleziona le autorizzazioni GPS e SOS.'});
-  // Changing recipients mid-alert would silently leave old listeners connected.
-  if(currentAlert(req.user.id)?.kind==='sos')
-    return res.status(409).json({error:'Termina prima il tuo SOS per modificare i destinatari.'});
-  const gps=new Set(gpsRecipientsFor(req.user).filter(id=>sharedCircle(req.user.id,id))),
-        sos=new Set((req.user.sosRecipients||[]).filter(id=>sharedCircle(req.user.id,id)));
+  const advanced=['remoteRing','remoteLock','listenSosAudio'];
+  if(advanced.some(k=>k in req.body && typeof req.body[k]!=='boolean'))
+    return res.status(400).json({error:'Autorizzazione avanzata non valida.'});
+  const active=currentAlert(req.user.id);
+  // Do not add SOS recipients or microphone listeners to an active SOS, but
+  // allow immediate revocation even if its owner is in an emergency.
+  if(active?.kind==='sos' &&
+     (req.body.receiveSos && !(req.user.sosRecipients||[]).includes(otherId) ||
+      req.body.listenSosAudio===true &&
+        !(req.user.sosAudioRecipients||[]).includes(otherId)))
+    return res.status(409).json({error:'Termina prima il tuo SOS per aggiungere destinatari o ascoltatori.'});
+  const gps=new Set(gpsRecipientsFor(req.user)),
+        sos=new Set((req.user.sosRecipients||[]).filter(id=>sharedCircle(req.user.id,id))),
+        audio=new Set((req.user.sosAudioRecipients||[]).filter(id=>sharedCircle(req.user.id,id))),
+        ring=new Set((req.user.pickRemoteRingContacts??req.user.pickRemoteContacts??[])
+          .filter(id=>sharedCircle(req.user.id,id))),
+        lock=new Set((req.user.pickRemoteLockContacts??req.user.pickRemoteContacts??[])
+          .filter(id=>sharedCircle(req.user.id,id)));
+  if((req.body.remoteRing===true||req.body.remoteLock===true)&&!premiumActive(req.user))
+    return res.status(402).json({error:'Controllo remoto incluso soltanto in Premium e Family.'});
+  if(req.body.listenSosAudio===true&&!familyActive(req.user))
+    return res.status(402).json({error:'Ascolto audio SOS incluso soltanto in Family.'});
   req.body.shareGps?gps.add(otherId):gps.delete(otherId);
   req.body.receiveSos?sos.add(otherId):sos.delete(otherId);
+  if(!req.body.receiveSos)audio.delete(otherId);
+  if('listenSosAudio' in req.body)req.body.listenSosAudio && req.body.receiveSos
+    ?audio.add(otherId):audio.delete(otherId);
+  if('remoteRing' in req.body)req.body.remoteRing?ring.add(otherId):ring.delete(otherId);
+  if('remoteLock' in req.body)req.body.remoteLock?lock.add(otherId):lock.delete(otherId);
   req.user.gpsRecipients=[...gps].slice(0,120);
   req.user.sosRecipients=[...sos].slice(0,60);
-  save();refreshRelated(req.user.id);
-  res.json({ok:true,gpsRecipients:req.user.gpsRecipients,sosRecipients:req.user.sosRecipients});
+  req.user.sosAudioRecipients=[...audio].filter(id=>sos.has(id)).slice(0,60);
+  req.user.pickRemoteRingContacts=[...ring].slice(0,60);
+  req.user.pickRemoteLockContacts=[...lock].slice(0,60);
+  req.user.pickRemoteContacts=[...new Set([...ring,...lock])].slice(0,60);
+  req.user.pickRemoteEnabled=req.user.pickRemoteContacts.length>0;
+  if(!req.user.pickRemoteEnabled||!req.user.pickRemoteContacts.includes(otherId))
+    delete db.pickRemoteCommands[req.user.id];
+  if(active?.kind==='sos'){
+    // Revoke this listener on the server, including existing relayed audio.
+    if(!sos.has(otherId))active.recipients=active.recipients.filter(id=>id!==otherId);
+    audioRelayOwnerUpdate(req.user.id);
+  }
+  save();refreshRelated(req.user.id);pushState(otherId);
+  res.json({ok:true,gpsRecipients:req.user.gpsRecipients,
+    sosRecipients:req.user.sosRecipients,sosAudioRecipients:req.user.sosAudioRecipients,
+    pickRemoteRingContacts:req.user.pickRemoteRingContacts,
+    pickRemoteLockContacts:req.user.pickRemoteLockContacts});
 });
 // Per-account opt-in: the SOS audio microphone is OFF by default and can only
 // be enabled by the authenticated owner from the invitees/permissions screen.
@@ -889,7 +970,11 @@ app.post('/api/settings/sos-recipients', requireAuth, limit, (req,res)=> {
   if(!Array.isArray(ids) || ids.length>60 || ids.some(id=>typeof id!=='string' || id.length>100)) return res.status(400).json({error:'Destinatari non validi.'});
   const chosen=[...new Set(ids)];
   if(chosen.some(id=>id===req.user.id || !sharedCircle(id,req.user.id))) return res.status(403).json({error:'Seleziona soltanto persone della tua cerchia.'});
-  req.user.sosRecipients=chosen;save();refreshRelated(req.user.id);res.json({ok:true,recipients:chosen});
+  req.user.sosRecipients=chosen;
+  // A revoked SOS recipient also loses their microphone-listening grant. If
+  // added back later, the owner must explicitly re-enable audio for them.
+  req.user.sosAudioRecipients=(req.user.sosAudioRecipients||[]).filter(id=>chosen.includes(id));
+  save();refreshRelated(req.user.id);res.json({ok:true,recipients:chosen});
 });
 app.post('/api/profile/avatar',requireAuth,limit,(req,res)=>{
   const avatar=req.body.avatar;
@@ -1041,6 +1126,8 @@ app.get('/api/pickpocket/remote/settings',requireAuth,(req,res)=>{
   res.set('Cache-Control','no-store');
   res.json({enabled:req.user.pickRemoteEnabled===true,
     contacts:(req.user.pickRemoteContacts||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)),
+    ringContacts:(req.user.pickRemoteRingContacts??req.user.pickRemoteContacts??[]).filter(id=>sharedCircle(id,req.user.id)),
+    lockContacts:(req.user.pickRemoteLockContacts??req.user.pickRemoteContacts??[]).filter(id=>sharedCircle(id,req.user.id)),
     premium:premiumActive(req.user)});
 });
 app.post('/api/pickpocket/remote/settings',requireAuth,limit,(req,res)=>{
@@ -1056,6 +1143,10 @@ app.post('/api/pickpocket/remote/settings',requireAuth,limit,(req,res)=>{
     return res.status(403).json({error:'Autorizza soltanto persone della tua cerchia.'});
   req.user.pickRemoteEnabled=enabled;
   req.user.pickRemoteContacts=enabled?authorized:[];
+  // Legacy clients have one combined toggle: consciously selecting that
+  // contact still grants both actions, matching the old opt-in semantics.
+  req.user.pickRemoteRingContacts=enabled?[...authorized]:[];
+  req.user.pickRemoteLockContacts=enabled?[...authorized]:[];
   if(!enabled)delete db.pickRemoteCommands[req.user.id];
   save();refreshRelated(req.user.id);
   res.json({ok:true,enabled,contacts:req.user.pickRemoteContacts});
@@ -1067,7 +1158,7 @@ app.post('/api/pickpocket/remote/request',requireAuth,limit,async(req,res)=>{
   const alert=owner&&currentAlert(ownerId);
   if(!owner||req.user.id===ownerId||!['lock','ring'].includes(action)||
      !premiumActive(owner)||owner.pickRemoteEnabled!==true||
-     !Array.isArray(owner.pickRemoteContacts)||!owner.pickRemoteContacts.includes(req.user.id)||
+     !remoteAccessFor(owner,req.user.id)[action]||
      !sharedCircle(ownerId,req.user.id)||!alert||alert.kind!=='pickpocket'||
      !alert.active||!alert.recipients?.includes(req.user.id))
     return res.status(403).json({error:'Comando non autorizzato oppure allarme Pick Pocket non attivo.'});
@@ -1108,7 +1199,7 @@ app.post('/api/pickpocket/remote/consume',requireAuth,(req,res)=>{
   const valid=command.expiresAt>now() && alert?.active &&
      alert.id===command.alertId && alert.kind==='pickpocket' &&
      req.user.pickRemoteEnabled===true && premiumActive(req.user) &&
-     req.user.pickRemoteContacts?.includes(command.by) &&
+     remoteAccessFor(req.user,command.by)[command.action] &&
      alert.recipients?.includes(command.by) && sharedCircle(req.user.id,command.by);
   save();
   res.json(valid?{ok:true,action:command.action}:{ok:false});
@@ -1156,8 +1247,8 @@ function relay(id, msg, preferMicrophone=false) { const con=[...connections(id)]
 const sosAudioRelaySubscribers=new Map();
 function authorizedAudioRelay(viewer,owner,alert){
   return !!alert?.active && alert.kind==='sos' && alert.userId===owner &&
-    owner!==viewer && familyActive(db.users[owner]) && db.users[owner]?.sosAudioConsent===true &&
-    canSeeAlert(viewer,alert);
+    owner!==viewer && canSeeAlert(viewer,alert) &&
+    sosAudioAccessFor(db.users[owner],viewer);
 }
 function audioRelayOwnerUpdate(owner){
   const alert=currentAlert(owner),listeners=sosAudioRelaySubscribers.get(owner);
@@ -1230,13 +1321,15 @@ wss.on('connection', ws => {
     }
     if (m.type==='listen-request') {
       const owner=String(m.to||''); const a=currentAlert(owner);
-      if (!familyActive(db.users[owner]) || !a || a.kind==='pickpocket' || !a.hasAudio || db.users[owner]?.sosAudioConsent!==true || !canSeeAlert(self,a) || owner===self) return;
+      if (!a || a.kind==='pickpocket' || !a.hasAudio ||
+        !authorizedAudioRelay(self,owner,a)) return;
       relay(owner,{type:'listen-request',from:self,alertId:a.id},true);
     }
     if (m.type==='rtc') {
       const target=String(m.to||''); const a=currentAlert(self) || currentAlert(target);
-      if (!a || !familyActive(db.users[a.userId]) || a.kind==='pickpocket' || db.users[a.userId]?.sosAudioConsent!==true ||
-          !canSeeAlert(self,a) || !canSeeAlert(target,a) || ![self,target].includes(a.userId) || self===target) return;
+      if (!a || a.kind==='pickpocket' || self===target ||
+          ![self,target].includes(a.userId) ||
+          !authorizedAudioRelay(self===a.userId?target:self,a.userId,a))return;
       const signal=m.signal;
       if (!signal || typeof signal!=='object' || !['offer','answer','candidate'].includes(signal.kind) || JSON.stringify(signal).length>24000) return;
       relay(target,{type:'rtc',from:self,alertId:a.id,signal});

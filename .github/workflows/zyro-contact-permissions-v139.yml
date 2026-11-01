@@ -1,0 +1,22 @@
+name: ZYRO 360 v1.0.39 Contact Permissions
+on:
+  push:
+    branches: ['feat/zyro-v139-contact-permissions']
+    paths: ['server.mjs','public/app.js','tests/contact-permissions-v139.test.mjs','.github/workflows/zyro-contact-permissions-v139.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-permissions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check backend syntax
+        run: node --check server.mjs
+      - name: Check frontend syntax
+        run: node --check public/app.js
+      - name: Verify revocation and contact authorizations
+        run: node --test tests/contact-permissions-v139.test.mjs
