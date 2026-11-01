@@ -1,0 +1,25 @@
+name: ZYRO 360 — Guida nuove protezioni v1.0.40
+on:
+  push:
+    branches: ['feat/zyro-v140-help-advanced-safety']
+    paths:
+      - 'public/index.html'
+      - 'tests/help-advanced-safety-v140.test.mjs'
+      - '.github/workflows/zyro-help-advanced-v140.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check-help:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify guide content and accessibility
+        run: node --test tests/help-advanced-safety-v140.test.mjs
+      - name: Verify frontend script compatibility
+        run: node --check public/app.js
+      - name: Verify backend compatibility
+        run: node --check server.mjs
