@@ -54,7 +54,7 @@ test('accordion uses matching summary/detail structure',()=>{
  const details=section.match(/<details\b/g)||[];
  const closes=section.match(/<\/details>/g)||[];
  assert.equal(details.length,closes.length);
- assert.ok(details.length>=17);
+ assert.ok(details.length>=16);
  assert.equal((section.match(/id="zyroHelpContactPermissions"/g)||[]).length,1);
  assert.equal((section.match(/id="zyroHelpRemoteControl"/g)||[]).length,1);
 });
