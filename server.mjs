@@ -80,6 +80,7 @@ async function initializeStorage() {
     console.warn('[ZYRO storage] MODALITÀ TEMPORANEA: account e chat possono sparire a ogni deploy/riavvio.');
   }
   db.journeys ||= {}; db.checkins ||= {}; db.adminAudit ||= []; db.userReports ||= [];
+  db.pickRemoteCommands ||= {}; db.pickRemoteAudit ||= [];
 }
 // Admin identity is pinned by a server-side user ID, never by a browser flag or email address.
 const ADMIN_ID = String(process.env.ZYRO_ADMIN_USER_ID || '').trim();
@@ -107,7 +108,7 @@ const premiumPlan = user => {
 };
 const premiumActive = user => premiumPlan(user)!=='free';
 const familyActive = user => premiumPlan(user)==='family';
-const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
+const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
@@ -184,7 +185,11 @@ function stateFor(id) {
   }));
   const alerts = Object.values(db.alerts).filter(a => a.active && canSeeAlert(id, a)).map(a => ({
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
-    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio), address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
+    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio),
+    remoteActionsAuthorized:a.kind==='pickpocket' && id!==a.userId &&
+      db.users[a.userId]?.pickRemoteEnabled===true &&
+      (db.users[a.userId]?.pickRemoteContacts||[]).includes(id) && premiumActive(db.users[a.userId]),
+    address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
   return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
@@ -1027,6 +1032,87 @@ app.post('/api/sos/stop', requireAuth, (req,res) => {
 });
 // Experimental Pick Pocket: browser sensors and alarm cannot lock Android or resist shutdown.
 // The contact list is explicitly approved by the owner at activation time.
+// Pick Pocket remote controls require explicit owner opt-in and an active theft
+// alert. No action is allowed merely because two people share a circle.
+// The Android app fetches the command using the device owner's HttpOnly session;
+// a forged/replayed FCM payload is never sufficient to lock or ring a phone.
+const pickRemoteCooldown=new Map();
+app.get('/api/pickpocket/remote/settings',requireAuth,(req,res)=>{
+  res.set('Cache-Control','no-store');
+  res.json({enabled:req.user.pickRemoteEnabled===true,
+    contacts:(req.user.pickRemoteContacts||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)),
+    premium:premiumActive(req.user)});
+});
+app.post('/api/pickpocket/remote/settings',requireAuth,limit,(req,res)=>{
+  if(!premiumActive(req.user))
+    return res.status(402).json({error:'Pick Pocket avanzato richiede ZYRO Premium o Family.'});
+  const enabled=req.body?.enabled;
+  const contacts=req.body?.contacts;
+  if(typeof enabled!=='boolean'||!Array.isArray(contacts)||contacts.length>60 ||
+     contacts.some(id=>typeof id!=='string'||id.length>100))
+    return res.status(400).json({error:'Autorizzazioni non valide.'});
+  const authorized=[...new Set(contacts)];
+  if(authorized.some(id=>id===req.user.id||!sharedCircle(id,req.user.id)))
+    return res.status(403).json({error:'Autorizza soltanto persone della tua cerchia.'});
+  req.user.pickRemoteEnabled=enabled;
+  req.user.pickRemoteContacts=enabled?authorized:[];
+  if(!enabled)delete db.pickRemoteCommands[req.user.id];
+  save();refreshRelated(req.user.id);
+  res.json({ok:true,enabled,contacts:req.user.pickRemoteContacts});
+});
+app.post('/api/pickpocket/remote/request',requireAuth,limit,async(req,res)=>{
+  const ownerId=String(req.body?.ownerId||'');
+  const action=String(req.body?.action||'');
+  const owner=db.users[ownerId];
+  const alert=owner&&currentAlert(ownerId);
+  if(!owner||req.user.id===ownerId||!['lock','ring'].includes(action)||
+     !premiumActive(owner)||owner.pickRemoteEnabled!==true||
+     !Array.isArray(owner.pickRemoteContacts)||!owner.pickRemoteContacts.includes(req.user.id)||
+     !sharedCircle(ownerId,req.user.id)||!alert||alert.kind!=='pickpocket'||
+     !alert.active||!alert.recipients?.includes(req.user.id))
+    return res.status(403).json({error:'Comando non autorizzato oppure allarme Pick Pocket non attivo.'});
+  // A single registered Android device per account avoids acting on the wrong
+  // phone if a user has signed in from multiple devices.
+  const entries=fcmEntriesFor(ownerId);
+  if(entries.length!==1)
+    return res.status(409).json({error:'Il proprietario deve avere un solo dispositivo Android registrato e attivo.'});
+  const cooldownKey=ownerId+':'+action;
+  if(now()-(pickRemoteCooldown.get(cooldownKey)||0)<30000)
+    return res.status(429).json({error:'Attendi prima di ripetere il comando.'});
+  if(!fcmReady)return res.status(503).json({error:'Notifiche Android non disponibili.'});
+  const id=token(12);
+  const command={id,action,ownerId,by:req.user.id,alertId:alert.id,
+    requestedAt:now(),expiresAt:now()+90000};
+  db.pickRemoteCommands[ownerId]=command;
+  try{
+    await firebaseAdmin.messaging().send({token:entries[0].token,
+      data:{kind:'pick-remote',commandId:id},
+      android:{priority:'high',ttl:90000}});
+  }catch(err){
+    delete db.pickRemoteCommands[ownerId];
+    return res.status(503).json({error:'Il telefono non ha accettato il comando remoto.'});
+  }
+  pickRemoteCooldown.set(cooldownKey,now());
+  db.pickRemoteAudit.push({id,action,ownerId,by:req.user.id,at:now()});
+  if(db.pickRemoteAudit.length>200)db.pickRemoteAudit.splice(0,db.pickRemoteAudit.length-200);
+  save();
+  // FCM accepted, but Android may not execute if offline, restricted or unarmed.
+  res.json({ok:true,queued:true,deliveryConfirmed:false,action});
+});
+app.post('/api/pickpocket/remote/consume',requireAuth,(req,res)=>{
+  res.set('Cache-Control','no-store');
+  const command=db.pickRemoteCommands[req.user.id];
+  if(!command)return res.json({ok:false});
+  delete db.pickRemoteCommands[req.user.id];
+  const alert=currentAlert(req.user.id);
+  const valid=command.expiresAt>now() && alert?.active &&
+     alert.id===command.alertId && alert.kind==='pickpocket' &&
+     req.user.pickRemoteEnabled===true && premiumActive(req.user) &&
+     req.user.pickRemoteContacts?.includes(command.by) &&
+     alert.recipients?.includes(command.by) && sharedCircle(req.user.id,command.by);
+  save();
+  res.json(valid?{ok:true,action:command.action}:{ok:false});
+});
 app.post('/api/pickpocket/start', requireAuth, limit, (req,res) => {
  if(!premiumActive(req.user))return res.status(402).json({error:'Pick Pocket richiede ZYRO Premium o Family.'});
   const existing = currentAlert(req.user.id);
@@ -1047,6 +1133,7 @@ app.post('/api/pickpocket/stop', requireAuth, limit, (req,res) => {
   const alert=currentAlert(req.user.id);
   if (!alert || alert.kind!=='pickpocket') return res.json({ok:true});
   alert.active=false;alert.endedAt=now();
+  delete db.pickRemoteCommands[req.user.id];
   if (!req.user.sharing) locations.delete(req.user.id);
   save(); refreshRelated(req.user.id);
   for (const id of alertAudience(alert)) for (const ws of connections(id)) sendSocket(ws,{type:'sos-ended',userId:req.user.id});

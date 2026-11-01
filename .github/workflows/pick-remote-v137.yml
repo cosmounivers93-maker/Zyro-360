@@ -1,0 +1,18 @@
+name: ZYRO Pick Pocket Remote Security V137
+on:
+  push:
+    branches: ['feat/pickpocket-remote-v137']
+    paths: ['server.mjs', 'tests/pick-remote-security.test.mjs', '.github/workflows/pick-remote-v137.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check server.mjs
+      - run: node --test tests/pick-remote-security.test.mjs
