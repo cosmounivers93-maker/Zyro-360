@@ -970,7 +970,11 @@ app.post('/api/settings/sos-recipients', requireAuth, limit, (req,res)=> {
   if(!Array.isArray(ids) || ids.length>60 || ids.some(id=>typeof id!=='string' || id.length>100)) return res.status(400).json({error:'Destinatari non validi.'});
   const chosen=[...new Set(ids)];
   if(chosen.some(id=>id===req.user.id || !sharedCircle(id,req.user.id))) return res.status(403).json({error:'Seleziona soltanto persone della tua cerchia.'});
-  req.user.sosRecipients=chosen;save();refreshRelated(req.user.id);res.json({ok:true,recipients:chosen});
+  req.user.sosRecipients=chosen;
+  // A revoked SOS recipient also loses their microphone-listening grant. If
+  // added back later, the owner must explicitly re-enable audio for them.
+  req.user.sosAudioRecipients=(req.user.sosAudioRecipients||[]).filter(id=>chosen.includes(id));
+  save();refreshRelated(req.user.id);res.json({ok:true,recipients:chosen});
 });
 app.post('/api/profile/avatar',requireAuth,limit,(req,res)=>{
   const avatar=req.body.avatar;
