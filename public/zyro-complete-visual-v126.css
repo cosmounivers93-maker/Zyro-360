@@ -1,0 +1,257 @@
+
+/* ZYRO 360 Next Generation v1.0.26 — unified visual design.
+ * Pure CSS. No alterations to location, SOS, chat, billing, permissions,
+ * navigation event handlers, or map geometry.
+ * Frost-white / electric blue / turquoise / violet with midnight counterpart.
+ */
+html[data-theme="light"]{
+ --ng-bg:#f2f9ff;--ng-surface:#ffffff;--ng-surface2:#e9f5ff;
+ --ng-ink:#173c64;--ng-muted:#536e88;--ng-border:rgba(100,166,229,.35);
+ --ng-blue:#118de5;--ng-cyan:#02bfd8;--ng-violet:#7263e9;
+ --ng-elev:0 9px 26px rgba(38,99,177,.12);
+ --ng-gradient:linear-gradient(125deg,#078fe3,#14c5df 52%,#7467ef);
+ --ng-glass:linear-gradient(135deg,rgba(255,255,255,.97),rgba(230,248,255,.95) 60%,rgba(240,236,255,.94));
+}
+html[data-theme="dark"]{
+ --ng-bg:#080e29;--ng-surface:#10243f;--ng-surface2:#1a3053;
+ --ng-ink:#edf7ff;--ng-muted:#bad0e4;--ng-border:rgba(100,194,245,.28);
+ --ng-blue:#55bdfc;--ng-cyan:#4de1ed;--ng-violet:#ae9aff;
+ --ng-elev:0 11px 29px rgba(0,4,18,.30);
+ --ng-gradient:linear-gradient(125deg,#0878e5,#13bfe1 50%,#7b60df);
+ --ng-glass:linear-gradient(145deg,rgba(19,46,77,.97),rgba(17,37,65,.96) 60%,rgba(38,28,73,.95));
+}
+html[data-theme="light"] body,
+html[data-theme="dark"] body{background:var(--ng-bg)!important;color:var(--ng-ink)!important;font-family:Inter,"Segoe UI",system-ui,-apple-system,sans-serif!important;-webkit-font-smoothing:antialiased}
+html[data-theme="light"] body{background-image:linear-gradient(145deg,#f7fdff 0%,#eef9ff 47%,#f5f1ff 100%)!important}
+html[data-theme="dark"] body{background-image:linear-gradient(145deg,#080f2b 0%,#0c2540 52%,#21173e 100%)!important}
+html[data-theme] #appScreen .topbar{
+ background:var(--ng-glass)!important;color:var(--ng-ink)!important;
+ border:1px solid var(--ng-border)!important;border-top:0!important;border-radius:0 0 23px 23px!important;
+ box-shadow:var(--ng-elev),inset 0 1px 0 rgba(255,255,255,.18)!important;
+ -webkit-backdrop-filter:none!important;backdrop-filter:none!important;position:relative;
+}
+html[data-theme] #appScreen .topbar:after{
+ content:"";position:absolute;pointer-events:none;bottom:0;left:16%;width:68%;height:2px;
+ background:linear-gradient(90deg,transparent,#04cde7,#7960e8,transparent);
+}
+html[data-theme] #appScreen .topbar .brand,
+html[data-theme] #appScreen .topbar .brand span{color:var(--ng-ink)!important;font-size:14px!important;font-weight:850!important;letter-spacing:1px!important}
+html[data-theme] #appScreen .topbar .brand b{color:var(--ng-blue)!important;text-shadow:0 0 12px rgba(46,187,235,.25)}
+html[data-theme] #appScreen .topbar .brand-emblem{width:39px!important;height:39px!important;border-radius:13px!important;color:var(--ng-blue)!important;background:var(--ng-surface2)!important;border:1px solid var(--ng-border)!important;box-shadow:0 4px 14px rgba(74,132,210,.15)!important}
+html[data-theme] #appScreen .connection-pill{background:var(--ng-surface2)!important;color:var(--ng-muted)!important;border:1px solid var(--ng-border)!important;box-shadow:none!important;font-size:10px!important}
+html[data-theme] #appScreen .bottom-nav{
+ bottom:6px!important;left:8px!important;right:8px!important;width:calc(100% - 16px)!important;
+ height:68px!important;min-height:68px!important;max-height:68px!important;
+ padding:4px!important;gap:0!important;border:1px solid var(--ng-border)!important;
+ border-radius:22px!important;background:var(--ng-glass)!important;
+ box-shadow:0 8px 23px rgba(24,78,155,.22)!important;
+ -webkit-backdrop-filter:none!important;backdrop-filter:none!important;
+}
+html[data-theme] #appScreen .bottom-nav .nav-item{
+ color:var(--ng-muted)!important;height:58px!important;min-height:58px!important;
+ padding:3px 0!important;transform:none!important;border-radius:17px!important;
+}
+html[data-theme] #appScreen .bottom-nav .nav-item .nav-icon,
+html[data-theme] #appScreen .bottom-nav .nav-item > span:not(.nav-icon){
+ transform:none!important;margin:0!important;
+}
+html[data-theme] #appScreen .bottom-nav .nav-item.active{
+ color:var(--ng-blue)!important;background:var(--ng-surface2)!important;
+}
+html[data-theme] #appScreen .bottom-nav .nav-item.active .nav-icon{
+ color:var(--ng-blue)!important;border:1px solid var(--ng-border)!important;
+ background:linear-gradient(130deg,rgba(17,182,232,.18),rgba(130,111,242,.19))!important;
+ border-radius:13px!important;
+}
+html[data-theme] #appScreen .bottom-nav .nav-item > .nav-icon{
+ height:31px!important;min-height:31px!important;width:46px!important;
+ padding:4px!important;flex:0 0 31px!important;
+}
+html[data-theme] #appScreen .bottom-nav .nav-item > span:not(.nav-icon){
+ font-size:clamp(9px,2.55vw,11px)!important;line-height:1.2!important;
+}
+html[data-theme] #appScreen .view:not(.home-map-view){padding-bottom:17px!important}
+html[data-theme] #appScreen .container{color:var(--ng-ink)}
+/* Home stays interactive: do not blur moving map tiles or overdraw markers. */
+html[data-theme] #homeView .geo-immersive{background:var(--ng-bg)!important}
+html[data-theme] #homeView .zyro-command-row{
+ width:calc(100% - 16px)!important;margin:0 8px 5px!important;gap:7px!important;
+ padding:8px!important;border:1px solid var(--ng-border)!important;
+ border-radius:23px!important;background:var(--ng-glass)!important;
+ box-shadow:0 -6px 18px rgba(25,103,173,.12),0 7px 20px rgba(12,80,141,.08)!important;
+}
+html[data-theme] #homeView .zyro-command-row .zyro-command-btn{
+ min-height:75px!important;height:75px!important;width:100%!important;
+ border-radius:17px!important;padding:6px 3px!important;gap:3px!important;
+ border:1px solid var(--ng-border)!important;background:var(--ng-surface2)!important;
+ color:var(--ng-ink)!important;box-shadow:0 5px 13px rgba(28,91,166,.12)!important;
+}
+html[data-theme] #homeView .zyro-command-row .zyro-command-locate{
+ background:linear-gradient(130deg,#0964d1,#13bde1)!important;
+ border-color:rgba(51,167,242,.5)!important;color:#fff!important;
+}
+html[data-theme] #homeView .zyro-command-row .zyro-command-sos{
+ background:linear-gradient(135deg,#ff728a,#e73155)!important;
+ border-color:rgba(235,56,89,.6)!important;color:#fff!important;
+}
+html[data-theme] #homeView .zyro-command-row .zyro-command-share.is-sharing{
+ background:linear-gradient(130deg,#aaf2eb,#dcfffa)!important;color:#0b697e!important
+}
+html[data-theme="dark"] #homeView .zyro-command-row .zyro-command-share.is-sharing{background:linear-gradient(135deg,#145866,#245778)!important;color:#d9ffff!important}
+html[data-theme] #homeView .zyro-command-row :is(.zyro-command-locate,.zyro-command-sos) :is(.zyro-cmd-icon,.zyro-cmd-state){color:white!important}
+html[data-theme] #homeView .zyro-command-row .zyro-cmd-title{font-size:clamp(10px,2.8vw,12px)!important;font-weight:850!important;line-height:1.15!important}
+html[data-theme] #homeView .zyro-command-row .zyro-cmd-state{font-size:9px!important;letter-spacing:.8px!important}
+html[data-theme] #homeView .zyro-command-row .zyro-cmd-icon svg{width:24px!important;height:24px!important}
+html[data-theme] #homeView #mapZoomControls{background:var(--ng-glass)!important;border:1px solid var(--ng-border)!important;border-radius:16px!important;box-shadow:var(--ng-elev)!important;overflow:hidden!important}
+html[data-theme] #homeView #mapZoomControls button{background:transparent!important;color:var(--ng-ink)!important}
+html[data-theme] #homeView #mapZoomControls #zyro3d{color:var(--ng-blue)!important}
+html[data-theme] #homeView .zyro-atlas-legend{background:var(--ng-glass)!important;color:var(--ng-ink)!important;border:1px solid var(--ng-border)!important;border-radius:14px!important;padding:7px 9px!important;box-shadow:0 5px 15px rgba(29,92,158,.12)!important}
+html[data-theme] #homeView #mapStatus{background:var(--ng-glass)!important;color:var(--ng-ink)!important;border:1px solid var(--ng-border)!important;border-radius:12px!important;padding:6px 8px!important}
+html[data-theme] #homeView :is(.zyro-map-navigation,#homeSOSListen){box-shadow:var(--ng-elev)!important;border-radius:17px!important}
+html[data-theme="light"] #homeView .zyro-map-navigation{background:rgba(248,252,255,.97)!important;color:#153b66!important}
+html[data-theme="dark"] #homeView .zyro-map-navigation{background:rgba(13,31,60,.98)!important;color:#e8f7ff!important}
+/* Headings and intro blocks across circles, modes, chat, account. */
+html[data-theme] #appScreen :is(.page-heading,.mode-heading,.profile-heading){
+ position:relative;background:var(--ng-glass)!important;
+ border:1px solid var(--ng-border)!important;border-radius:22px!important;
+ padding:16px!important;box-shadow:var(--ng-elev)!important;
+ color:var(--ng-ink)!important;margin-bottom:17px!important;
+}
+html[data-theme] #appScreen :is(.page-heading h1,.mode-heading h1,.profile-heading h1,.greeting h1){
+ color:var(--ng-ink)!important;font-size:clamp(23px,6.2vw,31px)!important;line-height:1.17!important;
+ letter-spacing:-.65px!important;font-weight:820!important;
+}
+html[data-theme] #appScreen :is(.page-heading h1 span,.mode-heading h1 span,.profile-heading h1 span,.greeting h1 span:not(.wave)){
+ color:var(--ng-blue)!important;
+}
+html[data-theme] #appScreen :is(.page-heading p,.mode-heading p,.profile-heading p,.greeting p){
+ color:var(--ng-muted)!important;line-height:1.55!important;
+}
+html[data-theme] #appScreen :is(.eyebrow,.mini-overline,.chat-eyebrow){color:var(--ng-blue)!important;font-weight:850!important;letter-spacing:1.2px!important}
+html[data-theme] #appScreen :is(.panel,.stat-card,.circle-card,.contact-card,.share-card,.chat-hub,.chat-conversation,.chat-empty,.pick-panel,.zyro-v15-panel,.profile-identity-card,.profile-action,.profile-detail-card,.circle-location-status,.zyro-native-monitor){
+ background:var(--ng-glass)!important;color:var(--ng-ink)!important;
+ border:1px solid var(--ng-border)!important;border-radius:20px!important;
+ box-shadow:var(--ng-elev)!important;
+}
+html[data-theme] #appScreen :is(.panel-title h2,.section-head h2,.pick-top h2,.chat-heading-row h2,.chat-header h2,.profile-identity-card strong,.contact-info b){color:var(--ng-ink)!important}
+html[data-theme] #appScreen :is(.panel-title p,.section-head p,.pick-top p,.stat-card small,.contact-info small,.setting-description,.chat-private-footnote){color:var(--ng-muted)!important}
+html[data-theme] #appScreen :is(.panel-icon,.stat-icon,.chat-heading-emblem,.pick-symbol,.mode-heading-emblem){
+ background:linear-gradient(135deg,rgba(12,198,223,.17),rgba(115,97,226,.17))!important;
+ color:var(--ng-blue)!important;border:1px solid var(--ng-border)!important;
+ border-radius:15px!important;
+}
+html[data-theme] #appScreen .stat-card strong{color:var(--ng-blue)!important;font-size:25px!important}
+html[data-theme] #appScreen .greeting .avatar,
+html[data-theme] #appScreen :is(.profile-avatar,.contact-avatar){
+ background:var(--ng-surface2)!important;border:2px solid var(--ng-border)!important;
+ color:var(--ng-blue)!important;border-radius:50%!important;
+}
+/* Circle/invite cards: preserve full codes and contact action buttons. */
+html[data-theme] #circlesView :is(.circle-card,.invite-code-box,.member-pill,.contact-card,.circle-list>div){border-color:var(--ng-border)!important}
+html[data-theme] #circlesView .circle-card{border-left:3px solid var(--ng-cyan)!important}
+html[data-theme] #circlesView :is(.circle-top strong,.circle-info strong,.circle-name){color:var(--ng-ink)!important}
+html[data-theme] #circlesView :is(.status-chip,.member-pill){background:var(--ng-surface2)!important;color:var(--ng-muted)!important}
+html[data-theme] #circlesView .status-chip.alert{background:rgba(238,56,92,.16)!important;color:#d33e65!important}
+/* Modes/Check-in/SOS: cards, checkboxes and pickpocket controls. */
+html[data-theme] #modesView :is(.pick-panel,.pick-section,.pick-settings,.zyro-v15-panel,.zyro-native-monitor){border-color:var(--ng-border)!important}
+html[data-theme] #modesView .pick-panel{border-top:3px solid var(--ng-cyan)!important}
+html[data-theme] #modesView :is(.pick-section-heading strong,.zyro-v15-heading h2,.zyro-v15-subhead,.zyro-native-monitor-head){color:var(--ng-ink)!important}
+html[data-theme] #modesView :is(.pick-section-heading small,.pick-limits,.zyro-v15-note,.zyro-native-monitor-note){color:var(--ng-muted)!important}
+html[data-theme] #modesView :is(.pick-section-icon,.zyro-v15-symbol){color:var(--ng-blue)!important;background:var(--ng-surface2)!important;border-radius:14px!important}
+html[data-theme] #modesView :is(.pick-select-line,.pick-check-line,.zyro-v15-field,.zyro-v15-destination){border-color:var(--ng-border)!important}
+html[data-theme] #modesView :is(.zyro-v15-primary,.zyro-sos-nav-button){background:var(--ng-gradient)!important;color:white!important;border-radius:13px!important}
+html[data-theme] #modesView :is(.zyro-v15-secondary,.pick-test){background:var(--ng-surface2)!important;color:var(--ng-ink)!important;border:1px solid var(--ng-border)!important}
+/* Chat: unmistakable holographic blue-violet hero plus clean conversation bubbles. */
+html[data-theme] #appScreen .chat-hero{
+ background:linear-gradient(120deg,rgba(2,142,218,.85),rgba(23,190,218,.85) 50%,rgba(117,88,226,.91))!important;
+ border:1px solid rgba(111,209,242,.45)!important;border-radius:24px!important;
+ box-shadow:0 13px 28px rgba(25,91,170,.20)!important;color:#fff!important;
+}
+html[data-theme] #appScreen .chat-hero :is(h1,h2,p,em,.chat-eyebrow){color:#fff!important}
+html[data-theme] #appScreen .chat-hero .chat-hero-graphic{animation:none!important;will-change:auto!important}
+html[data-theme] #appScreen .chat-hub{border-top:3px solid var(--ng-violet)!important}
+html[data-theme] #appScreen :is(.chat-filter-bar,.chat-heading-row,.chat-search){border-color:var(--ng-border)!important}
+html[data-theme] #appScreen .chat-filter.active{background:var(--ng-gradient)!important;color:#fff!important}
+html[data-theme] #appScreen .chat-filter:not(.active){background:var(--ng-surface2)!important;color:var(--ng-ink)!important}
+html[data-theme] #appScreen .chat-rooms :is(button,.chat-room){border-color:var(--ng-border)!important}
+html[data-theme] #appScreen .chat-messages{color:var(--ng-ink)!important}
+html[data-theme] #appScreen .chat-compose{background:var(--ng-surface)!important;border:1px solid var(--ng-border)!important;border-radius:18px!important}
+/* Profile, extra settings, privacy and appearance. */
+html[data-theme] #appScreen .profile-identity-card{
+ background:linear-gradient(125deg,var(--ng-surface2),var(--ng-surface),var(--ng-surface2))!important;
+ border:1px solid var(--ng-border)!important;
+}
+html[data-theme] #appScreen :is(.profile-action,.profile-setting-card,.zyro-settings-drawer,.zyro-settings-detail,.zyro-drawer-menu>button){
+ background:var(--ng-glass)!important;color:var(--ng-ink)!important;border-color:var(--ng-border)!important;
+}
+html[data-theme] #appScreen :is(.zyro-profile-more,.profile-avatar-camera,.profile-action-icon,.profile-chevron){
+ color:var(--ng-blue)!important;border-color:var(--ng-border)!important;
+}
+html[data-theme] #appScreen .zyro-settings-drawer{box-shadow:0 18px 52px rgba(4,14,45,.24)!important}
+html[data-theme] #appScreen .zyro-theme-option[aria-pressed="true"]{
+ outline:2px solid var(--ng-cyan)!important;border-radius:15px!important;
+}
+/* Buttons, labels, inputs, subscription info and menus. */
+html[data-theme] #appScreen .btn-primary,
+html[data-theme] #appScreen button.zyro-plan-soon:enabled{
+ background:var(--ng-gradient)!important;border:1px solid rgba(81,205,242,.38)!important;
+ color:white!important;box-shadow:0 5px 13px rgba(11,139,204,.19)!important;
+}
+html[data-theme] #appScreen .btn-dark{background:linear-gradient(125deg,#185291,#333d90)!important;color:#fff!important}
+html[data-theme] #appScreen :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea){
+ border:1px solid var(--ng-border)!important;background:var(--ng-surface)!important;color:var(--ng-ink)!important;
+ border-radius:13px!important;
+}
+html[data-theme] #appScreen :is(input,select,textarea)::placeholder{color:var(--ng-muted)!important;opacity:.75!important}
+html[data-theme] #appScreen :is(button,input,select,textarea,a):focus-visible{
+ outline:2px solid var(--ng-cyan)!important;outline-offset:2px!important;
+}
+html[data-theme] #appScreen .zyro-plan-card{border-radius:21px!important;border:1px solid var(--ng-border)!important;box-shadow:var(--ng-elev)!important}
+html[data-theme="light"] #appScreen .zyro-plan-card{
+ background:linear-gradient(132deg,#153e78,#106e9a 65%,#5745a6)!important;color:#fff!important
+}
+html[data-theme="dark"] #appScreen .zyro-plan-card{
+ background:linear-gradient(140deg,#142d56,#114964 60%,#362c65)!important;color:#fff!important
+}
+html[data-theme] #appScreen .zyro-plan-card :is(h3,.zyro-plan-price strong,.zyro-plan-caption,li){color:white!important}
+html[data-theme] #appScreen #premiumPanel.zyro-plans{border-color:var(--ng-border)!important}
+html[data-theme] #appScreen :is(.btn,.nav-item,.zyro-command-btn,.chat-filter,.zyro-v15-primary){touch-action:manipulation}
+@media(max-width:380px){
+ html[data-theme] #homeView .zyro-command-row{gap:5px!important;padding:6px!important}
+ html[data-theme] #homeView .zyro-command-row .zyro-command-btn{min-height:70px!important;height:70px!important}
+ html[data-theme] #homeView .zyro-command-row .zyro-cmd-title{font-size:10px!important}
+}
+@media(prefers-reduced-motion:reduce){
+ html[data-theme] #appScreen *,html[data-theme] #appScreen *::before,html[data-theme] #appScreen *::after{
+  animation-duration:.01ms!important;transition-duration:.01ms!important;
+ }
+}
+/* Performance: no filters/transform on map canvas, markers, moving tiles.
+   No continuous visual animations on cards or chat imagery. */
+html[data-theme] #appScreen .chat-hero-graphic,
+html[data-theme] #appScreen .connection-dot.connected{animation:none!important;will-change:auto!important}
+
+/* Web-only additions: account, initial loading and admin surfaces. */
+html[data-theme="light"] #authScreen{background:linear-gradient(155deg,#e8faff,#f6fbff 52%,#eeeafe)!important;color:#143963!important}
+html[data-theme="dark"] #authScreen{background:linear-gradient(150deg,#080f29,#123152 60%,#21153e)!important;color:#edf7ff!important}
+html[data-theme] #authScreen .auth-card{
+ background:var(--ng-glass)!important;color:var(--ng-ink)!important;
+ border:1px solid var(--ng-border)!important;border-radius:27px!important;
+ box-shadow:var(--ng-elev)!important;
+}
+html[data-theme] #authScreen .auth-card h1{color:var(--ng-ink)!important;font-weight:850!important}
+html[data-theme] #authScreen .auth-card h1 span{color:var(--ng-blue)!important}
+html[data-theme] #authScreen :is(.auth-copy,.auth-note,.tiny-auth){color:var(--ng-muted)!important}
+html[data-theme] #authScreen .auth-tab.active{color:var(--ng-blue)!important;border-color:var(--ng-blue)!important}
+html[data-theme] #authScreen .btn-primary{color:white!important;background:var(--ng-gradient)!important}
+html[data-theme] #authScreen .auth-brand{color:var(--ng-ink)!important}
+html[data-theme] #authScreen .auth-brand b{color:var(--ng-blue)!important}
+html[data-theme] #authScreen .center-shield{background:var(--ng-gradient)!important;border-color:var(--ng-border)!important}
+html[data-theme] #appScreen :is(.toast,.modal,.modal-content,.zyro-settings-panel,.zyro-admin-user,.zyro-admin-report){
+ border-color:var(--ng-border)!important;border-radius:18px!important;
+}
+html[data-theme] #appScreen #zyroAdminPanel :is(.zyro-admin-tabs button,.zyro-admin-report,.zyro-admin-user){
+ background:var(--ng-surface2)!important;color:var(--ng-ink)!important;
+ border:1px solid var(--ng-border)!important;
+}
+html[data-theme] #appScreen #zyroAdminPanel button[aria-pressed="true"]{background:var(--ng-gradient)!important;color:white!important}
