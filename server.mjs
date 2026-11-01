@@ -1243,8 +1243,8 @@ function relay(id, msg, preferMicrophone=false) { const con=[...connections(id)]
 const sosAudioRelaySubscribers=new Map();
 function authorizedAudioRelay(viewer,owner,alert){
   return !!alert?.active && alert.kind==='sos' && alert.userId===owner &&
-    owner!==viewer && familyActive(db.users[owner]) && db.users[owner]?.sosAudioConsent===true &&
-    canSeeAlert(viewer,alert);
+    owner!==viewer && canSeeAlert(viewer,alert) &&
+    sosAudioAccessFor(db.users[owner],viewer);
 }
 function audioRelayOwnerUpdate(owner){
   const alert=currentAlert(owner),listeners=sosAudioRelaySubscribers.get(owner);
@@ -1317,13 +1317,15 @@ wss.on('connection', ws => {
     }
     if (m.type==='listen-request') {
       const owner=String(m.to||''); const a=currentAlert(owner);
-      if (!familyActive(db.users[owner]) || !a || a.kind==='pickpocket' || !a.hasAudio || db.users[owner]?.sosAudioConsent!==true || !canSeeAlert(self,a) || owner===self) return;
+      if (!a || a.kind==='pickpocket' || !a.hasAudio ||
+        !authorizedAudioRelay(self,owner,a)) return;
       relay(owner,{type:'listen-request',from:self,alertId:a.id},true);
     }
     if (m.type==='rtc') {
       const target=String(m.to||''); const a=currentAlert(self) || currentAlert(target);
-      if (!a || !familyActive(db.users[a.userId]) || a.kind==='pickpocket' || db.users[a.userId]?.sosAudioConsent!==true ||
-          !canSeeAlert(self,a) || !canSeeAlert(target,a) || ![self,target].includes(a.userId) || self===target) return;
+      if (!a || a.kind==='pickpocket' || self===target ||
+          ![self,target].includes(a.userId) ||
+          !authorizedAudioRelay(self===a.userId?target:self,a.userId,a))return;
       const signal=m.signal;
       if (!signal || typeof signal!=='object' || !['offer','answer','candidate'].includes(signal.kind) || JSON.stringify(signal).length>24000) return;
       relay(target,{type:'rtc',from:self,alertId:a.id,signal});
