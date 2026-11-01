@@ -146,6 +146,41 @@ function loginUser(res, id) { const sid = token(32); db.sessions[hash(sid)] = { 
 function memberIds(circleId) { return db.memberships.filter(m => m.circleId === circleId).map(m => m.userId); }
 function userCircles(id) { return db.memberships.filter(m => m.userId === id).map(m => db.circles[m.circleId]).filter(Boolean); }
 function sharedCircle(a, b) { return a === b || userCircles(a).some(c => memberIds(c.id).includes(b)); }
+/** On disconnect, revoke ALL old relationship grants, including pending commands. */
+function pruneDisconnectedPermissions(){
+  const keys=['gpsRecipients','sosRecipients','sosAudioRecipients','pickRemoteContacts',
+    'pickRemoteRingContacts','pickRemoteLockContacts'];
+  for(const owner of Object.values(db.users)){
+    for(const key of keys)if(Array.isArray(owner[key]))
+      owner[key]=owner[key].filter(id=>id!==owner.id&&sharedCircle(owner.id,id));
+    if(!owner.pickRemoteRingContacts?.length&&!owner.pickRemoteLockContacts?.length)
+      owner.pickRemoteEnabled=false;
+  }
+  for(const alert of Object.values(db.alerts))
+    if(Array.isArray(alert.recipients))
+      alert.recipients=alert.recipients.filter(id=>sharedCircle(alert.userId,id));
+  for(const [owner,cmd] of Object.entries(db.pickRemoteCommands||{}))
+    if(!db.users[owner]||!db.users[cmd.by]||!sharedCircle(owner,cmd.by)||
+       !db.users[owner]?.pickRemoteEnabled ||
+       !(db.users[owner]?.pickRemoteContacts||[]).includes(cmd.by))
+      delete db.pickRemoteCommands[owner];
+}
+function remoteAccessFor(owner,id){
+  const circle=owner&&id!==owner.id&&sharedCircle(owner.id,id);
+  const legacy=owner?.pickRemoteContacts||[];
+  const ring=owner?.pickRemoteRingContacts??legacy;
+  const lock=owner?.pickRemoteLockContacts??legacy;
+  return {
+    ring:!!circle && owner.pickRemoteEnabled===true && ring.includes(id) && premiumActive(owner),
+    lock:!!circle && owner.pickRemoteEnabled===true && lock.includes(id) && premiumActive(owner)
+  };
+}
+function sosAudioAccessFor(owner,id){
+  return !!owner&&id!==owner.id&&sharedCircle(owner.id,id)&&
+    owner.sosAudioConsent===true&&familyActive(owner)&&
+    Array.isArray(owner.sosAudioRecipients)&&owner.sosAudioRecipients.includes(id)&&
+    (owner.sosRecipients||[]).includes(id);
+}
 // For legacy profiles, preserve previous all-circle-sharing until their owner
 // explicitly customizes contact access. New profiles start with an empty list.
 function gpsRecipientsFor(owner) {
@@ -180,18 +215,25 @@ function stateFor(id) {
       const shared = Boolean(mayViewSharedGps(u,id) || (visibleAlert?.kind === 'pickpocket' && emergencyShare));
       const location = (shared || emergencyShare) && locations.has(x) ? locations.get(x) : null;
       const membership = db.memberships.find(m => m.circleId === c.id && m.userId === x);
-      return { ...publicUser(u), invitedByMe: membership?.invitedBy === id, joinedAt:membership?.joinedAt||null, online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio, kind: alert.kind || 'sos' } : null };
+      return { ...publicUser(u), invitedByMe: membership?.invitedBy === id, joinedAt:membership?.joinedAt||null, online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio && sosAudioAccessFor(u,id), kind: alert.kind || 'sos' } : null };
     })
   }));
   const alerts = Object.values(db.alerts).filter(a => a.active && canSeeAlert(id, a)).map(a => ({
     id: a.id, userId: a.userId, name: db.users[a.userId]?.name || 'Contatto',
-    startedAt: a.startedAt, kind: a.kind || 'sos', hasAudio: Boolean(a.hasAudio),
-    remoteActionsAuthorized:a.kind==='pickpocket' && id!==a.userId &&
-      db.users[a.userId]?.pickRemoteEnabled===true &&
-      (db.users[a.userId]?.pickRemoteContacts||[]).includes(id) && premiumActive(db.users[a.userId]),
+    startedAt: a.startedAt, kind: a.kind || 'sos',
+    hasAudio:Boolean(a.hasAudio) && (a.userId===id || sosAudioAccessFor(db.users[a.userId],id)),
+    remoteActions:a.kind==='pickpocket'?remoteAccessFor(db.users[a.userId],id):{ring:false,lock:false},
+    remoteActionsAuthorized:a.kind==='pickpocket' &&
+      Object.values(remoteAccessFor(db.users[a.userId],id)).some(Boolean) &&
+      (a.recipients||[]).includes(id),
     address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
-  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)), sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)),
+  sosAudioRecipients:(me.sosAudioRecipients||[]).filter(x=>sharedCircle(id,x)),
+  pickRemoteContacts:(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)),
+  pickRemoteRingContacts:(me.pickRemoteRingContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)),
+  pickRemoteLockContacts:(me.pickRemoteLockContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)),
+  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -513,7 +555,7 @@ app.post('/api/circles/leave', requireAuth, (req,res) => {
   const circle = db.circles[String(req.body.circleId || '')];
   if (!circle || !memberIds(circle.id).includes(req.user.id)) return res.status(404).json({error:'Cerchia non trovata.'});
   if (circle.ownerId === req.user.id) return res.status(400).json({error:'Il proprietario deve eliminare la cerchia.'});
-  const others = memberIds(circle.id); db.memberships = db.memberships.filter(m => !(m.circleId === circle.id && m.userId === req.user.id)); save();
+  const others = memberIds(circle.id); db.memberships = db.memberships.filter(m => !(m.circleId === circle.id && m.userId === req.user.id)); pruneDisconnectedPermissions(); save();
   for (const id of others) refreshRelated(id);
   res.json({ok:true});
 });
@@ -521,7 +563,7 @@ app.post('/api/circles/remove', requireAuth, (req,res) => {
   const circle = db.circles[String(req.body.circleId || '')], id = String(req.body.userId || '');
   if (!circle || circle.ownerId !== req.user.id || id === req.user.id) return res.status(403).json({error:'Operazione non consentita.'});
   if (!memberIds(circle.id).includes(id)) return res.status(404).json({error:'Membro non trovato.'});
-  const others = memberIds(circle.id); db.memberships = db.memberships.filter(m => !(m.circleId === circle.id && m.userId === id)); save();
+  const others = memberIds(circle.id); db.memberships = db.memberships.filter(m => !(m.circleId === circle.id && m.userId === id)); pruneDisconnectedPermissions(); save();
   for (const u of others) refreshRelated(u);
   res.json({ok:true});
 });
@@ -531,7 +573,7 @@ app.post('/api/circles/delete', requireAuth, (req,res) => {
   const others = memberIds(circle.id);
   db.memberships = db.memberships.filter(m => m.circleId !== circle.id);
   for (const [k,v] of Object.entries(db.invites)) if (v.circleId === circle.id) delete db.invites[k];
-  delete db.circles[circle.id]; save();
+  delete db.circles[circle.id]; pruneDisconnectedPermissions(); save();
   for (const id of others) refreshRelated(id); res.json({ok:true});
 });
 app.post('/api/sharing', requireAuth, (req,res) => {
