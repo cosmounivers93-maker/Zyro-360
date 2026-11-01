@@ -153,7 +153,8 @@ function pruneDisconnectedPermissions(){
   for(const owner of Object.values(db.users)){
     for(const key of keys)if(Array.isArray(owner[key]))
       owner[key]=owner[key].filter(id=>id!==owner.id&&sharedCircle(owner.id,id));
-    if(!owner.pickRemoteRingContacts?.length&&!owner.pickRemoteLockContacts?.length)
+    if(!(owner.pickRemoteRingContacts??owner.pickRemoteContacts??[]).length &&
+       !(owner.pickRemoteLockContacts??owner.pickRemoteContacts??[]).length)
       owner.pickRemoteEnabled=false;
   }
   for(const alert of Object.values(db.alerts))
@@ -894,21 +895,59 @@ app.post('/api/push/test', requireAuth, limit, async (req,res) => {
 // It never enables GPS/microphone on another person's device.
 app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
   const otherId=String(req.body?.userId||'');
-  if(!otherId || otherId===req.user.id || !db.users[otherId] || !sharedCircle(req.user.id,otherId))
+  if(!otherId || otherId===req.user.id || !db.users[otherId] ||
+     !sharedCircle(req.user.id,otherId))
     return res.status(403).json({error:'Puoi modificare solo i contatti della tua cerchia.'});
   if(typeof req.body.shareGps!=='boolean' || typeof req.body.receiveSos!=='boolean')
     return res.status(400).json({error:'Seleziona le autorizzazioni GPS e SOS.'});
-  // Changing recipients mid-alert would silently leave old listeners connected.
-  if(currentAlert(req.user.id)?.kind==='sos')
-    return res.status(409).json({error:'Termina prima il tuo SOS per modificare i destinatari.'});
-  const gps=new Set(gpsRecipientsFor(req.user).filter(id=>sharedCircle(req.user.id,id))),
-        sos=new Set((req.user.sosRecipients||[]).filter(id=>sharedCircle(req.user.id,id)));
+  const advanced=['remoteRing','remoteLock','listenSosAudio'];
+  if(advanced.some(k=>k in req.body && typeof req.body[k]!=='boolean'))
+    return res.status(400).json({error:'Autorizzazione avanzata non valida.'});
+  const active=currentAlert(req.user.id);
+  // Do not add SOS recipients or microphone listeners to an active SOS, but
+  // allow immediate revocation even if its owner is in an emergency.
+  if(active?.kind==='sos' &&
+     (req.body.receiveSos && !(req.user.sosRecipients||[]).includes(otherId) ||
+      req.body.listenSosAudio===true &&
+        !(req.user.sosAudioRecipients||[]).includes(otherId)))
+    return res.status(409).json({error:'Termina prima il tuo SOS per aggiungere destinatari o ascoltatori.'});
+  const gps=new Set(gpsRecipientsFor(req.user)),
+        sos=new Set((req.user.sosRecipients||[]).filter(id=>sharedCircle(req.user.id,id))),
+        audio=new Set((req.user.sosAudioRecipients||[]).filter(id=>sharedCircle(req.user.id,id))),
+        ring=new Set((req.user.pickRemoteRingContacts??req.user.pickRemoteContacts??[])
+          .filter(id=>sharedCircle(req.user.id,id))),
+        lock=new Set((req.user.pickRemoteLockContacts??req.user.pickRemoteContacts??[])
+          .filter(id=>sharedCircle(req.user.id,id)));
+  if((req.body.remoteRing===true||req.body.remoteLock===true)&&!premiumActive(req.user))
+    return res.status(402).json({error:'Controllo remoto incluso soltanto in Premium e Family.'});
+  if(req.body.listenSosAudio===true&&!familyActive(req.user))
+    return res.status(402).json({error:'Ascolto audio SOS incluso soltanto in Family.'});
   req.body.shareGps?gps.add(otherId):gps.delete(otherId);
   req.body.receiveSos?sos.add(otherId):sos.delete(otherId);
+  if(!req.body.receiveSos)audio.delete(otherId);
+  if('listenSosAudio' in req.body)req.body.listenSosAudio && req.body.receiveSos
+    ?audio.add(otherId):audio.delete(otherId);
+  if('remoteRing' in req.body)req.body.remoteRing?ring.add(otherId):ring.delete(otherId);
+  if('remoteLock' in req.body)req.body.remoteLock?lock.add(otherId):lock.delete(otherId);
   req.user.gpsRecipients=[...gps].slice(0,120);
   req.user.sosRecipients=[...sos].slice(0,60);
-  save();refreshRelated(req.user.id);
-  res.json({ok:true,gpsRecipients:req.user.gpsRecipients,sosRecipients:req.user.sosRecipients});
+  req.user.sosAudioRecipients=[...audio].filter(id=>sos.has(id)).slice(0,60);
+  req.user.pickRemoteRingContacts=[...ring].slice(0,60);
+  req.user.pickRemoteLockContacts=[...lock].slice(0,60);
+  req.user.pickRemoteContacts=[...new Set([...ring,...lock])].slice(0,60);
+  req.user.pickRemoteEnabled=req.user.pickRemoteContacts.length>0;
+  if(!req.user.pickRemoteEnabled||!req.user.pickRemoteContacts.includes(otherId))
+    delete db.pickRemoteCommands[req.user.id];
+  if(active?.kind==='sos'){
+    // Revoke this listener on the server, including existing relayed audio.
+    if(!sos.has(otherId))active.recipients=active.recipients.filter(id=>id!==otherId);
+    audioRelayOwnerUpdate(req.user.id);
+  }
+  save();refreshRelated(req.user.id);pushState(otherId);
+  res.json({ok:true,gpsRecipients:req.user.gpsRecipients,
+    sosRecipients:req.user.sosRecipients,sosAudioRecipients:req.user.sosAudioRecipients,
+    pickRemoteRingContacts:req.user.pickRemoteRingContacts,
+    pickRemoteLockContacts:req.user.pickRemoteLockContacts});
 });
 // Per-account opt-in: the SOS audio microphone is OFF by default and can only
 // be enabled by the authenticated owner from the invitees/permissions screen.
@@ -1083,6 +1122,8 @@ app.get('/api/pickpocket/remote/settings',requireAuth,(req,res)=>{
   res.set('Cache-Control','no-store');
   res.json({enabled:req.user.pickRemoteEnabled===true,
     contacts:(req.user.pickRemoteContacts||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)),
+    ringContacts:(req.user.pickRemoteRingContacts??req.user.pickRemoteContacts??[]).filter(id=>sharedCircle(id,req.user.id)),
+    lockContacts:(req.user.pickRemoteLockContacts??req.user.pickRemoteContacts??[]).filter(id=>sharedCircle(id,req.user.id)),
     premium:premiumActive(req.user)});
 });
 app.post('/api/pickpocket/remote/settings',requireAuth,limit,(req,res)=>{
@@ -1098,6 +1139,10 @@ app.post('/api/pickpocket/remote/settings',requireAuth,limit,(req,res)=>{
     return res.status(403).json({error:'Autorizza soltanto persone della tua cerchia.'});
   req.user.pickRemoteEnabled=enabled;
   req.user.pickRemoteContacts=enabled?authorized:[];
+  // Legacy clients have one combined toggle: consciously selecting that
+  // contact still grants both actions, matching the old opt-in semantics.
+  req.user.pickRemoteRingContacts=enabled?[...authorized]:[];
+  req.user.pickRemoteLockContacts=enabled?[...authorized]:[];
   if(!enabled)delete db.pickRemoteCommands[req.user.id];
   save();refreshRelated(req.user.id);
   res.json({ok:true,enabled,contacts:req.user.pickRemoteContacts});
@@ -1109,7 +1154,7 @@ app.post('/api/pickpocket/remote/request',requireAuth,limit,async(req,res)=>{
   const alert=owner&&currentAlert(ownerId);
   if(!owner||req.user.id===ownerId||!['lock','ring'].includes(action)||
      !premiumActive(owner)||owner.pickRemoteEnabled!==true||
-     !Array.isArray(owner.pickRemoteContacts)||!owner.pickRemoteContacts.includes(req.user.id)||
+     !remoteAccessFor(owner,req.user.id)[action]||
      !sharedCircle(ownerId,req.user.id)||!alert||alert.kind!=='pickpocket'||
      !alert.active||!alert.recipients?.includes(req.user.id))
     return res.status(403).json({error:'Comando non autorizzato oppure allarme Pick Pocket non attivo.'});
@@ -1150,7 +1195,7 @@ app.post('/api/pickpocket/remote/consume',requireAuth,(req,res)=>{
   const valid=command.expiresAt>now() && alert?.active &&
      alert.id===command.alertId && alert.kind==='pickpocket' &&
      req.user.pickRemoteEnabled===true && premiumActive(req.user) &&
-     req.user.pickRemoteContacts?.includes(command.by) &&
+     remoteAccessFor(req.user,command.by)[command.action] &&
      alert.recipients?.includes(command.by) && sharedCircle(req.user.id,command.by);
   save();
   res.json(valid?{ok:true,action:command.action}:{ok:false});
