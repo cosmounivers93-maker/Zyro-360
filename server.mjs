@@ -1,6 +1,7 @@
 import express from 'express';
 import {eraseAccount} from './account-deletion.mjs';
 import {normalizeChatView,summarizeChat,chatPage} from './chat-view-core.mjs';
+import {lifeGuardGraceUntil,lifeGuardShouldEscalate} from './lifeguard-policies.mjs';
 import {PlayBilling,PlayRepository,GooglePlayApi,createTokenCipher,accountId,PACKAGE} from './play-billing.mjs';
 import {isIP} from 'node:net';
 import http from 'node:http';
@@ -855,13 +856,13 @@ function overdueCheck(){
   if(j.status==='active'&&j.dueAt<=t){
    j.status='late';j.lateAt=t;changed=true;
    if(j.autoSOS===true){
-    j.graceUntil=t+120000;
+    j.graceUntil=lifeGuardGraceUntil(t);
     void sendEventPush([j.userId],'⏱️ LifeGuard: conferma il rientro','Hai 2 minuti per confermare di essere arrivato/a, altrimenti partirà un possibile SOS. Apri Zyro 360.');
    }else{
     void sendEventPush(j.recipients,'⌛ Percorso in ritardo',`${db.users[j.userId]?.name||'Un contatto'} non ha ancora confermato l'arrivo a ${j.destination}. Verifica direttamente.`);
    }
    for(const x of j.recipients)pushState(x);
-  }else if(j.status==='late'&&j.autoSOS===true&&!j.sosSent&&j.graceUntil&&j.graceUntil<=t){
+  }else if(lifeGuardShouldEscalate(j,t)){
    j.sosSent=true;changed=true;escalate.push([j.userId,j.recipients,'journey']);
   }
  }
@@ -869,13 +870,13 @@ function overdueCheck(){
   if(c.status==='pending'&&c.dueAt<=t){
    c.status='late';c.lateAt=t;changed=true;
    if(c.autoSOS===true){
-    c.graceUntil=t+120000;
+    c.graceUntil=lifeGuardGraceUntil(t);
     void sendEventPush([c.userId],'⏱️ LifeGuard: conferma di stare bene','Hai 2 minuti per confermare che stai bene, altrimenti partirà un possibile SOS. Apri Zyro 360.');
    }else{
     void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);
    }
    for(const x of c.recipients)pushState(x);
-  }else if(c.status==='late'&&c.autoSOS===true&&!c.sosSent&&c.graceUntil&&c.graceUntil<=t){
+  }else if(lifeGuardShouldEscalate(c,t)){
    c.sosSent=true;changed=true;escalate.push([c.userId,c.recipients,'checkin']);
   }
  }
