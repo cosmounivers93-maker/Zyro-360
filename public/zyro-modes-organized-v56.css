@@ -114,3 +114,44 @@
 @media(prefers-reduced-motion:reduce){
  #modesView .zyro-modes-quicknav button:active{transform:none}
 }
+
+/* V57 · Due piani immediatamente leggibili nella palette chiara di ZYRO 360. */
+#modesView #zyroPlanOptions .zyro-plan-stack{
+  display:grid;grid-template-columns:minmax(0,1fr);gap:14px;
+  padding:15px 12px 8px;margin:0;
+}
+#modesView #zyroPlanOptions .zyro-plan-card{
+  padding:20px!important;border:1px solid #add4e8!important;border-radius:21px!important;
+  background:linear-gradient(135deg,#fbfeff 0%,#e6f7ff 56%,#f1edff 100%)!important;
+  color:#254d79!important;box-shadow:0 6px 18px #377aba17!important;
+}
+#modesView #zyroPlanOptions .zyro-plan-family{
+  border-color:#b9b2ef!important;
+  background:linear-gradient(135deg,#f7feff 0%,#e5f2ff 45%,#e8e2ff 100%)!important;
+  color:#244b80!important;
+}
+#modesView #zyroPlanOptions .zyro-plan-card h3,
+#modesView #zyroPlanOptions .zyro-plan-price strong{color:#244d80!important}
+#modesView #zyroPlanOptions .zyro-plan-price{margin:14px 0;padding-bottom:13px}
+#modesView #zyroPlanOptions .zyro-plan-price strong{font-size:33px!important}
+#modesView #zyroPlanOptions .zyro-plan-card .zyro-plan-caption,
+#modesView #zyroPlanOptions .zyro-plan-card .zyro-plan-price>span,
+#modesView #zyroPlanOptions .zyro-plan-exclusion{color:#55738c!important}
+#modesView #zyroPlanOptions .zyro-plan-card li{line-height:1.5;color:#345d80!important}
+#modesView #zyroPlanOptions .zyro-plan-family li:before,
+#modesView #zyroPlanOptions .zyro-plan-card li:before{color:#2499aa!important}
+#modesView #zyroPlanOptions .zyro-plan-card .zyro-plan-tag{
+  color:#2d679f!important;background:#dcefff!important;border-color:#badbf1!important;
+}
+#modesView #zyroPlanOptions .zyro-plan-family .zyro-plan-tag{
+  background:#e7e1ff!important;color:#6550a8!important;border-color:#c7b8f4!important;
+}
+#modesView #zyroPlanOptions .zyro-plan-card .zyro-plan-symbol{color:#398bcc!important}
+#modesView #zyroPlanOptions .zyro-plan-family .zyro-plan-symbol{color:#7a60c7!important}
+#modesView #zyroPlanOptions .zyro-plan-soon{
+  background:linear-gradient(115deg,#e8f7ff,#ecebff)!important;color:#2d6a9d!important;
+  border:1px solid #bed4e8!important;
+}
+#modesView #zyroPlanOptions :is(#premiumStatus,#premiumDetails,#zyroRestorePurchases,#zyroPlanHelp){
+  margin-left:12px!important;margin-right:12px!important;max-width:calc(100% - 24px)!important;
+}
