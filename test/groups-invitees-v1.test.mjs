@@ -33,9 +33,9 @@ test('chat forms and copy controls are all wired',()=>{
   assert.match(style,/\.zyro-group-editor/);
 });
 test('invited people are compact with independent five permissions and master',()=>{
-  assert.match(app,/data\.accessExpand=member\.id/);
-  assert.match(app,/data\.accessAll=member\.id/);
-  assert.match(app,/data\.accessOptions=member\.id/);
+  assert.match(app,/expand\.dataset\.accessExpand=member\.id/);
+  assert.match(app,/all\.dataset\.accessAll=member\.id/);
+  assert.match(app,/options\.dataset\.accessOptions=member\.id/);
   assert.match(app,/changeAllContactAccess\(target\)/);
   assert.match(app,/Abilita tutte le opzioni/);
   for(const key of ["'gps'","'sos'","'audio'","'ring'","'lock'"])assert.ok(app.includes(key),key);
