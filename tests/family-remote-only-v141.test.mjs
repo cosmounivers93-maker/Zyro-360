@@ -47,7 +47,7 @@ test('storefront and help say Premium local lock, Family exclusive remote contro
  assert.ok(!p.includes('<li>Blocca il telefono da remoto'));
  assert.match(f,/Fai squillare il telefono da remoto/);
  assert.match(f,/Blocca il telefono da remoto/);
- assert.match(html,/Non include audio SOS, rilevamento cadute né squillo\/blocco da remoto/);
+ assert.match(html,/Non include audio SOS né squillo\/blocco da remoto/);
  assert.match(html,/Family, 6,99 € al mese/);
  assert.match(css,/pickAdvanced1381/);
  assert.match(css,/display:none!important/);

@@ -1,0 +1,31 @@
+name: LifeGuard v154 - solo Accompagnami e Check-in
+on:
+  push:
+    branches: ['feature/remove-fall-keep-accompagnami-v154']
+  pull_request:
+    paths:
+      - 'server.mjs'
+      - 'public/**'
+      - 'test/lifeguard-v1.test.mjs'
+permissions:
+  contents: read
+jobs:
+  full-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verifica sintassi e sicurezza
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+          node --check public/zyro-journey-address-v1.js
+          test ! -e public/zyro-lifeguard-v1.js
+          ! grep -qi 'rilevamento cadute' public/index.html
+      - name: Installa dipendenze
+        run: npm install --no-audit --no-fund
+      - name: Test completo
+        run: npm test
