@@ -1,4 +1,3 @@
-
 /* LifeGuard 360: light futuristic palette, no global layout overrides. */
 #lifeguardPanel{min-width:0;display:block;scroll-margin-top:92px}
 #lifeguardPanel .zyro-modes-group-title{margin:20px 0 14px}
@@ -12,33 +11,5 @@
 #lifeguardPanel .zyro-life-consent span{min-width:0;display:grid;gap:6px}
 #lifeguardPanel .zyro-life-consent b{font-size:13px}
 #lifeguardPanel .zyro-life-consent small{font-size:11px;line-height:1.6;color:#506d7e}
-#lifeguardPanel .zyro-life-fall .zyro-v15-symbol{color:#6767d5;background:#dbdefe}
-#lifeguardPanel .zyro-life-fall-content{display:grid;gap:12px}
-#lifeguardPanel .zyro-life-fall-switch{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px;border:1px solid #abcff0;border-radius:18px;background:linear-gradient(110deg,#eff4ff,#e8faf7)}
-#lifeguardPanel .zyro-life-fall-switch>div{display:grid;gap:5px;min-width:0;color:#204e69}
-#lifeguardPanel .zyro-life-fall-switch strong{font-size:13px}
-#lifeguardPanel .zyro-life-fall-switch small{font-size:11px;line-height:1.5;color:#506f7f}
-#lifeguardPanel .zyro-life-toggle{flex:none;position:relative;display:block;width:52px;height:30px}
-#lifeguardPanel .zyro-life-toggle input{position:absolute;opacity:0;width:100%;height:100%;margin:0;cursor:pointer;z-index:1}
-#lifeguardPanel .zyro-life-toggle span{display:block;width:52px;height:30px;border-radius:40px;background:#aab9cd;transition:background .15s;position:relative}
-#lifeguardPanel .zyro-life-toggle span:before{content:"";position:absolute;left:4px;top:4px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 4px #22334430;transition:transform .15s}
-#lifeguardPanel .zyro-life-toggle input:checked+span{background:#6969df}
-#lifeguardPanel .zyro-life-toggle input:checked+span:before{transform:translateX(22px)}
-#lifeguardPanel .zyro-life-toggle input:focus-visible+span{outline:3px solid #44bfc9;outline-offset:3px}
-#lifeguardPanel .zyro-life-toggle input:disabled+span{opacity:.45}
-#lifeguardPanel .zyro-life-status{border-radius:14px;background:#ecf3ff;color:#244f69;padding:12px 14px;font-size:12px;line-height:1.6;margin:0}
-#lifeguardPanel .zyro-life-status[data-state="on"]{background:#e2f9f3;color:#135647}
-#lifeguardPanel .zyro-life-status[data-state="warning"]{background:#fff4df;color:#79541e}
-#lifeguardPanel .zyro-life-caution{font-size:11px;line-height:1.7;color:#5a7383;margin:0}
-@media(max-width:380px){#lifeguardPanel .zyro-life-intro{padding:14px}#lifeguardPanel .zyro-life-fall-switch{padding:12px}}
 
 /* Directly editable fall sensitivity, only inside LifeGuard. */
-#lifeguardPanel .zyro-life-sensitivity{border:1px solid #abcff0;border-radius:18px;background:#fffdfedb;padding:12px 15px;margin:0;min-width:0}
-#lifeguardPanel .zyro-life-sensitivity legend{padding:0 6px;color:#204e69;font-size:13px;font-weight:760}
-#lifeguardPanel .zyro-life-level-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 9px}
-#lifeguardPanel .zyro-life-level-buttons button{min-height:44px;border:1px solid #b5c9e6;background:#eef5ff;border-radius:13px;color:#344f78;font-weight:750;cursor:pointer;font-size:13px}
-#lifeguardPanel .zyro-life-level-buttons button[aria-pressed="true"]{background:linear-gradient(125deg,#d8d5ff,#c2f5ef);border-color:#898cda;color:#354388}
-#lifeguardPanel .zyro-life-level-buttons button:focus-visible{outline:3px solid #48bfc9;outline-offset:2px}
-#lifeguardPanel .zyro-life-sensitivity>small{display:block;color:#5a7383;font-size:11px;line-height:1.6}
-#lifeguardPanel .zyro-life-toggle input:disabled+span{opacity:.85}
-
