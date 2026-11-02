@@ -470,7 +470,7 @@ function renderCircles(){
   const sig=JSON.stringify([current.me.id,current.me.name,(current.circles||[]).map(c=>[c.id,c.name,c.mine,(c.members||[]).map(m=>[m.id,m.name])]),[...inviteCodes.entries()]]);
   if(list._zyroSig===sig&&list.children.length)return;
   list._zyroSig=sig;
-  list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions"><button type="button" data-chatcircle="${escapeHtml(c.id)}">💬 Chat gruppo</button><button type="button" data-invite="${escapeHtml(c.id)}">✚ Genera codice invito</button>${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
+  list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions"><button type="button" data-chatcircle="${escapeHtml(c.id)}">💬 Chat gruppo</button>${c.kind==='chat'?'':'<button type="button" data-invite="'+escapeHtml(c.id)+'">✚ Genera codice invito</button>'}${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
   list.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
     const r=await post('/api/invites',{circleId:b.dataset.invite});
     const target=b.closest('.circle-card').querySelector('.invite-target');
@@ -531,6 +531,28 @@ async function imageData(file,maxPx=520,maxBytes=105000){
   }finally{URL.revokeObjectURL(url);}
 }
 async function saveAvatar(file){const avatar=await imageData(file,400,100000);await post('/api/profile/avatar',{avatar});await refresh();toast('Foto profilo aggiornata.');}
+// Each chat group is a private circle with its own multi-use invitation code.
+// Joining does not opt anyone in to location, SOS, or microphone sharing.
+function showChatGroupEditor(type){
+ const create=$('chatGroupCreatePanel'),join=$('chatGroupJoinPanel');
+ const panel=type==='create'?create:join,other=type==='create'?join:create;
+ const open=panel.hidden;
+ panel.hidden=!open;other.hidden=true;
+ if(open)panel.querySelector('input')?.focus();
+}
+function showChatGroupInviteCode(code){
+ if(!/^G[A-F0-9]{18}$/.test(code))throw Error('Codice gruppo non valido.');
+ $('chatGroupInviteCode').textContent=code;
+ $('chatGroupInviteResult').hidden=false;
+}
+async function makeChatGroupInvite(){
+ if(!chatRoom||chatRoom.type!=='circle')throw Error('Apri prima un gruppo chat.');
+ const group=current.circles.find(c=>c.id===chatRoom.id);
+ if(!group||group.kind!=='chat'||!group.mine)throw Error('Solo chi ha creato il gruppo può invitare.');
+ const response=await post('/api/chat/groups/invite',{groupId:group.id});
+ showChatGroupInviteCode(response.code);
+ toast('Codice gruppo creato: può essere usato da più persone per 24 ore.');
+}
 let chatCategory='all';
 let chatSearch='';
 const roomArrow=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>`;
@@ -540,13 +562,14 @@ function renderChatRooms(){
   if(!current)return;
   const circles=current.circles||[], contacts=uniqueContacts();
   const list=$('chatRooms');
-  const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
+  const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.kind,c.mine,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
   if(list._zyroSig===sig&&list.children.length)return;
   list._zyroSig=sig;
   const matching=(name)=>String(name).toLocaleLowerCase('it').includes(chatSearch.toLocaleLowerCase('it'));
   const rooms=[];
-  if(chatCategory!=='direct')for(const c of circles.filter(c=>matching(c.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(c.name)}</b><small>Gruppo famiglia · ${c.members.length} ${c.members.length===1?'persona':'persone'}</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
-  if(chatCategory!=='circle')for(const u of contacts.filter(u=>matching(u.name)))rooms.push(`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon person-room-icon">${avatarHTML(u)}</span><span class="chat-room-text"><b>${escapeHtml(u.name)}</b><small>Messaggio privato · cerchia condivisa</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  const showCircle=(c)=>chatCategory==='all'||(chatCategory==='circle'&&c.kind!=='chat')||(chatCategory==='group'&&c.kind==='chat');
+  if(chatCategory!=='direct')for(const c of circles.filter(c=>showCircle(c)&&matching(c.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(c.name)}</b><small>${c.kind==='chat'?'Gruppo chat':'Gruppo famiglia'} · ${c.members.length} ${c.members.length===1?'persona':'persone'}</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  if(chatCategory==='all'||chatCategory==='direct')for(const u of contacts.filter(u=>matching(u.name)))rooms.push(`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon person-room-icon">${avatarHTML(u)}</span><span class="chat-room-text"><b>${escapeHtml(u.name)}</b><small>Messaggio privato · cerchia condivisa</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
   const hasAny = circles.length||contacts.length;
   $('chatRooms').innerHTML=rooms.length?rooms.join(''):chatSearch?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Nessun risultato</h3><p>Prova a cercare un altro nome.</p></div>`:hasAny?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Non ci sono chat qui</h3><p>Seleziona un'altra categoria.</p></div>`:`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Ogni legame inizia da qui</h3><p>Crea una cerchia o invita una persona fidata per iniziare una conversazione.</p><button type="button" class="btn btn-primary" id="chatInviteNow">Vai alle Cerchie <span aria-hidden="true">→</span></button></div>`;
   $('chatRooms').querySelectorAll('.chat-room').forEach(b=>b.addEventListener('click',()=>openChat(b.dataset.typ,b.dataset.id)));
@@ -558,6 +581,8 @@ function closeChat(){
   chatRoom=null;
   chatHistory={room:'',messages:[],nextBefore:null};
   $('chatConversation').classList.add('hidden');
+  $('chatGroupInviteButton')?.classList.add('hidden');
+  if($('chatGroupInviteResult'))$('chatGroupInviteResult').hidden=true;
   $('chatsView').classList.remove('is-conversation');
   document.body.classList.remove('zyro-chat-full');
 }
@@ -572,6 +597,7 @@ function openChat(type,id){
   const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);
   $('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';
   $('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · accesso riservato':'Chat riservata ai partecipanti';
+  $('chatGroupInviteButton')?.classList.toggle('hidden',!(type==='circle'&&circle?.kind==='chat'&&circle?.mine));
   $('chatMessages').innerHTML='<p class="chat-empty">Caricamento messaggi…</p>';
   loadChat().catch(e=>toast(e.message,true));
 }
@@ -1886,36 +1912,37 @@ function closeProfileSettings(){
  document.body.classList.remove('zyro-settings-open');
  if(profileMenuLastFocus?.isConnected)profileMenuLastFocus.focus();
 }
+let inviteeExpandedId=null;
 function renderInvitedPeople(){
- const root=$('savedInvitees');if(!root || !current)return;
- const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.premiumPlan,current.me.gpsRecipients,current.me.sosRecipients,current.me.sosAudioRecipients,current.me.pickRemoteRingContacts,current.me.pickRemoteLockContacts,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.invitedByMe])])]);
+ const root=$('savedInvitees');if(!root||!current)return;
+ const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.premiumPlan,current.me.gpsRecipients,current.me.sosRecipients,current.me.sosAudioRecipients,current.me.pickRemoteRingContacts,current.me.pickRemoteLockContacts,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.avatar||'',m.invitedByMe])])]);
  if(root._zyroSig===sig&&root.children.length)return;
  root._zyroSig=sig;
  const byId=new Map();
- for(const circle of current.circles||[]){
-   for(const member of circle.members||[]){
-     if(member.id===current.me.id)continue;
-     if(!byId.has(member.id))byId.set(member.id,{member,circles:new Set()});
-     byId.get(member.id).circles.add(circle.name);
-   }
+ for(const circle of current.circles||[])for(const member of circle.members||[]){
+   if(member.id===current.me.id)continue;
+   if(!byId.has(member.id))byId.set(member.id,{member,circles:new Set()});
+   byId.get(member.id).circles.add(circle.name);
  }
  root.replaceChildren();
- // Only place that controls emergency microphone opt-in:
- // Profilo > Persone invitate, alongside per-contact GPS/SOS permissions.
- const micBox=document.createElement('section');
- micBox.className='zyro-sos-mic-choice';
+ // Preserve independent, explicit microphone consent in a compact disclosure.
+ // Checking 'all permissions' for an invitee never starts the microphone.
+ const micBox=document.createElement('details');micBox.className='zyro-invitees-mic-compact';
+ const summary=document.createElement('summary');
+ summary.innerHTML='<span>🎙️ Consenso microfono SOS <small>Solo Family · funzione avanzata</small></span><span aria-hidden="true">＋</span>';
+ micBox.append(summary);
  const micLabel=document.createElement('label');micLabel.className='zyro-access-toggle zyro-sos-mic-toggle';
  const micCopy=document.createElement('span');
- const micTitle=document.createElement('strong');micTitle.textContent='Abilita microfono durante SOS';
+ const micTitle=document.createElement('strong');micTitle.textContent='Consenti audio durante SOS';
  const micExplanation=document.createElement('small');
- micExplanation.textContent='Se attivo, premendo SOS il microfono può trasmettere audio in diretta esclusivamente ai destinatari autorizzati anche all’ascolto audio che toccano «Ascolta». Se la connessione diretta fallisce, l’audio può transitare temporaneamente sul server per arrivare al destinatario: non viene registrato né conservato, ma questo percorso non è crittografato end-to-end. Puoi disattivare questa funzione in qualsiasi momento.';
+ micExplanation.textContent='Solo durante un SOS, verso i contatti autorizzati. Il collegamento di riserva tramite server non è crittografato end-to-end.';
  micCopy.append(micTitle,micExplanation);
  const micInput=document.createElement('input');micInput.type='checkbox';micInput.id='sosAudioConsent';
  micInput.checked=hasFamilyPlan()&&current.me.sosAudioConsent===true;micInput.disabled=!hasFamilyPlan();
- micInput.setAttribute('aria-label','Consenti audio in diretta automatico durante SOS');
+ micInput.setAttribute('aria-label','Consenti la trasmissione audio durante SOS');
  micLabel.append(micCopy,micInput);
  const micHint=document.createElement('p');micHint.className='zyro-sos-mic-note';
- micHint.textContent='Incluso in ZYRO Family. Scegli prima di usare SOS. Android richiede il permesso microfono. L’audio può interrompersi con lo schermo spento; lo stato sarà indicato nella Home.';
+ micHint.textContent='Richiede il permesso Android. L’audio può interrompersi a schermo spento. Puoi revocare il consenso quando vuoi.';
  const micTest=document.createElement('button');micTest.type='button';micTest.id='zyroTestMic';
  micTest.className='zyro-sos-mic-test';micTest.textContent='Verifica microfono';micTest.disabled=!micInput.checked;
  const micNative=document.createElement('button');micNative.type='button';
@@ -1931,24 +1958,19 @@ function renderInvitedPeople(){
    root.append(p);return;
  }
  const gpsInfo=document.createElement('div');gpsInfo.className='zyro-invitees-intro';
- const description=document.createElement('p');
- description.textContent='Condividi la tua posizione soltanto con i contatti che autorizzi.';
+ const description=document.createElement('p');description.textContent='Condividi la tua posizione soltanto con i contatti che autorizzi.';
  const gpsButton=document.createElement('button');gpsButton.type='button';gpsButton.id='zyroInviteesGpsGlobal';
- gpsButton.className='btn btn-outline btn-wide';
- gpsButton.textContent=current.me.sharing?'Disattiva GPS LIVE':'Attiva GPS LIVE';
+ gpsButton.className='btn btn-outline btn-wide';gpsButton.textContent=current.me.sharing?'Disattiva GPS LIVE':'Attiva GPS LIVE';
  gpsButton.disabled=!!current.me.sos;
- const status=document.createElement('strong');status.className='zyro-access-status';status.textContent=current.me.sharing?'Posizione LIVE attiva':'Posizione LIVE disattivata';
- const hint=document.createElement('small');hint.textContent='Solo i contatti autorizzati qui sotto possono vedere il tuo GPS mentre LIVE è attivo.';
+ const status=document.createElement('strong');status.className='zyro-access-status';
+ status.textContent=current.me.sharing?'Posizione LIVE attiva':'Posizione LIVE disattivata';
+ const hint=document.createElement('small');hint.textContent='I permessi dei contatti non attivano automaticamente il GPS LIVE.';
  gpsInfo.append(description,status,gpsButton,hint);root.append(gpsInfo);
- const gpsSet=new Set(current.me.gpsRecipients||[]);
- const sosSet=new Set(current.me.sosRecipients||[]);
- const audioSet=new Set(current.me.sosAudioRecipients||[]);
- const ringSet=new Set(current.me.pickRemoteRingContacts||[]);
- const lockSet=new Set(current.me.pickRemoteLockContacts||[]);
+ const sets={gps:new Set(current.me.gpsRecipients||[]),sos:new Set(current.me.sosRecipients||[]),audio:new Set(current.me.sosAudioRecipients||[]),ring:new Set(current.me.pickRemoteRingContacts||[]),lock:new Set(current.me.pickRemoteLockContacts||[])};
  for(const {member,circles} of byId.values()){
-   const card=document.createElement('article');card.className='zyro-access-card';
+   const card=document.createElement('article');card.className='zyro-access-card zyro-access-card-compact';
    const top=document.createElement('div');top.className='zyro-access-top';
-   const avatar=document.createElement('span');avatar.className='zyro-invitee-avatar';avatar.textContent=initials(member.name);
+   const avatar=document.createElement('span');avatar.className='zyro-invitee-avatar';avatar.innerHTML=avatarHTML(member);
    const name=document.createElement('div');name.className='zyro-access-name';
    const title=document.createElement('strong');title.textContent=member.name;
    const meta=document.createElement('small');meta.textContent=[...circles].join(' · ');
@@ -1956,6 +1978,28 @@ function renderInvitedPeople(){
    const flag=document.createElement('span');flag.className='zyro-invitee-flag';
    flag.textContent=member.invitedByMe?'Invitato da te':'Nella cerchia';
    top.append(avatar,name,flag);card.append(top);
+   const expand=document.createElement('button');expand.type='button';
+   expand.className='zyro-invitee-expand';expand.dataset.accessExpand=member.id;
+   expand.setAttribute('aria-expanded',String(inviteeExpandedId===member.id));
+   expand.textContent=inviteeExpandedId===member.id?'Nascondi opzioni':'Abilita opzioni';
+   card.append(expand);
+   const options=document.createElement('div');options.className='zyro-invitee-options';
+   options.dataset.accessOptions=member.id;options.hidden=inviteeExpandedId!==member.id;
+   const family=hasFamilyPlan();
+   const available=family?['gps','sos','audio','ring','lock']:['gps','sos'];
+   const enabledCount=available.filter(key=>sets[key].has(member.id)).length;
+   const allLabel=document.createElement('label');allLabel.className='zyro-access-toggle zyro-access-all';
+   const allText=document.createElement('span');
+   const allTitle=document.createElement('strong');allTitle.textContent='Abilita tutte le opzioni';
+   const allHint=document.createElement('small');
+   allHint.textContent='Oppure disattivale tutte. Le opzioni sotto restano modificabili singolarmente.';
+   allText.append(allTitle,allHint);
+   const all=document.createElement('input');all.type='checkbox';
+   all.dataset.accessAll=member.id;all.checked=enabledCount===available.length;
+   all.indeterminate=enabledCount>0&&enabledCount<available.length;
+   all.disabled=!!current.me.sos;
+   all.setAttribute('aria-label','Abilita o disabilita tutte le autorizzazioni per '+member.name);
+   allLabel.append(allText,all);options.append(allLabel);
    const addToggle=(type,labelText,help,checked)=>{
      const row=document.createElement('label');row.className='zyro-access-toggle';
      const info=document.createElement('span');
@@ -1965,28 +2009,40 @@ function renderInvitedPeople(){
      const input=document.createElement('input');input.type='checkbox';
      input.dataset.accessUser=member.id;input.dataset.accessType=type;
      input.checked=checked;
-     input.disabled=!!current.me.sos || (type==='audio' && (!hasFamilyPlan()||!sosSet.has(member.id))) ||
-       ((type==='ring'||type==='lock') && !hasFamilyPlan());
+     input.disabled=!!current.me.sos||(type==='audio'&&(!family||!sets.sos.has(member.id)))||
+       ((type==='ring'||type==='lock')&&!family);
      input.setAttribute('aria-label',labelText+' per '+member.name);
-     row.append(info,input);card.append(row);
+     row.append(info,input);options.append(row);
    };
-   addToggle('gps','Può vedere il mio GPS',
-       'Solo quando attivo la posizione LIVE.',gpsSet.has(member.id));
-   addToggle('sos','Riceve i miei SOS',
-       'Notifiche di emergenza selezionate da te.',sosSet.has(member.id));
-   addToggle('audio','Può ascoltare il mio microfono durante SOS',
-       'Solo Family: richiede anche SOS abilitato, il consenso microfono generale e la mia attivazione SOS.',audioSet.has(member.id));
-   addToggle('ring','Può far squillare il mio telefono',
-       'Solo Family: durante un vero allarme Pick Pocket e con consenso preventivo.',ringSet.has(member.id));
-   addToggle('lock','Può bloccare il mio telefono da remoto',
-       'Solo Family: durante un allarme Pick Pocket; richiede autorizzazione amministratore Android.',lockSet.has(member.id));
-   root.append(card);
+   addToggle('gps','Può vedere il mio GPS','Solo quando attivo la posizione LIVE.',sets.gps.has(member.id));
+   addToggle('sos','Riceve i miei SOS','Notifiche di emergenza selezionate da te.',sets.sos.has(member.id));
+   addToggle('audio','Può ascoltare il mio microfono durante SOS','Solo Family: richiede SOS e consenso microfono generale.',sets.audio.has(member.id));
+   addToggle('ring','Può far squillare il mio telefono','Solo Family: durante un vero allarme Pick Pocket.',sets.ring.has(member.id));
+   addToggle('lock','Può bloccare il mio telefono da remoto','Solo Family: richiede anche l’autorizzazione amministratore Android.',sets.lock.has(member.id));
+   card.append(options);root.append(card);
  }
- if(current.me.sos){
-   const n=document.createElement('p');n.className='setting-description';
-   n.textContent='Per cambiare i contatti, termina prima il SOS attivo.';
-   root.append(n);
+ if(current.me.sos){const n=document.createElement('p');n.className='setting-description';
+   n.textContent='Per modificare le autorizzazioni, termina prima il SOS attivo.';root.append(n);}
+}
+async function changeAllContactAccess(target){
+ if(!current)return;
+ const id=target.dataset.accessAll,contact=uniqueContacts().find(c=>c.id===id);
+ if(!contact){await refresh();throw Error('Questo contatto non appartiene più alla tua cerchia.');}
+ const enabled=target.checked,family=hasFamilyPlan();
+ if(enabled&&family&&!confirm('Vuoi autorizzare per '+contact.name+' GPS, SOS, ascolto audio e comandi remoti Pick Pocket? Il microfono richiede comunque il tuo consenso generale; GPS e SOS non si avviano automaticamente.')){
+   $('savedInvitees')._zyroSig=null;await refresh();return;
  }
+ const response=await post('/api/settings/contact-access',{
+   userId:id,shareGps:enabled,receiveSos:enabled,
+   listenSosAudio:enabled&&family,remoteRing:enabled&&family,remoteLock:enabled&&family
+ });
+ current.me.gpsRecipients=response.gpsRecipients;
+ current.me.sosRecipients=response.sosRecipients;
+ current.me.sosAudioRecipients=response.sosAudioRecipients;
+ current.me.pickRemoteRingContacts=response.pickRemoteRingContacts;
+ current.me.pickRemoteLockContacts=response.pickRemoteLockContacts;
+ sosPending=null;await refresh();
+ toast(enabled?'Opzioni del contatto abilitate. GPS LIVE e microfono richiedono attivazione separata.':'Tutte le autorizzazioni del contatto disabilitate.');
 }
 async function changeContactAccess(target){
  if(!current)return;
@@ -2086,6 +2142,12 @@ async function init(){
       });
       return;
     }
+    if(e.target.matches('input[data-access-all]')){
+      const input=e.target;input.disabled=true;
+      void action(async()=>{try{await changeAllContactAccess(input);}catch(err){input.checked=!input.checked;throw err;}
+        finally{if(input.isConnected)input.disabled=false;}});
+      return;
+    }
     if(!e.target.matches('input[data-access-user]'))return;
     const input=e.target;input.disabled=true;
     void action(async()=>{
@@ -2095,6 +2157,19 @@ async function init(){
     });
   });
   $('savedInvitees').addEventListener('click',e=>{
+    const expand=e.target.closest('button[data-access-expand]');
+    if(expand){
+      inviteeExpandedId=inviteeExpandedId===expand.dataset.accessExpand?null:expand.dataset.accessExpand;
+      $('savedInvitees').querySelectorAll('[data-access-options]').forEach(node=>{
+        node.hidden=node.dataset.accessOptions!==inviteeExpandedId;
+      });
+      $('savedInvitees').querySelectorAll('button[data-access-expand]').forEach(button=>{
+        const open=button.dataset.accessExpand===inviteeExpandedId;
+        button.textContent=open?'Nascondi opzioni':'Abilita opzioni';
+        button.setAttribute('aria-expanded',String(open));
+      });
+      return;
+    }
     if(e.target.id!=='zyroTestMic'&&e.target.id!=='zyroMicNativeCheck')return;
     const button=e.target,native=e.target.id==='zyroMicNativeCheck';
     button.disabled=true;
@@ -2167,6 +2242,31 @@ async function init(){
   $('avatarRemove').addEventListener('click',()=>action(async()=>{await post('/api/profile/avatar',{avatar:null});await refresh();toast('Foto profilo rimossa.');}));
   document.querySelectorAll('[data-chat-filter]').forEach(b=>b.addEventListener('click',()=>{chatCategory=b.dataset.chatFilter;document.querySelectorAll('[data-chat-filter]').forEach(t=>{const on=t===b;t.classList.toggle('active',on);t.setAttribute('aria-pressed',String(on));});renderChatRooms();}));
   $('chatSearch').addEventListener('input',e=>{chatSearch=e.target.value.trim();renderChatRooms();});
+  $('chatGroupCreateOpen').addEventListener('click',()=>showChatGroupEditor('create'));
+  $('chatGroupJoinOpen').addEventListener('click',()=>showChatGroupEditor('join'));
+  $('chatGroupCreateForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
+    const name=$('chatGroupName').value.trim();
+    const result=await post('/api/chat/groups',{name});
+    $('chatGroupName').value='';$('chatGroupCreatePanel').hidden=true;
+    await refresh();openChat('circle',result.groupId);
+    toast('Gruppo creato. Premi Invita per condividere il codice del gruppo.');
+  });});
+  $('chatGroupJoinForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
+    const result=await post('/api/chat/groups/join',{code:$('chatGroupCode').value.trim()});
+    $('chatGroupCode').value='';$('chatGroupJoinPanel').hidden=true;
+    await refresh();openChat('circle',result.groupId);
+    toast('Sei entrato nel gruppo! Puoi chattare con tutti i partecipanti.');
+  });});
+  $('chatGroupInviteButton').addEventListener('click',()=>void action(makeChatGroupInvite));
+  $('chatGroupCopy').addEventListener('click',()=>void action(async()=>{
+    await copyInvite($('chatGroupInviteCode').textContent,'Codice del gruppo copiato.');
+  }));
+  $('chatGroupShare').addEventListener('click',()=>void action(async()=>{
+    const code=$('chatGroupInviteCode').textContent;
+    if(!/^G[A-F0-9]{18}$/.test(code))throw Error('Genera prima un codice gruppo.');
+    if(navigator.share){try{await navigator.share({text:code});return;}catch(err){if(err?.name==='AbortError')return;}}
+    await copyInvite(code,'Codice copiato. Puoi condividerlo con i membri del gruppo.');
+  }));
   $('chatClose').addEventListener('click',closeChat);
   $('chatForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const text=$('chatText').value.trim();if(!text&&!chatPhotoData)return;await sendChat(text,chatPhotoData);});});
   $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});

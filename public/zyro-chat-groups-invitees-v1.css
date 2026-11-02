@@ -1,0 +1,88 @@
+/* ZYRO 360 · chat di gruppo e permessi per-contatto compatti (light UI) */
+.zyro-chat-page .chat-filter-bar{gap:5px}
+.zyro-chat-page .chat-filter-bar .chat-filter{min-width:0;padding:9px 3px;font-size:clamp(10px,2.6vw,12px);border-radius:13px}
+.zyro-chat-page .zyro-group-toolbar{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 14px}
+.zyro-chat-page .zyro-group-tool-btn,
+.zyro-chat-page .zyro-group-header-btn{
+  appearance:none;border:1px solid #a8cbef;border-radius:14px;
+  color:#2565aa;background:linear-gradient(125deg,#fbfdff,#e5f6ff 65%,#eae8ff);
+  box-shadow:0 4px 13px #3467a513;font-weight:750;cursor:pointer;
+  font:inherit;font-size:13px;padding:12px 8px;min-height:45px;
+}
+.zyro-chat-page .zyro-group-tool-btn:active,.zyro-chat-page .zyro-group-header-btn:active{transform:scale(.98)}
+.zyro-chat-page .zyro-group-editor{
+  border:1px solid #a8cfe4;border-radius:20px;
+  background:linear-gradient(130deg,#f8fdff,#e6f8fc 55%,#f2eaff);
+  padding:16px;box-shadow:0 6px 20px #2c7cb118;margin:0 0 14px;color:#264e74;
+}
+.zyro-chat-page .zyro-group-editor[hidden],
+.zyro-chat-page .zyro-group-code[hidden],
+#savedInvitees .zyro-invitee-options[hidden]{display:none!important}
+.zyro-chat-page .zyro-group-editor h3{font-size:17px;margin:0 0 6px;font-weight:800;color:#21538b}
+.zyro-chat-page .zyro-group-editor p{font-size:12px;line-height:1.5;margin:0 0 12px;color:#53799b}
+.zyro-chat-page .zyro-group-form{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:stretch}
+.zyro-chat-page .zyro-group-form input{
+  min-width:0;width:100%;padding:12px;border:1px solid #a5c9e0;
+  border-radius:13px;background:#ffffffd9;color:#244775;font-size:14px;
+}
+.zyro-chat-page .zyro-group-form button{min-width:80px;border-radius:13px;font-size:12px;padding:10px}
+.zyro-chat-page .zyro-group-header-btn{flex:none;min-height:36px;padding:8px 10px;font-size:12px;background:#e5f4ff}
+.zyro-chat-page .chat-header{gap:8px}
+.zyro-chat-page .chat-header>div:first-child{min-width:0;flex:1}
+.zyro-chat-page .chat-header strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zyro-chat-page .zyro-group-code{
+  margin:10px 12px;border:1px solid #94cde8;border-radius:16px;padding:13px;
+  background:linear-gradient(110deg,#f4fcff,#ddf6fa,#f0e8ff);color:#244e83;
+}
+.zyro-chat-page .zyro-group-code small{display:block;font-size:10px;font-weight:700;color:#557895;line-height:1.5}
+.zyro-chat-page .zyro-group-code code{display:block;overflow-wrap:anywhere;letter-spacing:.1em;font-size:18px;font-weight:850;padding:10px 0;color:#225d9d}
+.zyro-chat-page .zyro-group-code-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.zyro-chat-page .zyro-group-code-actions button{border:1px solid #a2c6e6;color:#285c9b;background:#ffffffdb;border-radius:12px;min-height:41px;font-weight:750}
+#savedInvitees .zyro-invitees-mic-compact{
+  margin:0 0 12px;padding:0!important;border:1px solid #b8d9e6!important;border-radius:19px;
+  background:linear-gradient(120deg,#f4fbff,#ecf9fc,#f0e9ff);color:#254b77;
+  box-shadow:0 4px 16px #4771a50f;overflow:hidden;
+}
+#savedInvitees .zyro-invitees-mic-compact summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;font-weight:800}
+#savedInvitees .zyro-invitees-mic-compact summary::-webkit-details-marker{display:none}
+#savedInvitees .zyro-invitees-mic-compact summary span:first-child{display:grid;gap:2px}
+#savedInvitees .zyro-invitees-mic-compact summary small{font-size:11px;font-weight:500;color:#607c97}
+#savedInvitees .zyro-invitees-mic-compact .zyro-access-toggle{border-radius:15px;margin:0 12px 6px;padding:12px;box-sizing:border-box}
+#savedInvitees .zyro-invitees-mic-compact .zyro-sos-mic-note{margin:4px 16px 14px;color:#53718b;font-size:11px;line-height:1.45}
+#savedInvitees .zyro-invitees-intro{padding:13px!important;margin-bottom:12px!important;gap:7px!important;border-radius:18px!important}
+#savedInvitees .zyro-invitees-intro p,#savedInvitees .zyro-invitees-intro small{font-size:12px!important;line-height:1.4!important}
+#savedInvitees .zyro-invitees-intro button{min-height:42px}
+#savedInvitees .zyro-access-card-compact{
+  display:flex;flex-direction:column;gap:10px!important;padding:14px!important;
+  margin:0 0 11px!important;border-radius:20px!important;
+  background:linear-gradient(126deg,#f8fcff,#e9f6fc 55%,#f1ebff)!important;
+  border:1px solid #bfd6e8!important;
+  box-shadow:0 5px 15px #386b9a12!important;color:#274d75;
+}
+#savedInvitees .zyro-access-card-compact .zyro-access-top{display:flex;gap:10px;align-items:center;min-width:0}
+#savedInvitees .zyro-access-card-compact .zyro-access-name{min-width:0;flex:1}
+#savedInvitees .zyro-access-card-compact .zyro-access-name strong{font-size:15px;display:block;overflow:hidden;text-overflow:ellipsis}
+#savedInvitees .zyro-access-card-compact .zyro-access-name small{overflow:hidden;text-overflow:ellipsis;display:block;white-space:nowrap;font-size:11px!important}
+#savedInvitees .zyro-invitee-avatar{width:48px;height:48px;flex:none;display:grid;place-items:center;overflow:hidden;border-radius:16px;background:linear-gradient(140deg,#dff7ff,#e7e8ff);color:#2981bb;font-size:22px}
+#savedInvitees .zyro-invitee-avatar img{width:100%;height:100%;object-fit:cover}
+#savedInvitees .zyro-invitee-flag{white-space:nowrap;font-size:10px;padding:6px 9px;border-radius:999px;background:#e9f1ff;color:#426294}
+#savedInvitees .zyro-invitee-expand{
+  min-height:43px;width:100%;cursor:pointer;border-radius:13px;
+  border:1px solid #96c6e4;background:linear-gradient(110deg,#e9faff,#ebebff);
+  color:#2264a3;font-size:13px;font-weight:800;
+}
+#savedInvitees .zyro-invitee-options{display:grid;gap:9px;padding-top:6px}
+#savedInvitees .zyro-invitee-options .zyro-access-toggle{
+  margin:0!important;min-height:65px;padding:12px!important;
+  border:1px solid #bdd8e6!important;border-radius:16px!important;
+  background:linear-gradient(116deg,#f3fbff,#eeefff)!important;
+}
+#savedInvitees .zyro-invitee-options .zyro-access-toggle strong{font-size:13px;line-height:1.35}
+#savedInvitees .zyro-invitee-options .zyro-access-toggle small{font-size:11px!important;line-height:1.45!important}
+#savedInvitees .zyro-invitee-options .zyro-access-all{
+  background:linear-gradient(110deg,#cfeeff,#e5d9ff)!important;border-color:#83badd!important;
+}
+@media(max-width:400px){
+ .zyro-chat-page .zyro-group-form{grid-template-columns:1fr}
+ #savedInvitees .zyro-invitee-flag{font-size:9px}
+}

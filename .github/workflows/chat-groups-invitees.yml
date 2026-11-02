@@ -1,0 +1,27 @@
+name: ZYRO 360 - Group chat and compact permissions
+on:
+  push:
+    branches: [feature/chat-groups-invitees-compact-20261102]
+  pull_request:
+    paths:
+      - 'server.mjs'
+      - 'public/app.js'
+      - 'public/index.html'
+      - 'public/zyro-chat-groups-invitees-v1.css'
+      - 'test/groups-invitees-v1.test.mjs'
+      - 'tests/contact-permissions-v139.test.mjs'
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Check JavaScript syntax
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+      - name: Run test suite
+        run: node --test

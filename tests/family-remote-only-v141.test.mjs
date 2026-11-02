@@ -33,9 +33,9 @@ test('Premium maintains optional automatic screen lock and other safety features
  assert.match(server,/journey:familyActive\(user\)/);
 });
 test('client disables remote contact switches for non-Family without blocking GPS/SOS',()=>{
- assert.match(client,/\(\(type==='ring'\|\|type==='lock'\) && !hasFamilyPlan\(\)\)/);
+ assert.match(client,/\(\(type==='ring'\|\|type==='lock'\)\&\&!family\)/);
  assert.match(client,/Solo Family: durante un vero allarme Pick Pocket/);
- assert.match(client,/Solo Family: durante un allarme Pick Pocket/);
+ assert.match(client,/Solo Family: richiede anche l’autorizzazione amministratore Android/);
  assert.match(client,/addToggle\('gps'/);
  assert.match(client,/addToggle\('sos'/);
 });
