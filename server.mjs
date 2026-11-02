@@ -584,7 +584,8 @@ app.post('/api/circles', requireAuth, limit, (req,res) => {
 });
 app.post('/api/invites', requireAuth, limit, (req,res) => {
   const id = String(req.body.circleId || '');
-  if (!memberIds(id).includes(req.user.id)) return res.status(403).json({error:'Non fai parte della cerchia.'});
+  if (db.circles[id]?.kind==='chat') return res.status(400).json({error:'Per i gruppi chat genera un codice dalla sezione Chat.'});
+   if (!memberIds(id).includes(req.user.id)) return res.status(403).json({error:'Non fai parte della cerchia.'});
   const code = crypto.randomBytes(9).toString('hex').toUpperCase();
   db.invites[hash(code)] = { circleId:id, createdBy:req.user.id, expiresAt:now()+24*3600*1000 }; save();
   res.json({code, expiresInHours:24});
