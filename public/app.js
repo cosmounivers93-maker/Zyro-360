@@ -531,6 +531,28 @@ async function imageData(file,maxPx=520,maxBytes=105000){
   }finally{URL.revokeObjectURL(url);}
 }
 async function saveAvatar(file){const avatar=await imageData(file,400,100000);await post('/api/profile/avatar',{avatar});await refresh();toast('Foto profilo aggiornata.');}
+// Each chat group is a private circle with its own multi-use invitation code.
+// Joining does not opt anyone in to location, SOS, or microphone sharing.
+function showChatGroupEditor(type){
+ const create=$('chatGroupCreatePanel'),join=$('chatGroupJoinPanel');
+ const panel=type==='create'?create:join,other=type==='create'?join:create;
+ const open=panel.hidden;
+ panel.hidden=!open;other.hidden=true;
+ if(open)panel.querySelector('input')?.focus();
+}
+function showChatGroupInviteCode(code){
+ if(!/^G[A-F0-9]{18}$/.test(code))throw Error('Codice gruppo non valido.');
+ $('chatGroupInviteCode').textContent=code;
+ $('chatGroupInviteResult').hidden=false;
+}
+async function makeChatGroupInvite(){
+ if(!chatRoom||chatRoom.type!=='circle')throw Error('Apri prima un gruppo chat.');
+ const group=current.circles.find(c=>c.id===chatRoom.id);
+ if(!group||group.kind!=='chat'||!group.mine)throw Error('Solo chi ha creato il gruppo può invitare.');
+ const response=await post('/api/chat/groups/invite',{groupId:group.id});
+ showChatGroupInviteCode(response.code);
+ toast('Codice gruppo creato: può essere usato da più persone per 24 ore.');
+}
 let chatCategory='all';
 let chatSearch='';
 const roomArrow=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>`;
@@ -540,13 +562,14 @@ function renderChatRooms(){
   if(!current)return;
   const circles=current.circles||[], contacts=uniqueContacts();
   const list=$('chatRooms');
-  const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
+  const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.kind,c.mine,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
   if(list._zyroSig===sig&&list.children.length)return;
   list._zyroSig=sig;
   const matching=(name)=>String(name).toLocaleLowerCase('it').includes(chatSearch.toLocaleLowerCase('it'));
   const rooms=[];
-  if(chatCategory!=='direct')for(const c of circles.filter(c=>matching(c.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(c.name)}</b><small>Gruppo famiglia · ${c.members.length} ${c.members.length===1?'persona':'persone'}</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
-  if(chatCategory!=='circle')for(const u of contacts.filter(u=>matching(u.name)))rooms.push(`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon person-room-icon">${avatarHTML(u)}</span><span class="chat-room-text"><b>${escapeHtml(u.name)}</b><small>Messaggio privato · cerchia condivisa</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  const showCircle=(c)=>chatCategory==='all'||(chatCategory==='circle'&&c.kind!=='chat')||(chatCategory==='group'&&c.kind==='chat');
+  if(chatCategory!=='direct')for(const c of circles.filter(c=>showCircle(c)&&matching(c.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(c.name)}</b><small>${c.kind==='chat'?'Gruppo chat':'Gruppo famiglia'} · ${c.members.length} ${c.members.length===1?'persona':'persone'}</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  if(chatCategory==='all'||chatCategory==='direct')for(const u of contacts.filter(u=>matching(u.name)))rooms.push(`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon person-room-icon">${avatarHTML(u)}</span><span class="chat-room-text"><b>${escapeHtml(u.name)}</b><small>Messaggio privato · cerchia condivisa</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
   const hasAny = circles.length||contacts.length;
   $('chatRooms').innerHTML=rooms.length?rooms.join(''):chatSearch?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Nessun risultato</h3><p>Prova a cercare un altro nome.</p></div>`:hasAny?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Non ci sono chat qui</h3><p>Seleziona un'altra categoria.</p></div>`:`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Ogni legame inizia da qui</h3><p>Crea una cerchia o invita una persona fidata per iniziare una conversazione.</p><button type="button" class="btn btn-primary" id="chatInviteNow">Vai alle Cerchie <span aria-hidden="true">→</span></button></div>`;
   $('chatRooms').querySelectorAll('.chat-room').forEach(b=>b.addEventListener('click',()=>openChat(b.dataset.typ,b.dataset.id)));
@@ -558,6 +581,8 @@ function closeChat(){
   chatRoom=null;
   chatHistory={room:'',messages:[],nextBefore:null};
   $('chatConversation').classList.add('hidden');
+  $('chatGroupInviteButton')?.classList.add('hidden');
+  if($('chatGroupInviteResult'))$('chatGroupInviteResult').hidden=true;
   $('chatsView').classList.remove('is-conversation');
   document.body.classList.remove('zyro-chat-full');
 }
@@ -572,6 +597,7 @@ function openChat(type,id){
   const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);
   $('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';
   $('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · accesso riservato':'Chat riservata ai partecipanti';
+  $('chatGroupInviteButton')?.classList.toggle('hidden',!(type==='circle'&&circle?.kind==='chat'&&circle?.mine));
   $('chatMessages').innerHTML='<p class="chat-empty">Caricamento messaggi…</p>';
   loadChat().catch(e=>toast(e.message,true));
 }
@@ -2167,6 +2193,31 @@ async function init(){
   $('avatarRemove').addEventListener('click',()=>action(async()=>{await post('/api/profile/avatar',{avatar:null});await refresh();toast('Foto profilo rimossa.');}));
   document.querySelectorAll('[data-chat-filter]').forEach(b=>b.addEventListener('click',()=>{chatCategory=b.dataset.chatFilter;document.querySelectorAll('[data-chat-filter]').forEach(t=>{const on=t===b;t.classList.toggle('active',on);t.setAttribute('aria-pressed',String(on));});renderChatRooms();}));
   $('chatSearch').addEventListener('input',e=>{chatSearch=e.target.value.trim();renderChatRooms();});
+  $('chatGroupCreateOpen').addEventListener('click',()=>showChatGroupEditor('create'));
+  $('chatGroupJoinOpen').addEventListener('click',()=>showChatGroupEditor('join'));
+  $('chatGroupCreateForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
+    const name=$('chatGroupName').value.trim();
+    const result=await post('/api/chat/groups',{name});
+    $('chatGroupName').value='';$('chatGroupCreatePanel').hidden=true;
+    await refresh();openChat('circle',result.groupId);
+    toast('Gruppo creato. Premi Invita per condividere il codice del gruppo.');
+  });});
+  $('chatGroupJoinForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
+    const result=await post('/api/chat/groups/join',{code:$('chatGroupCode').value.trim()});
+    $('chatGroupCode').value='';$('chatGroupJoinPanel').hidden=true;
+    await refresh();openChat('circle',result.groupId);
+    toast('Sei entrato nel gruppo! Puoi chattare con tutti i partecipanti.');
+  });});
+  $('chatGroupInviteButton').addEventListener('click',()=>void action(makeChatGroupInvite));
+  $('chatGroupCopy').addEventListener('click',()=>void action(async()=>{
+    await copyInvite($('chatGroupInviteCode').textContent,'Codice del gruppo copiato.');
+  }));
+  $('chatGroupShare').addEventListener('click',()=>void action(async()=>{
+    const code=$('chatGroupInviteCode').textContent;
+    if(!/^G[A-F0-9]{18}$/.test(code))throw Error('Genera prima un codice gruppo.');
+    if(navigator.share){try{await navigator.share({text:code});return;}catch(err){if(err?.name==='AbortError')return;}}
+    await copyInvite(code,'Codice copiato. Puoi condividerlo con i membri del gruppo.');
+  }));
   $('chatClose').addEventListener('click',closeChat);
   $('chatForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const text=$('chatText').value.trim();if(!text&&!chatPhotoData)return;await sendChat(text,chatPhotoData);});});
   $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});
