@@ -86,3 +86,14 @@
  .zyro-chat-page .zyro-group-form{grid-template-columns:1fr}
  #savedInvitees .zyro-invitee-flag{font-size:9px}
 }
+
+/* Il consenso globale Family vive nelle opzioni dei contatti, non in un pannello sopra la cerchia. */
+#savedInvitees .zyro-invitee-options .zyro-contact-audio-consent{
+  border-color:#a7c9e8!important;
+  background:linear-gradient(112deg,#e6f9ff 0%,#f0eaff 100%)!important;
+}
+#savedInvitees .zyro-contact-audio-consent strong{color:#255b88!important}
+#savedInvitees .zyro-contact-audio-consent small{color:#536f89!important}
+#savedInvitees .zyro-contact-audio-consent input{
+  accent-color:#367ccd;flex:none;
+}
