@@ -2030,7 +2030,7 @@ async function changeAllContactAccess(target){
  if(!contact){await refresh();throw Error('Questo contatto non appartiene più alla tua cerchia.');}
  const enabled=target.checked,family=hasFamilyPlan();
  if(enabled&&family&&!confirm('Vuoi autorizzare per '+contact.name+' GPS, SOS, ascolto audio e comandi remoti Pick Pocket? Il microfono richiede comunque il tuo consenso generale; GPS e SOS non si avviano automaticamente.')){
-   await refresh();return;
+   $('savedInvitees')._zyroSig=null;await refresh();return;
  }
  const response=await post('/api/settings/contact-access',{
    userId:id,shareGps:enabled,receiveSos:enabled,
