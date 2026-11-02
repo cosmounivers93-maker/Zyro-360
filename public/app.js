@@ -656,7 +656,33 @@ async function sendPushTest(){
   }finally{button.disabled=false;}
 }
 let sectionAnimation=null;
-function showView(view){const previousView=activeView;const sectionOrder=['home','circles','modes','chats','settings'];if(!sectionOrder.includes(view))return;if(view!=='settings')closeProfileSettings();if(view!=='chats'&&chatRoom)closeChat();activeView=view;for(const v of ['home','circles','modes','chats','settings'])$(`${v}View`).classList.toggle('hidden',v!==view);document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));window.scrollTo({top:0,behavior:'instant'});sectionAnimation?.cancel();if(previousView!==view && !matchMedia('(prefers-reduced-motion: reduce)').matches){const panel=$(`${view}View`);if(panel?.animate)sectionAnimation=panel.animate([{opacity:.75,transform:`translateX(${sectionOrder.indexOf(view)>sectionOrder.indexOf(previousView)?24:-24}px)`},{opacity:1,transform:'translateX(0)'}],{duration:180,easing:'cubic-bezier(.2,.7,.2,1)'});}if(view==='settings' && current?.me?.isAdmin && !adminLoaded)void action(adminLoad);if(view==='home'){requestAnimationFrame(()=>{renderMap();stableMap?.resize();});}}
+function showView(view){
+  const order=['home','circles','modes','chats','settings'];
+  if(!order.includes(view))return;
+  const previousView=activeView;
+  const changed=previousView!==view;
+  if(view!=='settings')closeProfileSettings();
+  if(view!=='chats'&&chatRoom)closeChat();
+  activeView=view;
+  for(const id of order)$(`${id}View`).classList.toggle('hidden',id!==view);
+  document.querySelectorAll('.bottom-nav .nav-item').forEach(button=>button.classList.toggle('active',button.dataset.view===view));
+  if(changed)window.scrollTo(0,0);
+  sectionAnimation?.cancel();
+  sectionAnimation=null;
+  if(changed&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+    const panel=$(`${view}View`);
+    if(panel?.animate)sectionAnimation=panel.animate(
+      [{opacity:.88,transform:`translate3d(${order.indexOf(view)>order.indexOf(previousView)?12:-12}px,0,0)`},
+       {opacity:1,transform:'translate3d(0,0,0)'}],
+      {duration:105,easing:'cubic-bezier(.22,.75,.25,1)'}
+    );
+  }
+  if(view==='settings'&&current?.me?.isAdmin&&!adminLoaded)void action(adminLoad);
+  // Preserve the live map; avoid a redundant re-render on repeated Home taps.
+  if(view==='home'&&(changed||!stableMap)){
+    requestAnimationFrame(()=>{renderMap();stableMap?.resize();});
+  }
+}
 // Native Android V21 runs GPS and sensors independently of the paused WebView.
 // The owner always activates it via an explicit first-party on-screen action.
 
@@ -2349,20 +2375,20 @@ async function init(){
   g={id:t.identifier,x:t.clientX,y:t.clientY,time:performance.now(),view:activeView,axis:null};
  },{passive:true,capture:true});
  document.addEventListener('touchmove',e=>{
-  if(!g)return;const t=Array.from(e.touches).find(t=>t.identifier===g.id);
+  if(!g)return;const t=e.touches.length===1&&e.touches[0].identifier===g.id?e.touches[0]:null;
   if(e.touches.length!==1 || !t){g=null;return;}
   const dx=t.clientX-g.x,dy=t.clientY-g.y;
-  if(!g.axis && Math.max(Math.abs(dx),Math.abs(dy))>12){
+  if(!g.axis && Math.max(Math.abs(dx),Math.abs(dy))>10){
    if(Math.abs(dx)>Math.abs(dy)*1.35)g.axis='x';else{g=null;return;}
   }
-  if(g.axis==='x' && e.cancelable)e.preventDefault();
+  // CSS touch-action:pan-y handles horizontal gestures; no scroll-blocking preventDefault.
  },{passive:false,capture:true});
  document.addEventListener('touchcancel',()=>{g=null;},{passive:true,capture:true});
  document.addEventListener('touchend',e=>{
   const s=g;g=null;if(!s || e.touches.length || !available() || activeView!==s.view)return;
   const t=Array.from(e.changedTouches).find(t=>t.identifier===s.id);if(!t)return;
   const dx=t.clientX-s.x,dy=t.clientY-s.y;
-  if(performance.now()-s.time>1200 || Math.abs(dx)<56 || Math.abs(dx)<Math.abs(dy)*1.35)return;
+  if(performance.now()-s.time>1200 || Math.abs(dx)<46 || Math.abs(dx)<Math.abs(dy)*1.35)return;
   const next=order[order.indexOf(activeView)+(dx<0?1:-1)];if(!next)return;
   suppressUntil=performance.now()+400;showView(next);
  },{passive:true,capture:true});
