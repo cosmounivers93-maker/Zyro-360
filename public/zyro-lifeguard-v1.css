@@ -1,0 +1,30 @@
+/* LifeGuard 360 — layout stabile, sfondo luminoso viola/azzurro/turchese. */
+#lifeGuardPanel.zyro-lifeguard-panel{box-sizing:border-box;max-width:100%;min-width:0;margin:0 0 18px;padding:20px;border:1px solid #93c5e2;border-radius:24px;background:linear-gradient(136deg,#f6f5ff,#eafaff 52%,#e3fff7);color:#183f63;box-shadow:0 8px 22px #4371b01c}
+#lifeGuardPanel .zyro-lifeguard-title{display:flex;align-items:flex-start;gap:12px;min-width:0}
+#lifeGuardPanel .zyro-lifeguard-title>div{min-width:0}
+#lifeGuardPanel .zyro-lifeguard-title h2{font-size:23px;font-weight:800;line-height:1.25;margin:4px 0 7px;letter-spacing:-.3px;color:#1f396b}
+#lifeGuardPanel .zyro-lifeguard-title p{font-size:13px;line-height:1.55;margin:0;color:#426987}
+#lifeGuardPanel .zyro-lifeguard-title .eyebrow{color:#634cb4;font-size:10px;letter-spacing:1.5px;font-weight:800}
+#lifeGuardPanel .zyro-lifeguard-emblem{flex:none;display:grid;place-items:center;width:46px;height:46px;border-radius:15px;font-size:27px;color:#643de0;background:linear-gradient(135deg,#d8ceff,#c9f7fa)}
+#lifeGuardPanel .zyro-lifeguard-tags{display:flex;flex-wrap:wrap;gap:8px;margin:17px 0}
+#lifeGuardPanel .zyro-lifeguard-tags span{font-size:11px;font-weight:750;padding:8px 10px;border-radius:999px;background:#dfeafb;color:#3e5685;line-height:1.2}
+#lifeGuardPanel details{border:1px solid #d0dcf3;border-radius:17px;background:#ffffffc4;overflow:hidden}
+#lifeGuardPanel details>summary{list-style:none;cursor:pointer;min-height:52px;box-sizing:border-box;padding:13px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+#lifeGuardPanel details>summary::-webkit-details-marker{display:none}
+#lifeGuardPanel .zyro-mode-summary-label{color:#293a72;font-weight:800;font-size:14px}
+#lifeGuardPanel .zyro-mode-summary-label small{display:block;font-size:11px;font-weight:500;margin-top:5px;color:#526b87;line-height:1.4}
+#lifeGuardPanel .zyro-lifeguard-setting{display:flex;align-items:start;justify-content:space-between;gap:15px;border-top:1px solid #dbe5f5;padding:17px 13px 13px}
+#lifeGuardPanel .zyro-lifeguard-setting>div{flex:1;min-width:0}
+#lifeGuardPanel .zyro-lifeguard-setting strong{font-size:13px;color:#263e76}
+#lifeGuardPanel .zyro-lifeguard-setting small{display:block;color:#526983;font-size:11px;line-height:1.6;margin-top:6px}
+#lifeGuardPanel .zyro-lifeguard-switch{flex:none;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#3e5588}
+#lifeGuardPanel .zyro-lifeguard-switch input{width:19px;height:19px;accent-color:#7050d9}
+#lifeGuardPanel .zyro-lifeguard-status{margin:0 13px 10px;padding:12px;border:1px solid #b9d1ee;border-radius:12px;background:#eef6ff;color:#28517e;font-size:12px;line-height:1.5;white-space:pre-line}
+#lifeGuardPanel .zyro-lifeguard-safety{margin:10px 13px 16px;font-size:11px;line-height:1.6;color:#617080}
+#modesView .zyro-lifeguard-optin{display:flex;align-items:flex-start;gap:12px;padding:14px;margin:15px 0;border:1px solid #c5d8ed;border-radius:15px;background:linear-gradient(120deg,#f3f0ff,#ebfcff);color:#243e68;cursor:pointer;text-align:left}
+#modesView .zyro-lifeguard-optin input{flex:none;width:19px;height:19px;margin:3px 0 0;accent-color:#7252d4}
+#modesView .zyro-lifeguard-optin span{min-width:0}
+#modesView .zyro-lifeguard-optin strong{font-size:13px;line-height:1.4}
+#modesView .zyro-lifeguard-optin small{display:block;font-size:11px;line-height:1.55;color:#4e6581;margin-top:6px}
+@media(max-width:400px){#lifeGuardPanel.zyro-lifeguard-panel{padding:16px}#lifeGuardPanel .zyro-lifeguard-title h2{font-size:20px}#lifeGuardPanel .zyro-lifeguard-setting{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){#lifeGuardPanel *{animation:none!important;transition:none!important}}
