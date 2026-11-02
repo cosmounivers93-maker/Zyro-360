@@ -1,0 +1,34 @@
+name: ZYRO 360 - Verifica aggiornamento Modalità online
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/index.html'
+      - 'public/app.js'
+      - 'public/zyro-modes-organized-v56.css'
+      - '.github/workflows/verify-modes-deploy-v56.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Controlla pagina Modalità sul server Render
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 18); do
+            if curl --fail --location --silent --show-error --max-time 28 'https://zyro-360.onrender.com/' -o /tmp/zyro-mode-page.html \
+               && curl --fail --location --silent --show-error --max-time 28 'https://zyro-360.onrender.com/zyro-modes-organized-v56.css?v=56.0' -o /tmp/zyro-modes.css \
+               && grep -Fq 'zyro-modes-quicknav' /tmp/zyro-mode-page.html \
+               && grep -Fq 'zyroSosOptions' /tmp/zyro-mode-page.html \
+               && grep -Fq 'zyro-mode-summary-label' /tmp/zyro-modes.css; then
+              echo 'OK: Nuova schermata Modalità online sul server.'
+              exit 0
+            fi
+            echo "Pubblicazione nuova pagina non ancora verificata (tentativo $attempt)"
+            sleep 5
+          done
+          echo 'La pagina nuova non risulta ancora pubblicata su Render.'
+          exit 1
