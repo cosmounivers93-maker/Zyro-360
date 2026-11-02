@@ -26,8 +26,12 @@ test('explicit Family microphone consent is inside contact options, not the all 
   assert.match(inviteesCss,/zyro-contact-audio-consent/);
 });
 
-test('two subscription cards are visible by default and keep Google Play buttons',()=>{
-  assert.match(html,/<details id="zyroPlanOptions"[^>]* open>/);
+test('subscription selector is collapsed by default and expands Base and Family',()=>{
+  assert.match(html,/<details id="zyroPlanOptions" class="zyro-mode-details zyro-mode-plans-details">/);
+  assert.match(html,/<summary><span class="zyro-mode-summary-label">Seleziona abbonamenti/);
+  assert.ok(html.indexOf('<header class="zyro-modes-group-title"><span aria-hidden="true">04</span>')<html.indexOf('Seleziona abbonamenti'));
+  assert.ok(html.indexOf('Seleziona abbonamenti')<html.indexOf('id="zyroPersonalTitle"'));
+  assert.ok(html.indexOf('id="zyroPersonalTitle"')<html.indexOf('id="zyroFamilyTitle"'));
   assert.match(html,/id="zyroPersonalTitle">ZYRO Base/);
   assert.match(html,/id="zyroFamilyTitle">ZYRO Family/);
   assert.match(html,/3,99 €/);
