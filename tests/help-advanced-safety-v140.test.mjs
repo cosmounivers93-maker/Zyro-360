@@ -48,7 +48,7 @@ test('Premium and Family include device-lock and approved remote action explanat
  assert.match(section,/Premium.*blocco automatico dello schermo.*Comprende anche Accompagnami e Check-in.*Non include audio SOS né squillo\/blocco da remoto/);
  assert.match(section,/Family.*in esclusiva, squillo e blocco da remoto/);
  assert.match(section,/Family.*audio SOS con consenso/);
- assert.match(html,/Come funziona l'app<small>Guida completa a mappa, LifeGuard, Accompagnami, SOS e privacy/);
+ assert.match(html,/Come funziona l'app<small>Guida completa a mappa, Accompagnami, Check-in, SOS e privacy/);
  assert.match(html,/Persone invitate<small>GPS, SOS, microfono e controllo remoto/);
 });
 test('accordion uses matching summary/detail structure',()=>{
