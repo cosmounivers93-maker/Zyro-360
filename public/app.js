@@ -1,6 +1,6 @@
 function hasFamilyPlan(){return current?.me?.features?.sosAudio===true;}
 function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione è inclusa in ZYRO Family.');}}
-function requireLifeGuardPlan(){if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('LifeGuard 360 richiede ZYRO Base o Family.');}}
+function requireJourneyOrCheckinPlan(){if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Accompagnami e Check-in richiedono ZYRO Base o Family.');}}
 function updateMarkupIfChanged(node,html){
  if(node._zyroMarkup===html)return;
  node._zyroMarkup=html;node.innerHTML=html;
@@ -1624,10 +1624,10 @@ function renderV15(){if(!current)return;
  updateMarkupIfChanged($('journeyContactsStatus'),others.map(x=>`<p class="zyro-v15-contact-status">🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)} · ${x.status==='late'?'In ritardo':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso annullato':'Arrivo previsto '+v15Time(x.dueAt)}</p>`).join(''));
  const checks=(current.checkins||[]).filter(x=>x.userId!==me.id);
  updateMarkupIfChanged($('checkinContactsStatus'),checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join(''));
- window.ZyroLifeGuardRender?.();window.ZyroJourneyRestore?.();
+ window.ZyroJourneyRestore?.();
 }
 async function v15JourneyStart(){
- requireLifeGuardPlan();
+ requireJourneyOrCheckinPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];
  if(!destination)throw Error('Scrivi dove stai andando: ad esempio Casa, Lavoro o Altro.');
  if(!journeyTarget||!window.ZyroJourneyAddressConfirmed?.())throw Error('Apri la mappa e premi «Imposta» per confermare il puntino blu prima di avviare Accompagnami.');
@@ -1651,7 +1651,7 @@ async function v15JourneyResume(){
  if(result.journey?.destinationPoint)journeyTarget={...result.journey.destinationPoint};
  await refresh();renderMap();toast('Accompagnami riattivato. Nuovo orario comunicato ai contatti.');
 }
-async function v15CheckinStart(){requireLifeGuardPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected],autoSos:$('checkinAutoSos').checked});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
+async function v15CheckinStart(){requireJourneyOrCheckinPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected],autoSos:$('checkinAutoSos').checked});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
 // ZYRO V16: one right-side settings drawer for every account. Existing controls
@@ -2237,7 +2237,7 @@ async function init(){
   $('modesView').addEventListener('click',event=>{
     const button=event.target.closest('button[data-mode-target]');
     if(!button||!$('modesView').contains(button))return;
-    const allowed={sosRecipientsPanel:'zyroSosOptions',pickPanel:null,lifeguardPanel:null,journeyPanel:'zyroJourneyOptions',checkinPanel:'zyroCheckinOptions'};
+    const allowed={sosRecipientsPanel:'zyroSosOptions',pickPanel:null,journeyPanel:'zyroJourneyOptions',checkinPanel:'zyroCheckinOptions'};
     const targetName=button.dataset.modeTarget;
     if(!Object.hasOwn(allowed,targetName))return;
     const target=$(targetName);
