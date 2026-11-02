@@ -1,0 +1,27 @@
+name: ZYRO 360 - UI cerchia e piani V57
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/app.js'
+      - 'public/index.html'
+      - 'public/zyro-chat-groups-invitees-v1.css'
+      - 'public/zyro-modes-organized-v56.css'
+      - 'test/invitees-plans-v57.test.mjs'
+      - 'test/groups-invitees-v1.test.mjs'
+      - '.github/workflows/zyro-ui-v57.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verifica sintassi
+        run: node --check public/app.js
+      - name: Test cerchia e piani
+        run: node --test test/invitees-plans-v57.test.mjs test/groups-invitees-v1.test.mjs test/modes-organized-v56.test.mjs
