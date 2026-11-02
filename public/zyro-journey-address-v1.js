@@ -14,7 +14,7 @@
  function clearChoice(){
    requestNo++;
    clearPin();
-   el('journeyDestination').value='';
+   // Keep the friendly destination name (Casa, Lavoro, etc.) independent of the address.
    el('journeyTargetInfo').textContent='Nessuna meta GPS impostata';
    el('journeyChosenAddress')?.classList.add('hidden');
    el('journeyAddressResults')?.replaceChildren();
@@ -26,12 +26,12 @@
    clearPin();journeyTarget={lat:Number(point.lat),lon:Number(point.lon)};
    const name=String(label||'Destinazione scelta').slice(0,160);
    selectedFromJourney={...journeyTarget,name,manual};
-   el('journeyDestination').value=name.slice(0,70);
+   // Address selection must never overwrite the owner's journey name.
    el('journeyTargetInfo').textContent='Meta GPS verificata sulla mappa: '+journeyTarget.lat.toFixed(5)+', '+journeyTarget.lon.toFixed(5);
    el('journeyChosenLabel').textContent=name;
    el('journeyChosenAddress').classList.remove('hidden');
    el('journeyAddressResults')?.replaceChildren();
-   status('Punto blu selezionato. Controllalo sulla Home, scegli i destinatari e avvia Accompagnami.','ok');
+   status('Punto blu selezionato. Controllalo sulla Home, scrivi Casa, Lavoro o un altro nome nella casella sotto, poi scegli i destinatari.','ok');
    renderMap();renderPin();
  }
  window.ZyroJourneyAddressSelected=selected;
@@ -63,6 +63,8 @@
    const j=typeof current!=='undefined'?current?.me?.journey:null;
    if(!j||!['active','late','cancelled'].includes(j.status)||!valid(j.destinationPoint))return;
    if(selectedFromJourney?.name===j.destination||journeyTarget)return;
+   const destinationName=el('journeyDestination');
+   if(destinationName&&!destinationName.value.trim())destinationName.value=j.destination;
    selected(j.destinationPoint,j.destination);
    selectedFromJourney={...journeyTarget,name:j.destination,journeyId:j.id};
  }
