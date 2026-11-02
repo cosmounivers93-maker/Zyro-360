@@ -1,0 +1,27 @@
+/* Accompagnami address verification: additive to the approved light violet/cyan theme. */
+#journeyPanel .zyro-journey-address{padding:15px;margin:14px 0;border:1px solid #a9cddd;border-radius:20px;background:linear-gradient(125deg,#eaf6ff,#f4efff 60%,#e7fff9);color:#284963;min-width:0;box-sizing:border-box}
+#journeyPanel .zyro-journey-address h3{margin:0 0 5px;font-size:17px;color:#2c4f78}
+#journeyPanel .zyro-journey-address>p{margin:0 0 14px;font-size:12px;line-height:1.6;color:#5a7184}
+#journeyPanel .zyro-journey-address label{display:block;margin:10px 0 6px;font-weight:720;font-size:13px;color:#325675}
+#journeyPanel .zyro-journey-address input{display:block;width:100%;box-sizing:border-box;min-height:46px;padding:10px 12px;border-radius:12px;border:1px solid #adc9db;background:#fff;color:#173a58;font:inherit;font-size:15px}
+#journeyPanel .zyro-journey-address-grid{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,.8fr);gap:10px}
+#journeyPanel #journeyFindAddress{width:100%;min-height:44px;margin:14px 0 5px}
+#journeyPanel #journeyAddressState{font-size:11px;line-height:1.6;color:#53718d;margin:10px 0}
+#journeyPanel #journeyAddressState[data-state="attention"]{color:#9c5f22}
+#journeyPanel #journeyAddressState[data-state="ok"]{color:#196c66}
+#journeyPanel .zyro-journey-results{display:grid;gap:8px}
+#journeyPanel .zyro-journey-result{width:100%;display:flex;align-items:center;gap:10px;text-align:left;padding:13px;min-height:50px;background:#ffffffed;color:#275078;border:1px solid #afcfdf;border-radius:14px;cursor:pointer}
+#journeyPanel .zyro-journey-result>span:last-child{flex:1;min-width:0;overflow-wrap:anywhere;font-size:12px;line-height:1.5}
+#journeyPanel .zyro-journey-blue-dot{width:13px;height:13px;display:inline-block;flex:none;border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 1px #147ee8,0 1px 7px #2678ed66;background:#1886ff}
+#journeyPanel .zyro-journey-chosen{padding:12px;display:grid;grid-template-columns:17px 1fr;gap:7px 10px;align-items:center;background:#e4f6ff;border:1px solid #9cc9ec;border-radius:14px;color:#24517a}
+#journeyPanel .zyro-journey-chosen strong{font-size:12px;overflow-wrap:anywhere}
+#journeyPanel .zyro-journey-chosen button{grid-column:1/-1;min-height:42px}
+#journeyPanel .zyro-journey-chosen.hidden{display:none}
+#journeyPanel .zyro-journey-restart{padding:16px;display:grid;gap:12px;border-radius:18px;border:1px solid #b5b2e7;background:linear-gradient(125deg,#e8f4ff,#f2ecff);margin:14px 0;color:#284965}
+#journeyPanel .zyro-journey-restart.hidden{display:none}
+#journeyPanel .zyro-journey-restart p{margin:0;font-size:13px;line-height:1.6}
+#journeyPanel .zyro-journey-restart small{line-height:1.5;font-size:11px;color:#617386}
+#journeyPanel .zyro-journey-address input:focus-visible,#journeyPanel .zyro-journey-result:focus-visible{outline:3px solid #3bbcca;outline-offset:2px}
+#liveMap .zyro-journey-map-pin,#zyroVectorMap .zyro-journey-map-pin{width:24px!important;height:24px!important;display:grid;place-items:center;border:4px solid white!important;border-radius:50%!important;background:#1685ff!important;box-shadow:0 2px 11px #1376d6b0!important;color:white!important;font-size:16px!important;line-height:1!important;pointer-events:none!important;z-index:12!important}
+#liveMap .zyro-journey-map-pin:after,#zyroVectorMap .zyro-journey-map-pin:after{content:'';position:absolute;top:24px;left:10px;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid #1685ff}
+@media(max-width:360px){#journeyPanel .zyro-journey-address-grid{grid-template-columns:1fr}#journeyPanel .zyro-journey-address{padding:12px}}
