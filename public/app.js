@@ -1629,7 +1629,8 @@ function renderV15(){if(!current)return;
 async function v15JourneyStart(){
  requireLifeGuardPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];
- if(!destination||!journeyTarget)throw Error('Cerca e conferma un indirizzo o scegli il punto GPS sulla mappa prima di avviare Accompagnami.');
+ if(!destination)throw Error('Scrivi dove stai andando: ad esempio Casa, Lavoro o Altro.');
+ if(!journeyTarget)throw Error('Cerca e conferma un indirizzo o scegli il punto GPS sulla mappa prima di avviare Accompagnami.');
  if(!recipients.length)throw Error('Scegli almeno un contatto dalla tua cerchia.');
  const auto=$('journeyAuto').checked;
  if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
@@ -2263,7 +2264,7 @@ async function init(){
  const center=stableMap.center||stableMap.map?.getCenter();if(!center||!mapValidPoint(center)){toast('Mappa non ancora pronta.',true);return;}
  journeyTarget={lat:Number(center.lat),lon:Number(center.lon)};
  const text=`Punto scelto sulla mappa (${journeyTarget.lat.toFixed(5)}, ${journeyTarget.lon.toFixed(5)})`;
- $('journeyDestination').value=text.slice(0,70);$('journeyTargetInfo').textContent=text;
+ $('journeyTargetInfo').textContent=text; // Map position is independent of the user's Casa/Lavoro name.
  window.ZyroJourneyAddressSelected?.(journeyTarget,text,true);renderMap();toast('Meta manuale selezionata. Controlla il puntino blu sulla Home.');
  });
   $('journeyStart').addEventListener('click',()=>action(v15JourneyStart));
