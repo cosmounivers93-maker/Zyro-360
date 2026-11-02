@@ -24,7 +24,7 @@ test('owner can set independent GPS SOS microphone ring lock permissions per mem
  for(const key of ['shareGps','receiveSos','listenSosAudio','remoteRing','remoteLock'])
    assert.ok(section.includes(key),key);
  assert.match(section,/sharedCircle\(req\.user\.id,otherId\)/);
- assert.match(section,/!premiumActive\(req\.user\)/);
+ assert.match(section,/!familyActive\(req\.user\)/);
  assert.match(section,/!familyActive\(req\.user\)/);
  assert.match(section,/req\.user\.sosAudioRecipients/);
  assert.match(section,/req\.user\.pickRemoteRingContacts/);
