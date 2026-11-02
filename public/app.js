@@ -221,7 +221,7 @@ function setState(data){
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
+  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderLifeGuard();renderAdminAccess();renderReportContacts();renderInvitedPeople();
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
 
@@ -690,6 +690,7 @@ function zyroNativeRequest(action,payload={}){
 function nativeSyncError(code){
  if(code==='zyro-needs-location')return 'Consenti la posizione Android e riprova.';
  if(code==='zyro-needs-login')return 'Accedi dall’app Android, non dal browser.';
+ if(code==='zyro-needs-notifications')return 'Autorizza le notifiche Android prima di avviare LifeGuard.';
  if(code==='zyro-denied')return 'Il sistema non autorizza il monitoraggio.';
  if(code==='zyro-invalid-recipients')return 'Contatti selezionati non validi.';
  return 'Servizio Android non avviato: controlla autorizzazioni e batteria.';
@@ -701,13 +702,14 @@ async function nativeBackgroundSync(options={}){
  const recipients=$('pickNotify')?.checked?[...pickSelected]:[];
  const selectedSensitivity=$('pickSensitivity')?.value;
  const sensitivity=['normal','high','ultra'].includes(selectedSensitivity)?selectedSensitivity:'normal';
- const payload={sharing,pick,recipients,sensitivity};
+ const lifeGuard=options.lifeGuard===undefined?Boolean(current?.me?.lifeguardFallEnabled):!!options.lifeGuard;
+ const payload={sharing,pick,recipients,sensitivity,lifeGuard};
  let result;
  if(hasZyroNativeBridge()){
    const response=await zyroNativeRequest('sync',payload);
    result=response.result;
    window.ZyroAndroidSafetySupported=true;
-   window.ZyroAndroidSafetyBuild=24;
+   window.ZyroAndroidSafetyBuild=25;
  }else result=window.prompt('ZYRO360_BG_SYNC',JSON.stringify(payload));
  if(result==='zyro-native')return true;
  throw Error(nativeSyncError(result));
@@ -724,7 +726,7 @@ function zyroNativeAge(ms){
 function nativeDiagnosticText(state){
  if(!isZyroNativeAvailable())
    return '⚠ Collegamento Android assente. Potresti aver aperto il sito o un collegamento del browser. Controlla in Impostazioni Android → App → Zyro 360 la versione 1.0.0-rc3, poi apri l’app dalla sua icona.';
- if(!state || !['v23-android','v24-android'].includes(state.build))
+ if(!state || !['v23-android','v24-android','v25-android'].includes(state.build))
    return '⚠ Collegamento non ancora verificato. Premi «Verifica servizio Android»: controlliamo la risposta diretta del telefono.';
  if(!state.running)
    return '○ Servizio Android non attivo. Attiva GPS LIVE oppure Pick Pocket, poi verifica di nuovo.';
@@ -734,6 +736,7 @@ function nativeDiagnosticText(state){
    const fresh=Date.now()-Number(state.lastServerAcceptedAt||0)<120000;
    parts.push((fresh?'✓':'⚠')+' GPS accettato dal server: '+zyroNativeAge(state.lastServerAcceptedAt));
  }else parts.push('GPS LIVE: non condiviso');
+ if(state.lifeGuard)parts.push('LifeGuard: rilevamento possibile caduta attivo · '+(state.fallWarning?'VERIFICA IN CORSO':'sensori in ascolto'));
  if(state.pick){
    const recent=Date.now()-Number(state.lastSensorAt||0)<90000;
    parts.push((state.sensorReady&&state.sensorSamplingActive&&recent?'✓':'⚠')+
@@ -1596,6 +1599,45 @@ async function previewSiren(){
   setTimeout(()=>{if(!theftTriggered)stopSiren();},2000);
 }
 
+function renderLifeGuard(){
+ const box=$('lifeGuardFallEnabled'), status=$('lifeGuardStatus');
+ if(!box||!status||!current)return;
+ const enabled=current.me.lifeguardFallEnabled===true;
+ box.checked=enabled;
+ const family=current.me.features?.lifeguardFall===true;
+ const native=window.ZyroNativeSafety;
+ if(!family){box.disabled=true;status.textContent='Il rilevamento di possibili cadute richiede Family. Rientro sicuro e Check-in sono disponibili con Base.';return;}
+ box.disabled=false;
+ if(!enabled){status.textContent='Rilevamento cadute disattivato. Per attivarlo scegli prima i destinatari SOS.';return;}
+ if(!isZyroNativeAvailable()){status.textContent='Autorizzazione salvata. Rilevamento non attivo: apri Zyro 360 nell’app Android compatibile.';return;}
+ if(!native?.lifeGuard){status.textContent='Protezione non attiva sul telefono. Riattivala dall’interruttore o aggiorna l’app Android.';return;}
+ if(!native?.sensorReady){status.textContent='Il servizio Android è avviato, ma l’accelerometro non risulta disponibile.';return;}
+ status.textContent=native.fallWarning?'Possibile caduta: verifica in corso! Usa la notifica Android «Sto bene» per annullare.':'Servizio LifeGuard avviato su Android. Rilevamento non garantito: verifica la notifica persistente.';
+}
+async function toggleLifeGuard(){
+ const wanted=$('lifeGuardFallEnabled')?.checked===true;
+ if(wanted&&!hasFamilyPlan())throw Error('Rilevamento possibili cadute incluso solo in ZYRO Family.');
+ await post('/api/lifeguard/settings',{fallEnabled:wanted});
+ await refresh();
+ if(!isZyroNativeAvailable()){
+   renderLifeGuard();
+   toast('Impostazione salvata, ma il rilevamento richiede la versione Android con supporto LifeGuard.',true);
+   return;
+ }
+ try{
+   await nativeBackgroundSync({lifeGuard:wanted});
+   await readNativeSafetyStatus();
+   renderLifeGuard();
+   toast(wanted?'Controlla lo stato: sensori Android in avvio.':'Rilevamento possibili cadute disattivato.');
+ }catch(err){
+   if(wanted){
+     await post('/api/lifeguard/settings',{fallEnabled:false});
+     await refresh();
+     renderLifeGuard();
+   }
+   throw err;
+ }
+}
 function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
  return contacts.length?contacts.map(u=>`<label class="zyro-v15-contact"><input data-${tag}="${escapeHtml(u.id)}" type="checkbox" ${selected.has(u.id)?'checked':''}><span>${escapeHtml(u.name)}</span></label>`).join(''):'<p class="zyro-v15-note">Invita prima almeno una persona nella sezione Cerchie.</p>';
 }
@@ -1611,25 +1653,25 @@ function renderV15(){if(!current)return;
  }
  const j=me.journey,onJ=j&&['active','late'].includes(j.status);
  $('journeyInactive').classList.toggle('hidden',!!onJ);$('journeyActive').classList.toggle('hidden',!onJ);
- if(onJ){$('journeyStatus').textContent=j.status==='late'?'Orario previsto superato: contatta i tuoi familiari':'Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination} · Previsto entro ${v15Time(j.dueAt)}${j.autoArrival?' · Rilevamento GPS attivo':''}`;}
+ if(onJ){$('journeyStatus').textContent=j.status==='late'?(j.sosSent?'SOS LifeGuard avviato, verifica sulla Home':j.autoSOS?'Conferma rientro: scadenza SOS in 2 minuti':'Orario previsto superato: contatta i tuoi familiari'):'Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination} · Previsto entro ${v15Time(j.dueAt)}${j.autoArrival?' · Rilevamento GPS attivo':''}${j.autoSOS?' · SOS automatico autorizzato':''}`;}
  const c=me.checkin,onC=c&&['pending','late'].includes(c.status);
  $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
- if(onC){$('checkinStatus').textContent=c.status==='late'?'Orario scaduto: conferma appena puoi':'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.`;}
+ if(onC){$('checkinStatus').textContent=c.status==='late'?(c.sosSent?'SOS LifeGuard avviato, verifica sulla Home':c.autoSOS?'Conferma entro 2 minuti per evitare l’SOS':'Orario scaduto: conferma appena puoi'):'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.${c.autoSOS?' SOS automatico autorizzato.':''}`;}
  const others=(current.journeys||[]).filter(x=>x.userId!==me.id);
  updateMarkupIfChanged($('journeyContactsStatus'),others.map(x=>`<p class="zyro-v15-contact-status">🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)} · ${x.status==='late'?'In ritardo':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso annullato':'Arrivo previsto '+v15Time(x.dueAt)}</p>`).join(''));
  const checks=(current.checkins||[]).filter(x=>x.userId!==me.id);
  updateMarkupIfChanged($('checkinContactsStatus'),checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join(''));
 }
 async function v15JourneyStart(){
- requireFamilyPlan();
+ if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Accompagnami richiede Base o Family.');}
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
  const auto=$('journeyAuto').checked;
  if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
- const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:auto?journeyTarget:null});
+ const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,autoSOS:$('journeyAutoSOS').checked,destinationPoint:auto?journeyTarget:null});
  await refresh();toast(result.ok?'Accompagnami attivo. I contatti scelti vedono il percorso se hai attivato la posizione.':'Percorso non avviato.');
 }
 async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere il percorso?'))return;await post('/api/journey/end',{arrived});journeyTarget=null;$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato.');}
-async function v15CheckinStart(){requireFamilyPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
+async function v15CheckinStart(){if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Check-in richiede Base o Family.');}if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected],autoSOS:$('checkinAutoSOS').checked});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
 // ZYRO V16: one right-side settings drawer for every account. Existing controls
@@ -2215,7 +2257,7 @@ async function init(){
   $('modesView').addEventListener('click',event=>{
     const button=event.target.closest('button[data-mode-target]');
     if(!button||!$('modesView').contains(button))return;
-    const allowed={sosRecipientsPanel:'zyroSosOptions',pickPanel:null,journeyPanel:'zyroJourneyOptions',checkinPanel:'zyroCheckinOptions'};
+    const allowed={sosRecipientsPanel:'zyroSosOptions',pickPanel:null,lifeGuardPanel:null,journeyPanel:'zyroJourneyOptions',checkinPanel:'zyroCheckinOptions'};
     const targetName=button.dataset.modeTarget;
     if(!Object.hasOwn(allowed,targetName))return;
     const target=$(targetName);
@@ -2230,6 +2272,8 @@ async function init(){
     }
     target.scrollIntoView({behavior:'auto',block:'start'});
   });
+  $('lifeGuardFallEnabled')?.addEventListener('change',()=>action(toggleLifeGuard));
+  window.addEventListener('zyro:android-safety-state',renderLifeGuard);
   $('pickArm').addEventListener('click',()=>action(armPick));
   $('pickTest').addEventListener('click',()=>action(previewSiren));
   $('theftStop').addEventListener('click',()=>action(stopTheft));

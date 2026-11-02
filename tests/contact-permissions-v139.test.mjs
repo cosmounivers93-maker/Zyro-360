@@ -53,7 +53,8 @@ test('profile permission page lists all five specific toggles and SOS global mic
  for(const t of ['Può vedere il mio GPS','Riceve i miei SOS',
   'Può ascoltare il mio microfono durante SOS',
   'Può far squillare il mio telefono','Può bloccare il mio telefono da remoto',
-  'Consenti audio durante SOS','Abilita tutte le opzioni'])assert.ok(client.includes(t),t);
+  'Abilita tutte le opzioni'])assert.ok(client.includes(t),t);
+ assert.match(client,/consentToggle\.dataset\.sosAudioConsent='true'/);
  for(const prop of ['sosAudioRecipients','pickRemoteRingContacts','pickRemoteLockContacts'])
    assert.ok(client.includes('current.me.'+prop),prop);
  assert.match(client,/uniqueContacts\(\)\.some\(c=>c\.id===id\)/);

@@ -30,7 +30,9 @@ test('Premium maintains optional automatic screen lock and other safety features
  assert.match(server,/pickAdvanced:premiumActive\(user\)/);
  assert.match(server,/sos:premiumActive\(user\)/);
  assert.match(server,/sosAudio:familyActive\(user\)/);
- assert.match(server,/journey:familyActive\(user\)/);
+ assert.match(server,/journey:premiumActive\(user\)/);
+ assert.match(server,/checkin:premiumActive\(user\)/);
+ assert.match(server,/lifeguardFall:familyActive\(user\)/);
 });
 test('client disables remote contact switches for non-Family without blocking GPS/SOS',()=>{
  assert.match(client,/\(\(type==='ring'\|\|type==='lock'\)\&\&!family\)/);

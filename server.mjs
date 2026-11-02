@@ -1,6 +1,7 @@
 import express from 'express';
 import {eraseAccount} from './account-deletion.mjs';
 import {normalizeChatView,summarizeChat,chatPage} from './chat-view-core.mjs';
+import {lifeGuardGraceUntil,lifeGuardShouldEscalate} from './lifeguard-policies.mjs';
 import {PlayBilling,PlayRepository,GooglePlayApi,createTokenCipher,accountId,PACKAGE} from './play-billing.mjs';
 import {isIP} from 'node:net';
 import http from 'node:http';
@@ -108,14 +109,14 @@ const premiumPlan = user => {
 };
 const premiumActive = user => premiumPlan(user)!=='free';
 const familyActive = user => premiumPlan(user)==='family';
-const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
+const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:premiumActive(user),checkin:premiumActive(user),lifeguardBasic:premiumActive(user),lifeguardFall:familyActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
 function validCoords(point){const lat=Number(point?.lat),lon=Number(point?.lon),accuracy=Number(point?.accuracy||0);return Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180&&Number.isFinite(accuracy)&&accuracy>=0&&accuracy<=100000?{lat,lon,accuracy,updatedAt:now()}:null;}
 function metersBetween(a,b){const r=Math.PI/180,phi=(b.lat-a.lat)*r,l=(b.lon-a.lon)*r;const q=Math.sin(phi/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(l/2)**2;return 12742000*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
-const publicJourney = (j,viewer) => j && (j.userId===viewer || (j.recipients||[]).includes(viewer)) ? {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',destination:j.destination,dueAt:j.dueAt,startedAt:j.startedAt,status:j.status,arrivedAt:j.arrivedAt||null,autoArrival:!!j.destinationPoint} : null;
-const publicCheckin = (c,viewer) => c && (c.userId===viewer || (c.recipients||[]).includes(viewer)) ? {id:c.id,userId:c.userId,name:db.users[c.userId]?.name||'Contatto',dueAt:c.dueAt,status:c.status,completedAt:c.completedAt||null} : null;
+const publicJourney = (j,viewer) => j && (j.userId===viewer || (j.recipients||[]).includes(viewer)) ? {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',destination:j.destination,dueAt:j.dueAt,startedAt:j.startedAt,status:j.status,arrivedAt:j.arrivedAt||null,autoArrival:!!j.destinationPoint,autoSOS:j.autoSOS===true,graceUntil:j.graceUntil||null,sosSent:j.sosSent===true} : null;
+const publicCheckin = (c,viewer) => c && (c.userId===viewer || (c.recipients||[]).includes(viewer)) ? {id:c.id,userId:c.userId,name:db.users[c.userId]?.name||'Contatto',dueAt:c.dueAt,status:c.status,completedAt:c.completedAt||null,autoSOS:c.autoSOS===true,graceUntil:c.graceUntil||null,sosSent:c.sosSent===true} : null;
 
 const cleanText = (s, max = 60) => String(s || '').trim().replace(/[\u0000-\u001F\u007F<>]/g, '').slice(0, max);
 const publicUser = u => ({ id: u.id, name: u.name, avatar: u.avatar || null });
@@ -239,6 +240,7 @@ function stateFor(id) {
   pickRemoteContacts:familyActive(me)?(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteRingContacts:familyActive(me)?(me.pickRemoteRingContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteLockContacts:familyActive(me)?(me.pickRemoteLockContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
+  lifeguardFallEnabled:familyActive(me)&&me.lifeguardFallEnabled===true,
   sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
@@ -824,13 +826,98 @@ async function sosAddressFor(pos){
  }catch{return null;}
 }
 function journeyAudience(userId, ids){const chosen=allowedRecipients(userId,ids);return chosen&&chosen.length===new Set(ids).size&&chosen.length?chosen:null;}
-// Trip / check-in events are server-backed but cannot run during Render Free spin-down.
-function overdueCheck(){
- const t=now();let changed=false;
- for(const j of Object.values(db.journeys))if(j.status==='active'&&j.dueAt<=t){j.status='late';j.lateAt=t;changed=true;void sendEventPush(j.recipients,'⌛ Percorso in ritardo',`${db.users[j.userId]?.name||'Un contatto'} non ha ancora confermato l'arrivo a ${j.destination}. Verifica direttamente.`);for(const x of j.recipients)pushState(x);}
- for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){c.status='late';c.lateAt=t;changed=true;void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);for(const x of c.recipients)pushState(x);}
- if(changed)save();
+// Only an account owner's opt-in settings may create a possible-emergency alert.
+// The server owns the account, subscription, recipient selection and cooldown.
+async function lifeGuardSOS(ownerId, selected, reason, position=null){
+ const owner=db.users[ownerId];
+ if(!owner||!premiumActive(owner))return {ok:false,reason:'piano_non_attivo'};
+ const recipients=[...new Set((selected||[]).filter(id=>id!==ownerId&&sharedCircle(ownerId,id)))];
+ if(!recipients.length)return {ok:false,reason:'destinatari_non_disponibili'};
+ if(currentAlert(ownerId))return {ok:false,reason:'allarme_gia_attivo'};
+ const loc=validCoords(position) || (locations.get(ownerId)&&now()-locations.get(ownerId).updatedAt<120000?locations.get(ownerId):null);
+ if(loc)locations.set(ownerId,loc);
+ const alert={id:token(12),userId:ownerId,recipients,startedAt:now(),active:true,hasAudio:false,
+   kind:'sos',address:null,lifeGuardReason:reason};
+ db.alerts[alert.id]=alert;save();refreshRelated(ownerId);
+ const address=await sosAddressFor(loc);
+ if(address){alert.address=address;save();refreshRelated(ownerId);}
+ const place=address||(loc?'Coordinate GPS disponibili nella mappa, se aggiornate.':'Posizione non disponibile.');
+ const label=reason==='fall'?'Possibile caduta o impatto':'Mancata conferma di sicurezza';
+ const push=await sendEventPush(recipients,`🆘 Zyro LifeGuard: ${label}`,
+   `${cleanText(owner.name,36)} potrebbe avere bisogno di aiuto. ${label}. ${place} Apri Zyro 360 e verifica direttamente.`,'sos');
+ return {ok:true,id:alert.id,pushConfigured:push.configured,pushAccepted:push.accepted,
+   pushAttempted:push.attempted,recipientCount:recipients.length};
 }
+// Deadlines run on the server while it is awake. Push acceptance is not delivery.
+// Never promote a missed check-in to SOS without explicit advance consent.
+function overdueCheck(){
+ const t=now();let changed=false;const escalate=[];
+ for(const j of Object.values(db.journeys)){
+  if(j.status==='active'&&j.dueAt<=t){
+   j.status='late';j.lateAt=t;changed=true;
+   if(j.autoSOS===true){
+    j.graceUntil=lifeGuardGraceUntil(t);
+    void sendEventPush([j.userId],'⏱️ LifeGuard: conferma il rientro','Hai 2 minuti per confermare di essere arrivato/a, altrimenti partirà un possibile SOS. Apri Zyro 360.');
+   }else{
+    void sendEventPush(j.recipients,'⌛ Percorso in ritardo',`${db.users[j.userId]?.name||'Un contatto'} non ha ancora confermato l'arrivo a ${j.destination}. Verifica direttamente.`);
+   }
+   for(const x of j.recipients)pushState(x);
+  }else if(lifeGuardShouldEscalate(j,t)){
+   j.sosSent=true;changed=true;escalate.push([j.userId,j.recipients,'journey']);
+  }
+ }
+ for(const c of Object.values(db.checkins)){
+  if(c.status==='pending'&&c.dueAt<=t){
+   c.status='late';c.lateAt=t;changed=true;
+   if(c.autoSOS===true){
+    c.graceUntil=lifeGuardGraceUntil(t);
+    void sendEventPush([c.userId],'⏱️ LifeGuard: conferma di stare bene','Hai 2 minuti per confermare che stai bene, altrimenti partirà un possibile SOS. Apri Zyro 360.');
+   }else{
+    void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);
+   }
+   for(const x of c.recipients)pushState(x);
+  }else if(lifeGuardShouldEscalate(c,t)){
+   c.sosSent=true;changed=true;escalate.push([c.userId,c.recipients,'checkin']);
+  }
+ }
+ if(changed)save();
+ for(const [id,recipients,reason] of escalate)
+   void lifeGuardSOS(id,recipients,reason).catch(err=>console.error('[LifeGuard] SOS non confermato:',err.message));
+}
+app.get('/api/lifeguard/settings',requireAuth,(req,res)=>{
+ res.set('Cache-Control','no-store');
+ res.json({basic:premiumActive(req.user),family:familyActive(req.user),
+  fallEnabled:familyActive(req.user)&&req.user.lifeguardFallEnabled===true,
+  recipients:(req.user.sosRecipients||[]).filter(id=>id!==req.user.id&&sharedCircle(req.user.id,id))});
+});
+app.post('/api/lifeguard/settings',requireAuth,limit,(req,res)=>{
+ if(req.body?.fallEnabled!==true&&req.body?.fallEnabled!==false)
+   return res.status(400).json({error:'Indica se abilitare o disabilitare il controllo cadute.'});
+ if(req.body.fallEnabled===true&&!familyActive(req.user))
+   return res.status(402).json({error:'Rilevamento cadute disponibile nel piano Family.'});
+ const recipients=(req.user.sosRecipients||[]).filter(id=>id!==req.user.id&&sharedCircle(req.user.id,id));
+ if(req.body.fallEnabled===true&&!recipients.length)
+   return res.status(409).json({error:'Seleziona prima i destinatari SOS in Modalità.'});
+ req.user.lifeguardFallEnabled=req.body.fallEnabled===true;save();
+ res.json({ok:true,fallEnabled:familyActive(req.user)&&req.user.lifeguardFallEnabled===true});
+});
+app.post('/api/lifeguard/fall',requireAuth,limit,async(req,res)=>{
+ if(!familyActive(req.user)||req.user.lifeguardFallEnabled!==true)
+   return res.status(403).json({error:'LifeGuard non autorizzato su questo account.'});
+ const last=Number(req.user.lifeguardLastFallAt||0);
+ if(now()-last<10*60*1000)return res.status(429).json({error:'Protezione anti-duplicati: attendi prima di un nuovo avviso.'});
+ const recipients=(req.user.sosRecipients||[]).filter(id=>id!==req.user.id&&sharedCircle(req.user.id));
+ if(!recipients.length)return res.status(409).json({error:'Nessun destinatario SOS autorizzato.'});
+ if(currentAlert(req.user.id))return res.status(409).json({error:'Un allarme è già attivo.'});
+ req.user.lifeguardLastFallAt=now();save();
+ try{
+  const result=await lifeGuardSOS(req.user.id,recipients,'fall',req.body?.location);
+  res.status(result.ok?200:409).json(result);
+ }catch(err){
+  console.error('[LifeGuard] fall alert failure',err.message);
+  res.status(503).json({error:'Non è stato possibile confermare l’invio dell’allarme.'});
+ }
+});
 app.get('/api/premium/status',requireAuth,(req,res)=>res.json({active:premiumActive(req.user),plan:premiumPlan(req.user),features:planFeatures(req.user),billingReady:billingReady(),expiresAt:premiumExpiry(req.user)}));
 app.get('/api/billing/bootstrap',requireAuth,(req,res)=>{
  res.set('Cache-Control','no-store');
@@ -876,7 +963,7 @@ app.post('/api/billing/google-notifications',async(req,res)=>{
 });
 
 app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
- if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
+ if(!premiumActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Base o Family.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients);
  const destination=cleanText(req.body.destination,70);const mins=Number(req.body.minutes);
  if(!recipients||!destination||!Number.isInteger(mins)||mins<5||mins>720)return res.status(400).json({error:'Indica meta, minuti (5-720) e destinatari della cerchia.'});
@@ -884,7 +971,7 @@ app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  if(['active','late'].includes(db.journeys[req.user.id]?.status))return res.status(409).json({error:'Termina prima il percorso esistente.'});
  const point=req.body.destinationPoint?validCoords(req.body.destinationPoint):null;
  if(req.body.destinationPoint && !point)return res.status(400).json({error:'Coordinate della destinazione non valide.'});
- const j={id:token(10),userId:req.user.id,destination,recipients,startedAt:now(),dueAt:now()+mins*60000,status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,nearCount:0};
+ const j={id:token(10),userId:req.user.id,destination,recipients,startedAt:now(),dueAt:now()+mins*60000,status:'active',autoSOS:req.body.autoSOS===true,graceUntil:null,sosSent:false,destinationPoint:point?{lat:point.lat,lon:point.lon}:null,nearCount:0};
  db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
  void sendEventPush(recipients,'🚶 Percorso iniziato',`${req.user.name} è in viaggio verso ${destination}. Orario di arrivo previsto: ${new Date(j.dueAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'})}.`);
  res.json({ok:true,journey:publicJourney(j,req.user.id)});
@@ -895,11 +982,11 @@ app.post('/api/journey/end',requireAuth,(req,res)=>{
  save();refreshRelated(req.user.id);void sendEventPush(j.recipients,arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`);res.json({ok:true});
 });
 app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
- if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
+ if(!premiumActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Base o Family.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients),minutes=Number(req.body.minutes);
  if(!recipients||!Number.isInteger(minutes)||minutes<5||minutes>1440)return res.status(400).json({error:'Scegli i contatti e un controllo tra 5 e 1440 minuti.'});
  if(['pending','late'].includes(db.checkins[req.user.id]?.status))return res.status(409).json({error:'Hai già un check-in attivo.'});
- const c={id:token(10),userId:req.user.id,recipients,dueAt:now()+minutes*60000,status:'pending',startedAt:now()};db.checkins[req.user.id]=c;save();refreshRelated(req.user.id);res.json({ok:true,checkin:publicCheckin(c,req.user.id)});
+ const c={id:token(10),userId:req.user.id,recipients,dueAt:now()+minutes*60000,status:'pending',startedAt:now(),autoSOS:req.body.autoSOS===true,graceUntil:null,sosSent:false};db.checkins[req.user.id]=c;save();refreshRelated(req.user.id);res.json({ok:true,checkin:publicCheckin(c,req.user.id)});
 });
 app.post('/api/checkin/end',requireAuth,(req,res)=>{
  const c=db.checkins[req.user.id];if(!c||!['pending','late'].includes(c.status))return res.status(404).json({error:'Nessun check-in attivo.'});
