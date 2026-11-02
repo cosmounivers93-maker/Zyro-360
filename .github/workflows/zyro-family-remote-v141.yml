@@ -1,0 +1,28 @@
+name: ZYRO 360 Family-Only Remote Security v1.0.41
+on:
+  push:
+    branches: ['feat/zyro-family-only-remote-v141']
+    paths:
+      - 'server.mjs'
+      - 'public/index.html'
+      - 'public/app.js'
+      - 'public/style.css'
+      - 'tests/**'
+      - '.github/workflows/zyro-family-remote-v141.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  family-entitlements:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate server and frontend syntax
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+      - name: Verify plan entitlement, contact permissions and guide
+        run: node --test tests/family-remote-only-v141.test.mjs tests/pick-remote-security.test.mjs tests/contact-permissions-v139.test.mjs tests/help-advanced-safety-v140.test.mjs

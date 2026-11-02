@@ -1966,7 +1966,7 @@ function renderInvitedPeople(){
      input.dataset.accessUser=member.id;input.dataset.accessType=type;
      input.checked=checked;
      input.disabled=!!current.me.sos || (type==='audio' && (!hasFamilyPlan()||!sosSet.has(member.id))) ||
-       ((type==='ring'||type==='lock') && !current.me.premiumActive);
+       ((type==='ring'||type==='lock') && !hasFamilyPlan());
      input.setAttribute('aria-label',labelText+' per '+member.name);
      row.append(info,input);card.append(row);
    };
@@ -1977,9 +1977,9 @@ function renderInvitedPeople(){
    addToggle('audio','Può ascoltare il mio microfono durante SOS',
        'Solo Family: richiede anche SOS abilitato, il consenso microfono generale e la mia attivazione SOS.',audioSet.has(member.id));
    addToggle('ring','Può far squillare il mio telefono',
-       'Solo Premium e Family, durante un vero allarme Pick Pocket, con consenso preventivo.',ringSet.has(member.id));
+       'Solo Family: durante un vero allarme Pick Pocket e con consenso preventivo.',ringSet.has(member.id));
    addToggle('lock','Può bloccare il mio telefono da remoto',
-       'Solo Premium e Family, durante un vero allarme Pick Pocket; richiede autorizzazione amministratore Android.',lockSet.has(member.id));
+       'Solo Family: durante un allarme Pick Pocket; richiede autorizzazione amministratore Android.',lockSet.has(member.id));
    root.append(card);
  }
  if(current.me.sos){
