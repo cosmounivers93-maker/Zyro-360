@@ -31,3 +31,13 @@
 #lifeguardPanel .zyro-life-status[data-state="warning"]{background:#fff4df;color:#79541e}
 #lifeguardPanel .zyro-life-caution{font-size:11px;line-height:1.7;color:#5a7383;margin:0}
 @media(max-width:380px){#lifeguardPanel .zyro-life-intro{padding:14px}#lifeguardPanel .zyro-life-fall-switch{padding:12px}}
+
+/* Directly editable fall sensitivity, only inside LifeGuard. */
+#lifeguardPanel .zyro-life-sensitivity{border:1px solid #abcff0;border-radius:18px;background:#fffdfedb;padding:12px 15px;margin:0;min-width:0}
+#lifeguardPanel .zyro-life-sensitivity legend{padding:0 6px;color:#204e69;font-size:13px;font-weight:760}
+#lifeguardPanel .zyro-life-level-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:6px 0 9px}
+#lifeguardPanel .zyro-life-level-buttons button{min-height:44px;border:1px solid #b5c9e6;background:#eef5ff;border-radius:13px;color:#344f78;font-weight:750;cursor:pointer;font-size:13px}
+#lifeguardPanel .zyro-life-level-buttons button[aria-pressed="true"]{background:linear-gradient(125deg,#d8d5ff,#c2f5ef);border-color:#898cda;color:#354388}
+#lifeguardPanel .zyro-life-level-buttons button:focus-visible{outline:3px solid #48bfc9;outline-offset:2px}
+#lifeguardPanel .zyro-life-sensitivity>small{display:block;color:#5a7383;font-size:11px;line-height:1.6}
+#lifeguardPanel .zyro-life-toggle input:disabled+span{opacity:.85}
