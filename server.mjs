@@ -825,7 +825,7 @@ async function sosAddressFor(pos){
   return cleanText([[road,number].filter(Boolean).join(' '),city].filter(Boolean).join(', '),160)||null;
  }catch{return null;}
 }
-/** LifeGuard SOS: unconfirmed safety check, not a medically verified incident.
+/** Missed-confirmation SOS: unconfirmed safety check, not a medically verified incident.
  * Authenticated owner opt-in; server records the alert before sending best-effort push. */
 function startLifeGuardAlert(userId, requested, source, suppliedLocation=null){
  const owner=db.users[userId];
@@ -839,9 +839,9 @@ function startLifeGuardAlert(userId, requested, source, suppliedLocation=null){
  const alert={id:token(12),userId,recipients,startedAt:now(),active:true,hasAudio:false,kind:'sos',source:'lifeguard',reason:source,address:null};
  db.alerts[alert.id]=alert;save();refreshRelated(userId);
  const coords=pos?' Ultima posizione disponibile: '+pos.lat.toFixed(5)+', '+pos.lon.toFixed(5)+'.':' Posizione non disponibile.';
- const message='Controllo LifeGuard scaduto senza conferma.'+coords+' Contatta la persona e, se necessario, chiama il 112.';
- void sendEventPush(recipients,'🆘 LifeGuard 360: verifica urgente',cleanText(owner.name,36)+': '+message,'sos')
-   .catch(err=>console.error('[LifeGuard push]',err.message));
+ const message='Controllo di sicurezza scaduto senza conferma.'+coords+' Contatta la persona e, se necessario, chiama il 112.';
+ void sendEventPush(recipients,'🆘 Zyro 360: verifica urgente',cleanText(owner.name,36)+': '+message,'sos')
+   .catch(err=>console.error('[Safety-check push]',err.message));
  return {ok:true,id:alert.id,recipientCount:recipients.length};
 }
 function journeyAudience(userId, ids){const chosen=allowedRecipients(userId,ids);return chosen&&chosen.length===new Set(ids).size&&chosen.length?chosen:null;}
@@ -854,7 +854,7 @@ function overdueCheck(){
   if(!record.autoSos || record.autoSosSentAt || record.status!=='late' || t<record.dueAt+120000)continue;
   record.autoSosSentAt=t;changed=true;
   const result=startLifeGuardAlert(record.userId,record.recipients,'missed-checkin');
-  if(!result.ok)console.warn('[LifeGuard] SOS non inviato:',result.reason);
+  if(!result.ok)console.warn('[Safety-check] SOS non inviato:',result.reason);
  }
  if(changed)save();
 }
@@ -904,7 +904,7 @@ app.post('/api/billing/google-notifications',async(req,res)=>{
 
 // Fall monitoring was retired at the owner's request.
 // Old Android builds cannot enable it: no sensor SOS alert is sent.
-// The other LifeGuard tools (Accompagnami and Check-in) remain available.
+// Accompagnami and Check-in remain available as separate modes.
 app.post(['/api/lifeguard/fall/settings','/api/lifeguard/fall'],requireAuth,limit,(_req,res)=>{
  res.status(410).json({error:'La modalità rilevamento cadute è stata rimossa da Zyro 360.'});
 });
