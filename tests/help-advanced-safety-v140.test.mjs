@@ -58,3 +58,11 @@ test('accordion uses matching summary/detail structure',()=>{
  assert.equal((section.match(/id="zyroHelpContactPermissions"/g)||[]).length,1);
  assert.equal((section.match(/id="zyroHelpRemoteControl"/g)||[]).length,1);
 });
+
+test('help explains how owners freely revoke DeviceAdmin and uninstall Zyro 360',()=>{
+ assert.match(section,/Disattiva amministratore dispositivo/);
+ assert.match(section,/Android può impedirne la disinstallazione/);
+ assert.match(section,/Modalità → Pick Pocket → Protezione avanzata/);
+ assert.match(section,/blocco automatico e il blocco remoto non saranno più disponibili/);
+ assert.match(section,/disinstallare normalmente Zyro 360/);
+});
