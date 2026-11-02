@@ -6,7 +6,7 @@ const source=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 
 test('premium and family each include advanced Pick Pocket capabilities',()=>{
  assert.match(source,/pickAdvanced:premiumActive\(user\)/);
- assert.match(source,/premiumActive\(owner\)/);
+ assert.match(source,/familyActive\(owner\)/);
 });
 test('remote rights are default-off, selected by the owner only',()=>{
  assert.match(source,/pickRemoteEnabled===true/);
@@ -20,7 +20,7 @@ test('only explicit alert recipients with consent can request a command',()=>{
  assert.match(p,/req\.user\.id===ownerId/);
  assert.match(p,/!sharedCircle\(ownerId,req\.user\.id\)/);
  assert.match(p,/owner\.pickRemoteEnabled!==true/);
- assert.match(p,/owner\.pickRemoteContacts\.includes\(req\.user\.id\)/);
+ assert.match(p,/remoteAccessFor\(owner,req\.user\.id\)\[action\]/);
  assert.match(p,/alert\.kind!=='pickpocket'/);
  assert.match(p,/alert\.recipients\?\.includes\(req\.user\.id\)/);
  assert.match(p,/entries\.length!==1/);
@@ -36,8 +36,8 @@ test('server verifies commands on consumption and prevents replay',()=>{
  assert.match(p,/delete db\.pickRemoteCommands\[req\.user\.id\]/);
  assert.match(p,/command\.expiresAt>now\(\)/);
  assert.match(p,/alert\.id===command\.alertId/);
- assert.match(p,/premiumActive\(req\.user\)/);
- assert.match(p,/req\.user\.pickRemoteContacts\?\.includes\(command\.by\)/);
+ assert.match(p,/familyActive\(req\.user\)/);
+ assert.match(p,/remoteAccessFor\(req\.user,command\.by\)\[command\.action\]/);
  assert.match(p,/alert\.recipients\?\.includes\(command\.by\)/);
 });
 test('alarm closure revokes pending remote commands',()=>{
