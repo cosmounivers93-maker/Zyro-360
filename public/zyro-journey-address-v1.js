@@ -160,7 +160,7 @@
      clearChoice(true);
    });
    for(const name of ['journeyStreet','journeyCity','journeyPostcode']){
-     el(name)?.addEventListener('input',clearChoice);
+     el(name)?.addEventListener('input',()=>clearChoice());
      el(name)?.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();void search();}});
    }
    ensureMapActions();restore();
