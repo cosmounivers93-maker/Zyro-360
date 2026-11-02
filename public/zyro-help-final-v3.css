@@ -1,0 +1,13 @@
+/* ZYRO 360 — help readability: approved light indigo, cyan and turquoise. */
+#profileSettingsDrawer #zyroHelp,#zyroHelp{--zyro-help-ink:#294862!important;--zyro-help-muted:#586d87!important;color:var(--zyro-help-ink)!important}
+#profileSettingsDrawer #zyroHelp .how-heading,#zyroHelp .how-heading{background:linear-gradient(125deg,#f2f7ff,#eceaff 52%,#e8fdf7)!important;border-radius:21px!important;border:1px solid #b9d4eb!important;padding:15px!important;color:#2f4d80!important}
+#profileSettingsDrawer #zyroHelp .how-heading h2,#zyroHelp .how-heading h2{color:#284979!important}
+#profileSettingsDrawer #zyroHelp .how-heading p,#zyroHelp .how-heading p{color:#5a7189!important}
+#profileSettingsDrawer #zyroHelp details,#zyroHelp details{background:linear-gradient(130deg,#f6faff,#f3f1ff 60%,#edfff9)!important;border:1px solid #b6d7e2!important;border-radius:17px!important;overflow:hidden!important}
+#profileSettingsDrawer #zyroHelp summary,#zyroHelp summary{color:#2a4c78!important;background:transparent!important;font-weight:780!important;line-height:1.48!important}
+#profileSettingsDrawer #zyroHelp summary>span,#zyroHelp summary>span{color:#5682d0!important}
+#profileSettingsDrawer #zyroHelp .how-content,#profileSettingsDrawer #zyroHelp .how-content p,#profileSettingsDrawer #zyroHelp .how-content strong,#zyroHelp .how-content,#zyroHelp .how-content p,#zyroHelp .how-content strong{color:#3d586e!important;line-height:1.7!important}
+#profileSettingsDrawer #zyroHelp .how-content strong,#zyroHelp .how-content strong{color:#3159a0!important;font-weight:800!important}
+#profileSettingsDrawer #zyroHelp details[open],#zyroHelp details[open]{box-shadow:0 6px 20px #7a91bd20!important}
+#profileSettingsDrawer #zyroHelp #zyroHelpLifeGuardFall,#zyroHelp #zyroHelpLifeGuardFall{border-color:#88cdd2!important}
+#profileSettingsDrawer #zyroHelp #zyroHelpLifeGuardFall summary,#zyroHelp #zyroHelpLifeGuardFall summary{color:#225d8c!important}

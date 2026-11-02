@@ -83,7 +83,9 @@ async function initializeStorage() {
   db.pickRemoteCommands ||= {}; db.pickRemoteAudit ||= [];
 }
 // Admin identity is pinned by a server-side user ID, never by a browser flag or email address.
-const ADMIN_ID = String(process.env.ZYRO_ADMIN_USER_ID || '').trim();
+// Only a server-configured immutable user ID can receive creator entitlements.
+const ADMIN_ID = String(process.env.ZYRO_ADMIN_USER_ID || process.env.ZYRO_CREATOR_USER_ID || '').trim();
+if(!ADMIN_ID)console.warn('[ZYRO admin] Missing ZYRO_ADMIN_USER_ID: creator Family bypass cannot be verified.');
 // Browser microphone tracks cannot survive a backend restart; do not claim audio is live.
 for (const alert of Object.values(db.alerts)) alert.hasAudio = false;
 let locations = new Map();
