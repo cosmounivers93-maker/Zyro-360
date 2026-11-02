@@ -48,7 +48,14 @@ test('No unqualified protection claims or misleading experimental label on the i
   for(const content of [html,feature,css]){
     assert.doesNotMatch(content,/sperimentale/i);
   }
-  assert.match(html,/non può riconoscere ogni caduta/);
+  assert.match(html,/LifeGuard è al tuo fianco/);
+  assert.match(html,/Per gli avvisi servono connessione e notifiche attive/);
+  assert.match(html,/id="lifeGuardFallLevels"/);
+  assert.match(html,/data-life-level="low"/);
+  assert.match(html,/data-life-level="high"/);
+  assert.match(feature,/toggle\.disabled=changing/);
+  assert.match(feature,/sensitivity:selected/);
+  assert.match(feature,/localStorage\.setItem\(STORAGE_KEY,level\)/);
   assert.match(feature,/monitoraggio Android non confermato/);
   assert.match(html,/La consegna delle notifiche non è garantita/);
 });
