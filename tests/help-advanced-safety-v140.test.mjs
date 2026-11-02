@@ -45,7 +45,7 @@ test('leaving the last shared circle revokes rights and existing help is preserv
 test('Premium and Family include device-lock and approved remote action explanations',()=>{
  assert.match(section,/Premium, 3,99 € al mese/);
  assert.match(section,/Family, 6,99 € al mese/);
- assert.match(section,/Premium.*blocco automatico dello schermo.*Non include audio SOS né squillo\/blocco da remoto/);
+ assert.match(section,/Premium.*blocco automatico dello schermo.*Comprende anche Accompagnami e Check-in.*Non include audio SOS, rilevamento cadute né squillo\/blocco da remoto/);
  assert.match(section,/Family.*in esclusiva, squillo e blocco da remoto/);
  assert.match(section,/Family.*audio SOS con consenso/);
  assert.match(html,/Come funziona l'app<small>Guida a cerchie, SOS e protezioni remote/);
