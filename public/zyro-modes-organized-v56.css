@@ -155,3 +155,18 @@
 #modesView #zyroPlanOptions :is(#premiumStatus,#premiumDetails,#zyroRestorePurchases,#zyroPlanHelp){
   margin-left:12px!important;margin-right:12px!important;max-width:calc(100% - 24px)!important;
 }
+
+/* V58: il comando è immediatamente sotto il titolo della sezione 04. */
+#modesView #premiumPanel{margin-top:6px!important}
+#modesView #zyroPlanOptions{margin:0 0 12px!important;overflow:hidden}
+#modesView #zyroPlanOptions>summary{
+  min-height:70px!important;padding:14px 17px!important;
+  background:linear-gradient(115deg,#d8f5ff,#e8e4ff)!important;
+  border-radius:17px;color:#235a8c!important;
+  box-shadow:inset 0 0 0 1px #8fcbe75c;
+}
+#modesView #zyroPlanOptions>summary .zyro-mode-summary-label{font-size:16px!important}
+#modesView #zyroPlanOptions>summary .zyro-mode-summary-label small{font-size:12px!important}
+#modesView #zyroPlanOptions>summary:focus-visible{outline:3px solid #417cbb;outline-offset:-3px}
+#modesView #zyroPlanOptions[open]>summary{border-radius:17px 17px 0 0}
+#modesView #zyroPlanOptions>.zyro-plans-free{margin:13px 12px 0!important}
