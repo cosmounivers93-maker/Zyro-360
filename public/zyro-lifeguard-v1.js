@@ -22,7 +22,7 @@
     }
     if(feedback){status.textContent=feedback;status.dataset.state='warning';return;}
     if(!eligible){
-      status.textContent='Rilevamento cadute non ancora attivabile: verifica Family e completa l’aggiornamento del server. La sensibilità può essere scelta ora.';
+      status.textContent=me?.isAdmin||me?.creatorPremium?'Il server non ha ancora verificato l’accesso Family del creatore. Controlla la configurazione ZYRO_ADMIN_USER_ID.':'Rilevamento cadute non ancora attivabile: verifica Family e completa l’aggiornamento del server. La sensibilità può essere scelta ora.';
       status.dataset.state='warning';
     }else if(authorized&&monitored){
       status.textContent='Sensori Android attivi · Sensibilità '+(native.lifeGuardSensitivity==='high'?'Elevata':'Bassa')+'. Puoi disattivare LifeGuard anche dalla notifica.';
@@ -58,7 +58,7 @@
     const requested=!(me?.lifeGuardFallEnabled===true && native.lifeGuardActive===true&&native.lifeGuardSensorsReady===true);
     feedback='';
     if(!me?.features?.lifeGuardFall){
-      feedback='Serve il piano Family e l’aggiornamento del server LifeGuard. Il monitoraggio non è stato attivato.';
+      feedback=me?.isAdmin||me?.creatorPremium?'Accesso amministratore non riconosciuto come Family dal server: verifica ZYRO_ADMIN_USER_ID e l’aggiornamento backend.':'Serve il piano Family e l’aggiornamento del server LifeGuard. Il monitoraggio non è stato attivato.';
       paint();return;
     }
     changing=true;paint();
