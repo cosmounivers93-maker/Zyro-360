@@ -1,0 +1,30 @@
+name: LifeGuard v3 - Admin Family, Guida e Mappa
+on:
+  push:
+    branches: ['feature/lifeguard-final-guide-v3-20261102']
+  pull_request:
+    paths:
+      - 'server.mjs'
+      - 'public/**'
+      - 'test/zyro-life-final-v3.test.mjs'
+permissions:
+  contents: read
+jobs:
+  full-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verifica sintassi e sicurezza
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+          node --check public/zyro-journey-address-v1.js
+          node --check public/zyro-lifeguard-v1.js
+      - name: Installa dipendenze
+        run: npm install --no-audit --no-fund
+      - name: Test completo
+        run: npm test
