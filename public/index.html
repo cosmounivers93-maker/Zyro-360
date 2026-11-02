@@ -29,7 +29,7 @@
   <link rel="stylesheet" href="/zyro-glass-v30.css?v=30.0">
   <link rel="stylesheet" href="/zyro-sos-home-v33.css?v=33.0">
   <link rel="stylesheet" href="/zyro-sos-card-v34.css?v=34.0">
-  <link rel="stylesheet" href="/zyro-chat-groups-invitees-v1.css?v=1">
+  <link rel="stylesheet" href="/zyro-chat-groups-invitees-v1.css?v=2">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
 .zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult,[data-zyro-permission="testpush"]{display:none!important}
@@ -289,7 +289,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
 </style>
 <link rel="stylesheet" href="/zyro-welcome-v64.css">
 <style>body.zyro-await-intro{background:#081725}body.zyro-await-intro #authScreen,body.zyro-await-intro #appScreen{visibility:hidden!important}</style>
-  <link rel="stylesheet" href="/zyro-modes-organized-v56.css?v=56.0">
+  <link rel="stylesheet" href="/zyro-modes-organized-v56.css?v=57.0">
 </head>
 <body class="zyro-await-intro">
 <div id="authScreen" class="auth-shell">
@@ -467,12 +467,12 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
       <section class="zyro-v15-panel zyro-plans" id="premiumPanel" aria-label="Piani ZYRO 360">
         <div class="zyro-plans-intro"><span class="zyro-plans-mark" aria-hidden="true">✦</span><div><span class="zyro-plans-kicker">IL TUO SPAZIO DI SICUREZZA</span><h2>Scegli come proteggerti</h2><p>Due piani, le funzioni che ti servono.</p></div></div>
         <div class="zyro-plans-free"><span aria-hidden="true">✓</span><p><b>Le basi restano gratuite</b><br>Mappa, posizione condivisa, cerchie e chat.</p></div>
-        <details id="zyroPlanOptions" class="zyro-mode-details zyro-mode-plans-details">
-          <summary><span class="zyro-mode-summary-label">Confronta i piani Premium e Family<small>Prezzi, funzioni e gestione abbonamento</small></span><span class="zyro-mode-chevron" aria-hidden="true">⌄</span></summary>
+        <details id="zyroPlanOptions" class="zyro-mode-details zyro-mode-plans-details" open>
+          <summary><span class="zyro-mode-summary-label">Base e Family · confronta i vantaggi<small>Base 3,99 € / mese · Family 6,99 € / mese</small></span><span class="zyro-mode-chevron" aria-hidden="true">⌄</span></summary>
         <div class="zyro-plan-stack">
           <article class="zyro-plan-card" aria-labelledby="zyroPersonalTitle">
             <div class="zyro-plan-top"><span class="zyro-plan-symbol" aria-hidden="true">◇</span><span class="zyro-plan-tag">ESSENZIALE</span></div>
-            <h3 id="zyroPersonalTitle">ZYRO Premium</h3><p class="zyro-plan-caption">SOS e protezione antifurto.</p>
+            <h3 id="zyroPersonalTitle">ZYRO Base</h3><p class="zyro-plan-caption">Protezione essenziale per te e la tua cerchia.</p>
             <div class="zyro-plan-price"><strong>3,99 €</strong><span>/ mese</span></div>
             <ul><li>SOS ai contatti selezionati</li><li>Posizione GPS e indirizzo disponibile</li><li>Modalità Pick Pocket</li><li>Navigazione SOS e possibile furto sulla mappa con percorso stradale indicativo</li><li>Blocco automatico dello schermo su allarme Pick Pocket, previa autorizzazione Android</li></ul>
             <p class="zyro-plan-exclusion">Audio SOS, Accompagnami, Check-in e controllo remoto (squillo o blocco del telefono da parte di un contatto autorizzato) sono inclusi soltanto nel piano Family.</p>
@@ -480,9 +480,9 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
           </article>
           <article class="zyro-plan-card zyro-plan-family" aria-labelledby="zyroFamilyTitle">
             <div class="zyro-plan-top"><span class="zyro-plan-symbol" aria-hidden="true">✦</span><span class="zyro-plan-tag">TUTTO INCLUSO</span></div>
-            <h3 id="zyroFamilyTitle">ZYRO Family</h3><p class="zyro-plan-caption">Tutte le modalità, in un unico piano.</p>
+            <h3 id="zyroFamilyTitle">ZYRO Family</h3><p class="zyro-plan-caption">Protezione completa, audio SOS e percorsi condivisi.</p>
             <div class="zyro-plan-price"><strong>6,99 €</strong><span>/ mese</span></div>
-            <ul><li>Tutte le funzioni di Premium</li><li>Audio SOS in diretta, con il tuo consenso</li><li>Accompagnami</li><li>Check-in intelligente</li><li>Fai squillare il telefono da remoto, con autorizzazione del proprietario</li><li>Blocca il telefono da remoto durante l’allarme Pick Pocket, con autorizzazione Android e consenso del proprietario</li></ul>
+            <ul><li>Tutte le funzioni di Base</li><li>Audio SOS in diretta, con il tuo consenso</li><li>Accompagnami e segui percorso</li><li>Check-in intelligente</li><li>Fai squillare il telefono da remoto, con autorizzazione del proprietario</li><li>Blocca il telefono da remoto durante l’allarme Pick Pocket, con autorizzazione Android e consenso del proprietario</li></ul>
             <button type="button" class="zyro-plan-soon" data-billing-open disabled>Abbonamenti non ancora disponibili</button>
           </article>
         </div>
@@ -702,7 +702,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=67.0" defer></script>
+<script src="/app.js?v=68.0" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
 </html>
