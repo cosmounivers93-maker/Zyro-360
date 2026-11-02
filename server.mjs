@@ -186,7 +186,12 @@ function sosAudioAccessFor(owner,id){
 // explicitly customizes contact access. New profiles start with an empty list.
 function gpsRecipientsFor(owner) {
   if (Array.isArray(owner.gpsRecipients)) return owner.gpsRecipients.filter(id => id!==owner.id && sharedCircle(owner.id,id));
-  return [...activeRecipients(owner.id)].filter(id=>id!==owner.id);
+  // Older profiles keep existing circle GPS access, but joining a chat-only
+  // group must never silently start sharing location with new members.
+  const legacy=new Set();
+  for(const c of userCircles(owner.id).filter(c=>c.kind!=='chat'))
+    for(const id of memberIds(c.id))if(id!==owner.id)legacy.add(id);
+  return [...legacy];
 }
 function mayViewSharedGps(owner, viewerId) {
   return !!owner?.sharing && gpsRecipientsFor(owner).includes(viewerId);
@@ -208,7 +213,7 @@ function stateFor(id) {
   const me = db.users[id];
   if (!me) return null;
   const circles = userCircles(id).map(c => ({
-    id: c.id, name: c.name, ownerId: c.ownerId, mine: c.ownerId === id,
+    id: c.id, name: c.name, kind: c.kind === 'chat' ? 'chat' : 'circle', ownerId: c.ownerId, mine: c.ownerId === id,
     members: memberIds(c.id).filter(x => db.users[x]).map(x => {
       const u = db.users[x]; const alert = currentAlert(x);
       const visibleAlert = alert && canSeeAlert(id,alert) ? alert : null;
@@ -527,6 +532,49 @@ app.post('/api/admin/report-resolve',requireAuth,requireAdmin,limit,(req,res)=>{
  recordAction('report-'+report.status,req.user.id,report.userId,report.id);save();res.json({ok:true});
 });
 
+// Dedicated multi-member chat groups are represented as private circles, so
+// existing group chat, notifications, and per-contact permissions keep working.
+// Group invite codes are distinct from one-time person/circle codes.
+app.post('/api/chat/groups', requireAuth, limit, (req,res) => {
+  const name=cleanText(req.body?.name,48);
+  if(name.length<2)return res.status(400).json({error:'Dai un nome al gruppo (almeno 2 caratteri).'});
+  if(userCircles(req.user.id).length>=MAX_USER_CIRCLES)
+    return res.status(400).json({error:'Limite gruppi e cerchie raggiunto.'});
+  const id=token(12);
+  db.circles[id]={id,name,ownerId:req.user.id,kind:'chat',createdAt:now()};
+  db.memberships.push({circleId:id,userId:req.user.id,joinedAt:now()});
+  save();refreshRelated(req.user.id);res.json({ok:true,groupId:id});
+});
+app.post('/api/chat/groups/invite', requireAuth, limit, (req,res) => {
+  const id=String(req.body?.groupId||''),group=db.circles[id];
+  if(!group||group.kind!=='chat'||group.ownerId!==req.user.id)
+    return res.status(403).json({error:'Solo chi ha creato il gruppo può generare il codice.'});
+  // One active code per group. Regenerating revokes the previous code.
+  for(const [key,inv] of Object.entries(db.invites))
+    if(inv.kind==='group'&&inv.circleId===id)delete db.invites[key];
+  const code='G'+crypto.randomBytes(9).toString('hex').toUpperCase();
+  db.invites[hash(code)]={circleId:id,kind:'group',createdBy:req.user.id,expiresAt:now()+24*3600*1000};
+  save();res.json({code,expiresInHours:24,multipleUses:true});
+});
+app.post('/api/chat/groups/join', requireAuth, limit, (req,res) => {
+  const code=String(req.body?.code||'').replace(/[\\s-]/g,'').toUpperCase();
+  if(!/^G[A-F0-9]{18}$/.test(code))
+    return res.status(400).json({error:'Codice gruppo non valido.'});
+  const inv=db.invites[hash(code)],group=inv&&db.circles[inv.circleId];
+  if(!inv||inv.kind!=='group'||inv.expiresAt<now()||!group||group.kind!=='chat')
+    return res.status(400).json({error:'Codice gruppo non valido o scaduto.'});
+  if(memberIds(group.id).includes(req.user.id))
+    return res.status(400).json({error:'Sei già nel gruppo.'});
+  if(userCircles(req.user.id).length>=MAX_USER_CIRCLES)
+    return res.status(400).json({error:'Limite gruppi e cerchie raggiunto.'});
+  if(memberIds(group.id).length>=30)
+    return res.status(400).json({error:'Questo gruppo è pieno.'});
+  db.memberships.push({circleId:group.id,userId:req.user.id,invitedBy:inv.createdBy,joinedAt:now()});
+  // Unlike one-time personal invites, a group code remains valid for 24h.
+  save();for(const member of memberIds(group.id))refreshRelated(member);
+  res.json({ok:true,groupId:group.id});
+});
+
 app.post('/api/circles', requireAuth, limit, (req,res) => {
   const name = cleanText(req.body.name, 48);
   if (name.length < 2) return res.status(400).json({error:'Dai un nome alla cerchia.'});
@@ -544,7 +592,7 @@ app.post('/api/invites', requireAuth, limit, (req,res) => {
 app.post('/api/invites/join', requireAuth, limit, (req,res) => {
   const code = String(req.body.code || '').replace(/[\s-]/g,'').toUpperCase();
   const key = hash(code), inv = db.invites[key];
-  if (!inv || inv.expiresAt < now() || !db.circles[inv.circleId]) return res.status(400).json({error:'Codice non valido o scaduto.'});
+  if (!inv || inv.kind==='group' || inv.expiresAt < now() || !db.circles[inv.circleId]) return res.status(400).json({error:'Codice non valido o scaduto.'});
   if (userCircles(req.user.id).length >= MAX_USER_CIRCLES) return res.status(400).json({error:'Limite cerchie raggiunto.'});
   if (memberIds(inv.circleId).includes(req.user.id)) return res.status(400).json({error:'Sei già nella cerchia.'});
   if (memberIds(inv.circleId).length >= 30) return res.status(400).json({error:'Cerchia piena.'});
