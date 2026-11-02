@@ -1086,3 +1086,10 @@ html[data-theme="dark"] .zyro-invitees-empty{background:#143549;color:#d7f2f2;bo
 @media(prefers-reduced-motion:reduce){.zyro-settings-backdrop,.zyro-settings-drawer,.zyro-profile-more{transition:none!important}}
 
 .zyro-profile-access-label{display:inline-block;margin-top:7px;border-radius:999px;padding:5px 10px;color:#c8fff1;background:rgba(39,194,164,.15);border:1px solid rgba(92,220,191,.32);font-size:11px;font-weight:800}
+
+/* v1.0.41: on older installed Android wrappers, remove the obsolete
+   injected Premium "remote control included" line; only Family has it. */
+#premiumPanel .zyro-plan-card:not(.zyro-plan-family) li[data-zyro-pick-plan="pickAdvanced1381"],
+#premiumPanel .zyro-plan-card:not(.zyro-plan-family) li[data-zyro-pick-plan="pickAdvanced1382"] {
+  display:none!important;
+}
