@@ -1,0 +1,29 @@
+name: ZYRO 360 - Modalità ordinate V56
+on:
+  push:
+    branches: ['feature/modalita-ordinata-v56-20261102']
+    paths:
+      - 'public/index.html'
+      - 'public/app.js'
+      - 'public/zyro-modes-organized-v56.css'
+      - 'test/modes-organized-v56.test.mjs'
+      - '.github/workflows/modes-organized-v56.yml'
+  pull_request:
+    paths:
+      - 'public/index.html'
+      - 'public/app.js'
+      - 'public/zyro-modes-organized-v56.css'
+      - 'test/modes-organized-v56.test.mjs'
+      - '.github/workflows/modes-organized-v56.yml'
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node --check public/app.js
+      - run: node --test test/modes-organized-v56.test.mjs
+      - run: node --test
