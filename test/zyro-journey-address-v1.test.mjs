@@ -56,8 +56,8 @@ test('the how-it-works guide explains address confirmation, contacts, and cancel
  assert.match(html,/Controlla il puntino blu/);
  assert.match(html,/Riattiva Accompagnami/);
  assert.match(html,/Disponibile con Base e Family/);
- assert.match(html,/zyro-journey-address-v1.js\?v=1/);
- assert.match(html,/zyro-journey-address-v1.css\?v=1/);
+ assert.match(html,/zyro-journey-address-v1.js\?v=2/);
+ assert.match(html,/zyro-journey-address-v1.css\?v=2/);
 });
 
 test('Address lookup never fills the separate Casa/Lavoro/Altro description',()=>{
@@ -67,4 +67,22 @@ test('Address lookup never fills the separate Casa/Lavoro/Altro description',()=
  assert.doesNotMatch(js,/el\('journeyDestination'\)\.value=''/);
  assert.doesNotMatch(app,/\$\('journeyDestination'\)\.value=text\.slice/);
  assert.match(html,/il nome non viene compilato dall'indirizzo/i);
+});
+
+test('map selection is explicitly approved; cancel clears only destination, not Casa/Lavoro',()=>{
+ assert.match(html,/id="journeySeePin"[^>]*>Apri sulla mappa/);
+ assert.match(html,/id="journeyCancelDestination"/);
+ assert.match(js,/id='zyroJourneyMapConfirm'/);
+ assert.match(js,/textContent='✓ Imposta'/);
+ assert.match(js,/textContent='Annulla'/);
+ assert.match(js,/addEventListener\('click',confirmOnMap\)/);
+ assert.match(js,/addEventListener\('click',cancelOnMap\)/);
+ assert.match(js,/confirmed=true/);
+ assert.match(js,/window\.ZyroJourneyAddressConfirmed/);
+ assert.match(app,/window\.ZyroJourneyAddressConfirmed\?\.\(\)/);
+ assert.match(js,/clearChoice\(true\)/);
+ assert.match(js,/showView\('modes'\)/);
+ assert.match(js,/addEventListener\('input',\(\)=>clearChoice\(\)\)/);
+ assert.doesNotMatch(js,/el\('journeyDestination'\)\.value=''/);
+ assert.match(html,/premi «Imposta»/);
 });
