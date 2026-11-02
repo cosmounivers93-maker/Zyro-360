@@ -27,7 +27,7 @@ test('all primary ids and controls remain unique',()=>{
  }
 });
 test('quick navigation has three grouped destinations and accessible disclosures',()=>{
- for(const target of ['sosRecipientsPanel','pickPanel','lifeguardPanel'])
+ for(const target of ['sosRecipientsPanel','pickPanel','journeyPanel'])
    assert.match(modes,new RegExp('data-mode-target="'+target+'"'));
  for(const id of ['zyroSosOptions','zyroPickOptions','zyroJourneyOptions','zyroCheckinOptions','zyroModeContacts','zyroPlanOptions'])
    assert.equal((modes.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);

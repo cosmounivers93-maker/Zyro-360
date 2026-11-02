@@ -289,7 +289,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
 </style>
 <link rel="stylesheet" href="/zyro-welcome-v64.css">
 <style>body.zyro-await-intro{background:#081725}body.zyro-await-intro #authScreen,body.zyro-await-intro #appScreen{visibility:hidden!important}</style>
-  <link rel="stylesheet" href="/zyro-modes-organized-v56.css?v=59.0"><link rel="stylesheet" href="/zyro-lifeguard-v1.css?v=3"><link rel="stylesheet" href="/zyro-help-final-v3.css?v=1"><link rel="stylesheet" href="/zyro-journey-address-v1.css?v=2">
+  <link rel="stylesheet" href="/zyro-modes-organized-v56.css?v=59.0"><link rel="stylesheet" href="/zyro-help-final-v3.css?v=1"><link rel="stylesheet" href="/zyro-journey-address-v1.css?v=2">
 </head>
 <body class="zyro-await-intro">
 <div id="authScreen" class="auth-shell">
@@ -371,7 +371,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
       <nav class="zyro-modes-quicknav" aria-label="Vai alle modalità">
         <button type="button" data-mode-target="sosRecipientsPanel"><span class="zyro-mode-quick-icon" aria-hidden="true">🆘</span><span>SOS<small>Contatti</small></span></button>
         <button type="button" data-mode-target="pickPanel"><span class="zyro-mode-quick-icon" aria-hidden="true">🛡️</span><span>Pick Pocket<small>Antifurto</small></span></button>
-        <button type="button" data-mode-target="lifeguardPanel"><span class="zyro-mode-quick-icon" aria-hidden="true">💜</span><span>LifeGuard 360<small>Protezione</small></span></button>
+        <button type="button" data-mode-target="journeyPanel"><span class="zyro-mode-quick-icon" aria-hidden="true">↗</span><span>Accompagnami<small>Percorso</small></span></button>
       </nav>
       <div class="greeting"><div><p class="eyebrow muted">UNO SPAZIO DI FIDUCIA</p><h1>Ciao, <span id="greetingName">amico</span> <span class="wave">✳</span></h1><p>La tua sicurezza è la nostra priorità.</p></div><div class="avatar" id="myAvatar">S</div></div>
       <div class="top-cards">
@@ -426,7 +426,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
         <p class="pick-limits">Nell’app Android Pick Pocket funziona anche in background e a schermo spento, con il servizio di protezione attivo e i permessi necessari. Le restrizioni della batteria o l’arresto forzato possono interromperlo. Non blocca Android né impedisce lo spegnimento; rispetta il volume del dispositivo e può produrre falsi allarmi.</p>
       </section>
 
-      <div id="lifeguardPanel" class="zyro-lifeguard-group"><header class="zyro-modes-group-title"><span aria-hidden="true">02</span><div><h2>LifeGuard 360</h2><p>Protezione intelligente: percorsi accompagnati e conferme di sicurezza.</p></div></header><div class="zyro-life-intro"><span aria-hidden="true">💜</span><div><strong>La tua sicurezza, sotto controllo</strong><p>Organizza i tuoi percorsi e i check-in con le persone fidate. In emergenza chiama il 112.</p></div></div>
+      <header class="zyro-modes-group-title"><span aria-hidden="true">02</span><div><h2>Percorsi e conferme</h2><p>Accompagnami e Check-in, indipendenti e sempre a tua scelta.</p></div></header>
       <section class="zyro-v15-panel" id="journeyPanel">
         <div class="zyro-v15-heading zyro-heading-v55"><span class="zyro-v15-symbol">↗</span><div class="zyro-heading-copy"><p class="eyebrow muted">VIAGGIA CON PIÙ TRANQUILLITÀ</p><h2>Accompagnami</h2></div><p class="zyro-heading-description">Condividi il percorso con i contatti scelti e indica quando pensi di arrivare.</p></div>
         <details id="zyroJourneyOptions" class="zyro-mode-details">
@@ -449,7 +449,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
           <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, Lavoro, Palestra, Altro" autocomplete="off"><small>Scrivi soltanto un nome per la meta. La via, la città e il CAP servono a individuare il punto sulla mappa.</small></label>
           <label class="zyro-v15-field">Tempo previsto<select id="journeyMinutes"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e mezza</option><option value="120">2 ore</option><option value="240">4 ore</option></select></label>
           <div class="zyro-v15-destination"><label><input id="journeyAuto" type="checkbox"> Riconosci automaticamente l’arrivo vicino alla meta scelta</label><small>Se preferisci, puoi scegliere manualmente un punto spostando la mappa nella Home e usando il pulsante sotto. L’arrivo automatico richiede GPS, connessione e monitoraggio attivo.</small><button id="journeySetTarget" type="button" class="zyro-v15-secondary">In alternativa: usa il centro della mappa</button><span id="journeyTargetInfo">Nessuna meta GPS impostata</span></div>
-          <p class="zyro-v15-subhead">Chi può seguire il tuo percorso?</p><div id="journeyRecipients" class="zyro-v15-contacts"></div><label class="zyro-life-consent"><input id="journeyAutoSos" type="checkbox"><span><b>Avvisa automaticamente in caso di mancata conferma</b><small>Dopo l’orario previsto hai 2 minuti per rispondere. Senza conferma, LifeGuard registra un SOS e tenta di avvisare i contatti selezionati. Richiede un server sempre attivo.</small></span></label>
+          <p class="zyro-v15-subhead">Chi può seguire il tuo percorso?</p><div id="journeyRecipients" class="zyro-v15-contacts"></div><label class="zyro-life-consent"><input id="journeyAutoSos" type="checkbox"><span><b>Avvisa automaticamente in caso di mancata conferma</b><small>Dopo l’orario previsto hai 2 minuti per rispondere. Senza conferma, Zyro 360 registra un SOS e tenta di avvisare i contatti selezionati. Richiede un server sempre attivo.</small></span></label>
           <button id="journeyStart" type="button" class="zyro-v15-primary">Avvia Accompagnami</button>
         </div>
         </details>
@@ -472,7 +472,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
         
       </section>
 
-      </div>
+      
       <header class="zyro-modes-group-title"><span aria-hidden="true">03</span><div><h2>La tua rete di fiducia</h2><p>Controlla le persone collegate senza affollare la schermata.</p></div></header>
       <details class="zyro-mode-contacts-details zyro-mode-details" id="zyroModeContacts">
         <summary><span class="zyro-mode-summary-label">Persone della cerchia<small>Vedi contatti, posizione e aggiornamenti</small></span><span class="zyro-mode-chevron" aria-hidden="true">⌄</span></summary>
@@ -493,7 +493,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
             <div class="zyro-plan-top"><span class="zyro-plan-symbol" aria-hidden="true">◇</span><span class="zyro-plan-tag">ESSENZIALE</span></div>
             <h3 id="zyroPersonalTitle">ZYRO Base</h3><p class="zyro-plan-caption">Protezione essenziale per te e la tua cerchia.</p>
             <div class="zyro-plan-price"><strong>3,99 €</strong><span>/ mese</span></div>
-            <ul><li>SOS ai contatti selezionati</li><li>LifeGuard 360: rientro sicuro, check-in e SOS dopo mancata conferma (con attivazione volontaria)</li><li>Posizione GPS e indirizzo disponibile</li><li>Modalità Pick Pocket</li><li>Navigazione SOS e possibile furto sulla mappa con percorso stradale indicativo</li><li>Blocco automatico dello schermo su allarme Pick Pocket, previa autorizzazione Android</li></ul>
+            <ul><li>SOS ai contatti selezionati</li><li>Accompagnami e Check-in, con SOS dopo mancata conferma solo se autorizzato</li><li>Posizione GPS e indirizzo disponibile</li><li>Modalità Pick Pocket</li><li>Navigazione SOS e possibile furto sulla mappa con percorso stradale indicativo</li><li>Blocco automatico dello schermo su allarme Pick Pocket, previa autorizzazione Android</li></ul>
             <p class="zyro-plan-exclusion">Audio SOS e controllo remoto (squillo o blocco del telefono da parte di un contatto autorizzato) sono inclusi soltanto nel piano Family.</p>
             <button type="button" class="zyro-plan-soon" data-billing-open disabled>Abbonamenti non ancora disponibili</button>
           </article>
@@ -650,14 +650,14 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
           <p><strong>Limiti:</strong> lo squillo segue le regole audio e Non disturbare di Android. Senza Internet, notifiche operative o autorizzazioni necessarie, i comandi possono arrivare in ritardo o non funzionare. Nessuno può usarli liberamente al di fuori di un allarme Pick Pocket valido.</p>
         </div></details>
         <details><summary>Accompagnami: scegli una meta sulla mappa <span aria-hidden="true">＋</span></summary><div class="how-content">
-          <p><strong>1. Inserisci la destinazione:</strong> apri Modalità → LifeGuard 360 → Accompagnami → «Prepara il percorso». Scrivi via e numero civico, città e CAP, quindi premi «Cerca indirizzo sulla mappa».</p>
+          <p><strong>1. Inserisci la destinazione:</strong> apri Modalità → Accompagnami → «Prepara il percorso». Scrivi via e numero civico, città e CAP, quindi premi «Cerca indirizzo sulla mappa».</p>
           <p><strong>2. Conferma il puntino blu:</strong> scegli il risultato e premi «Apri sulla mappa». Sulla mappa controlla il puntino blu, poi premi «Imposta» per confermare la meta oppure «Annulla» per scartarla. Se cambi idea puoi anche usare «Annulla destinazione» direttamente nella sezione Accompagnami. La ricerca necessita di Internet e del servizio indirizzi attivo.</p>
           <p><strong>3. Scrivi soltanto un nome alla meta:</strong> nella casella «Dove stai andando?» scrivi, per esempio, «Casa», «Lavoro», «Palestra» oppure «Altro». Il nome non viene compilato dall'indirizzo ed è indipendente dalla posizione scelta sulla mappa.</p>
           <p><strong>4. Scegli chi ti accompagna:</strong> imposta il tempo previsto, seleziona i contatti della cerchia e premi «Avvia Accompagnami». Il GPS LIVE deve essere abilitato per la condivisione; l’arrivo automatico è facoltativo e dipende dal monitoraggio GPS.</p>
           <p><strong>5. Concludi o riparti:</strong> premi «Sono arrivato/a» a destinazione oppure «Interrompi percorso» per annullare. Dopo un’interruzione puoi scegliere «Riattiva Accompagnami»: verrà avviato un nuovo percorso verso la stessa meta, con un nuovo orario e un nuovo avviso ai contatti. Per cambiare meta o contatti prepara invece un nuovo percorso.</p>
           <p>Disponibile con Base e Family. Il servizio di ricerca può individuare una via o un punto approssimativo: verifica sempre il puntino. Non sostituisce i soccorsi e la consegna degli avvisi dipende dalla rete.</p>
         </div></details>
-        <details><summary>Check-in: conferma che va tutto bene <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Incluso in Base e Family. Apri Modalità → LifeGuard 360 → Check-in, scegli una scadenza e i contatti della cerchia. Alla scadenza conferma «Tutto bene» oppure annulla prima. Puoi scegliere separatamente il consenso a un SOS dopo una mancata conferma. La verifica dipende dal server e dalle notifiche: una mancata risposta non dimostra automaticamente un’emergenza.</p></div></details>
+        <details><summary>Check-in: conferma che va tutto bene <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Incluso in Base e Family. Apri Modalità → Check-in, scegli una scadenza e i contatti della cerchia. Alla scadenza conferma «Tutto bene» oppure annulla prima. Puoi scegliere separatamente il consenso a un SOS dopo una mancata conferma. La verifica dipende dal server e dalle notifiche: una mancata risposta non dimostra automaticamente un’emergenza.</p></div></details>
         <details><summary>Notifiche e funzionamento in background <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Autorizza le notifiche in «Abilita permessi» e controlla anche le impostazioni Android. Per il GPS e Pick Pocket in background lascia attivo il servizio Android e consenti l’attività in background nelle impostazioni batteria. Anche i destinatari devono autorizzare gli avvisi. Internet e disponibilità del telefono influiscono sulla consegna: se manca una risposta, contatta direttamente la persona.</p></div></details>
         <details><summary>Scegli il piano adatto <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Mappa, posizione condivisa, cerchie e chat restano gratuite. <strong>Premium, 3,99 € al mese:</strong> SOS con posizione e indirizzo disponibile, Pick Pocket e blocco automatico dello schermo su allarme con permesso Android. Comprende anche Accompagnami e Check-in. Non include audio SOS né squillo/blocco da remoto. <strong>Family, 6,99 € al mese:</strong> include tutte le funzioni Base e, in esclusiva, squillo e blocco da remoto autorizzati durante un allarme Pick Pocket, audio SOS con consenso. Family sblocca le funzioni dell’account abbonato; non assegna automaticamente abbonamenti agli altri membri della cerchia. Gli acquisti disponibili nell’app Android sono gestiti da Google Play: controlla prezzo e rinnovo nella schermata di conferma. Puoi ripristinare un acquisto con lo stesso account ZYRO 360 e gestire il rinnovo in Google Play.</p></div></details>
         <details><summary>Profilo, privacy e segnalazioni <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Dal Profilo modifica la tua foto e le impostazioni. In «Persone invitate» gestisci separatamente per ciascun contatto GPS, SOS, ascolto microfono, squillo e blocco da remoto. Se non condividete più una cerchia, le autorizzazioni vengono revocate. Usa «Segnala un utente» per inviare all’amministratore una descrizione del problema. I dati amministrativi e le segnalazioni sono accessibili solo al proprietario autorizzato. Condividi posizione e audio soltanto con persone di cui ti fidi.</p></div></details>
@@ -675,7 +675,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
     </div>
     <nav id="zyroSettingsMenu" class="zyro-drawer-menu" aria-label="Sezioni impostazioni">
       <button type="button" data-settings-target="appearance"><span class="zyro-settings-glyph">◐</span><span>Aspetto dell'app<small>Tema chiaro o scuro</small></span><b>›</b></button>
-      <button type="button" data-settings-target="help"><span class="zyro-settings-glyph">?</span><span>Come funziona l'app<small>Guida completa a mappa, LifeGuard, Accompagnami, SOS e privacy</small></span><b>›</b></button>
+      <button type="button" data-settings-target="help"><span class="zyro-settings-glyph">?</span><span>Come funziona l'app<small>Guida completa a mappa, Accompagnami, Check-in, SOS e privacy</small></span><b>›</b></button>
       <button type="button" data-settings-target="premium"><span class="zyro-settings-glyph">✦</span><span>Abbonamenti<small>Funzioni e accesso Premium</small></span><b>›</b></button>
       <button type="button" data-settings-target="emergency"><span class="zyro-settings-glyph">✚</span><span>Numeri di emergenza<small>Chiama il 112</small></span><b>›</b></button>
       <button type="button" data-settings-target="invitees"><span class="zyro-settings-glyph">♧</span><span>Persone invitate<small>GPS, SOS, microfono e controllo remoto</small></span><b>›</b></button>
