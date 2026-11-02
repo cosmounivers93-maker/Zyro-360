@@ -2090,6 +2090,7 @@ async function init(){
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
   setupProfileSettings();
+  $('zyroOpenSubscriptionPlans')?.addEventListener('click',()=>openProfileSettings('premium'));
   const permissionsHost=document.querySelector('.zyro-permission-panel');
   permissionsHost?.addEventListener('click',event=>{
     const type=event.target.closest('button[data-zyro-permission]')?.dataset.zyroPermission;
