@@ -114,7 +114,7 @@ const banNotice = 'A causa di una violazione delle norme e delle politiche di ut
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
 function validCoords(point){const lat=Number(point?.lat),lon=Number(point?.lon),accuracy=Number(point?.accuracy||0);return Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180&&Number.isFinite(accuracy)&&accuracy>=0&&accuracy<=100000?{lat,lon,accuracy,updatedAt:now()}:null;}
 function metersBetween(a,b){const r=Math.PI/180,phi=(b.lat-a.lat)*r,l=(b.lon-a.lon)*r;const q=Math.sin(phi/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(l/2)**2;return 12742000*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
-const publicJourney = (j,viewer) => j && (j.userId===viewer || (j.recipients||[]).includes(viewer)) ? {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',destination:j.destination,dueAt:j.dueAt,startedAt:j.startedAt,status:j.status,arrivedAt:j.arrivedAt||null,autoArrival:!!j.destinationPoint,autoSos:!!j.autoSos,autoSosSent:!!j.autoSosSentAt,destinationPoint:j.destinationPoint?{lat:j.destinationPoint.lat,lon:j.destinationPoint.lon}:null,minutes:Number(j.minutes||Math.round((j.dueAt-j.startedAt)/60000))||30} : null;
+const publicJourney = (j,viewer) => j && (j.userId===viewer || (j.recipients||[]).includes(viewer)) ? {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',destination:j.destination,dueAt:j.dueAt,startedAt:j.startedAt,status:j.status,arrivedAt:j.arrivedAt||null,autoArrival:j.autoArrival===true||(j.autoArrival===undefined&&!!j.destinationPoint),autoSos:!!j.autoSos,autoSosSent:!!j.autoSosSentAt,destinationPoint:j.destinationPoint?{lat:j.destinationPoint.lat,lon:j.destinationPoint.lon}:null,minutes:Number(j.minutes||Math.round((j.dueAt-j.startedAt)/60000))||30} : null;
 const publicCheckin = (c,viewer) => c && (c.userId===viewer || (c.recipients||[]).includes(viewer)) ? {id:c.id,userId:c.userId,name:db.users[c.userId]?.name||'Contatto',dueAt:c.dueAt,status:c.status,completedAt:c.completedAt||null,autoSos:!!c.autoSos,autoSosSent:!!c.autoSosSentAt} : null;
 
 const cleanText = (s, max = 60) => String(s || '').trim().replace(/[\u0000-\u001F\u007F<>]/g, '').slice(0, max);
@@ -641,7 +641,7 @@ app.post('/api/position', requireAuth, (req,res) => {
   const t=now(); if (t-(lastPos.get(req.user.id)||0)<2400) return res.json({ok:true}); lastPos.set(req.user.id,t);
   locations.set(req.user.id,{lat,lon,accuracy,updatedAt:t});
   const j=db.journeys[req.user.id];
-  if(j?.status==='active' && j.destinationPoint && accuracy<=100){
+  if(j?.status==='active' && (j.autoArrival===true||(j.autoArrival===undefined&&!!j.destinationPoint)) && j.destinationPoint && accuracy<=100){
     j.nearCount = metersBetween({lat,lon},j.destinationPoint) <= 120 ? (j.nearCount||0)+1 : 0;
     if(j.nearCount>=2){j.status='arrived';j.arrivedAt=t;save();void sendEventPush(j.recipients,'✅ Arrivo confermato',`${req.user.name} è arrivato/a a ${j.destination}.`);}
   }
@@ -949,7 +949,7 @@ app.post('/api/journey/geocode',requireAuth,limit,async(req,res)=>{
   const results=(Array.isArray(body.features)?body.features:[]).slice(0,5).map(feature=>{
    const lon=Number(feature?.center?.[0]??feature?.geometry?.coordinates?.[0]);
    const lat=Number(feature?.center?.[1]??feature?.geometry?.coordinates?.[1]);
-   if(!validCoords({lat,lon}))return null;
+   if(!Number.isFinite(lat)||!Number.isFinite(lon)||!validCoords({lat,lon})||(lat===0&&lon===0))return null;
    return {lat,lon,label:cleanText(feature.place_name||feature.text||query,160)};
   }).filter(Boolean);
   if(journeyAddressCache.size>400)journeyAddressCache.clear();
@@ -967,7 +967,7 @@ app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  if(['active','late'].includes(db.journeys[req.user.id]?.status))return res.status(409).json({error:'Termina prima il percorso esistente.'});
  const point=req.body.destinationPoint?validCoords(req.body.destinationPoint):null;
  if(req.body.destinationPoint && !point)return res.status(400).json({error:'Coordinate della destinazione non valide.'});
- const j={id:token(10),userId:req.user.id,destination,recipients,startedAt:now(),dueAt:now()+mins*60000,minutes:mins,status:'active',autoSos:req.body.autoSos===true,destinationPoint:point?{lat:point.lat,lon:point.lon}:null,nearCount:0};
+ const j={id:token(10),userId:req.user.id,destination,recipients,startedAt:now(),dueAt:now()+mins*60000,minutes:mins,status:'active',autoSos:req.body.autoSos===true,autoArrival:req.body.autoArrival===true&&!!point,destinationPoint:point?{lat:point.lat,lon:point.lon}:null,nearCount:0};
  db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
  void sendEventPush(recipients,'🚶 Percorso iniziato',`${req.user.name} è in viaggio verso ${destination}. Orario di arrivo previsto: ${new Date(j.dueAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'})}.`);
  res.json({ok:true,journey:publicJourney(j,req.user.id)});
@@ -989,7 +989,7 @@ app.post('/api/journey/resume',requireAuth,limit,(req,res)=>{
  if(!recipients || recipients.length!==old.recipients.length)return res.status(409).json({error:'Alcuni contatti non sono più nella cerchia. Prepara un nuovo percorso.'});
  const mins=Number(old.minutes||Math.round((old.dueAt-old.startedAt)/60000));
  if(!Number.isInteger(mins)||mins<5||mins>720)return res.status(409).json({error:'Durata precedente non valida. Crea un nuovo percorso.'});
- const startedAt=now(),j={id:token(10),userId:req.user.id,destination:old.destination,recipients,startedAt,dueAt:startedAt+mins*60000,minutes:mins,status:'active',autoSos:false,destinationPoint:old.destinationPoint||null,nearCount:0,resumedFrom:old.id};
+ const startedAt=now(),j={id:token(10),userId:req.user.id,destination:old.destination,recipients,startedAt,dueAt:startedAt+mins*60000,minutes:mins,status:'active',autoSos:false,autoArrival:old.autoArrival===true||(old.autoArrival===undefined&&!!old.destinationPoint),destinationPoint:old.destinationPoint||null,nearCount:0,resumedFrom:old.id};
  db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
  void sendEventPush(recipients,'🚶 Accompagnami riattivato',`${req.user.name} ha riattivato il percorso verso ${j.destination}. Nuovo orario previsto: ${new Date(j.dueAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'})}.`);
  res.json({ok:true,journey:publicJourney(j,req.user.id)});
