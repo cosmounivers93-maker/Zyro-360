@@ -1,0 +1,31 @@
+name: Accompagnami v2 - imposta o annulla sulla mappa
+on:
+  push:
+    branches: ['feature/accompagnami-map-confirm-v2-20261102']
+  pull_request:
+    paths:
+      - 'server.mjs'
+      - 'public/**'
+      - 'test/zyro-journey-address-v1.test.mjs'
+      - '.github/workflows/accompagnami-address-ci.yml'
+permissions:
+  contents: read
+jobs:
+  node-and-ui-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verifica sintassi mappa, interfaccia, server
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+          node --check public/zyro-journey-address-v1.js
+          node --check public/zyro-lifeguard-v1.js
+      - name: Installa dipendenze
+        run: npm install --no-audit --no-fund
+      - name: Esegui test di regressione
+        run: npm test
