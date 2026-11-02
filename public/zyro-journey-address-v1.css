@@ -45,3 +45,11 @@
 #zyroJourneyMapConfirm .zyro-journey-map-actions button{min-width:0!important;min-height:48px!important;font-size:14px!important;font-weight:800!important;cursor:pointer!important;border-radius:12px!important;touch-action:manipulation!important}
 #zyroJourneyMapConfirm #zyroJourneyMapApply{color:#23547b!important;border:1px solid #62c5c8!important;background:linear-gradient(115deg,#b8e9ff,#9de9da)!important}
 #zyroJourneyMapConfirm #zyroJourneyMapCancel{color:#636c9a!important;border:1px solid #adb7dc!important;background:#fff!important}
+
+/* Standalone Accompagnami/Check-in cards after removing the retired wrapper. */
+#journeyPanel,#checkinPanel{scroll-margin-top:92px;min-width:0;box-sizing:border-box;margin-bottom:16px}
+#journeyPanel .zyro-life-consent,#checkinPanel .zyro-life-consent{display:flex;align-items:flex-start;gap:12px;padding:15px;margin:16px 0;border-radius:17px;border:1px solid #a2cfeb;background:linear-gradient(120deg,#f2f5ff,#e9fbfc);color:#194b65;cursor:pointer}
+#journeyPanel .zyro-life-consent input,#checkinPanel .zyro-life-consent input{width:21px;height:21px;flex:none;accent-color:#6362dc;margin:2px 0 0}
+#journeyPanel .zyro-life-consent span,#checkinPanel .zyro-life-consent span{min-width:0;display:grid;gap:6px}
+#journeyPanel .zyro-life-consent b,#checkinPanel .zyro-life-consent b{font-size:13px}
+#journeyPanel .zyro-life-consent small,#checkinPanel .zyro-life-consent small{font-size:11px;line-height:1.6;color:#506d7e}
