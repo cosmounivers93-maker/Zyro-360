@@ -709,7 +709,7 @@ async function nativeBackgroundSync(options={}){
    const response=await zyroNativeRequest('sync',payload);
    result=response.result;
    window.ZyroAndroidSafetySupported=true;
-   window.ZyroAndroidSafetyBuild=24;
+   window.ZyroAndroidSafetyBuild=25;
  }else result=window.prompt('ZYRO360_BG_SYNC',JSON.stringify(payload));
  if(result==='zyro-native')return true;
  throw Error(nativeSyncError(result));
@@ -726,7 +726,7 @@ function zyroNativeAge(ms){
 function nativeDiagnosticText(state){
  if(!isZyroNativeAvailable())
    return '⚠ Collegamento Android assente. Potresti aver aperto il sito o un collegamento del browser. Controlla in Impostazioni Android → App → Zyro 360 la versione 1.0.0-rc3, poi apri l’app dalla sua icona.';
- if(!state || !['v23-android','v24-android'].includes(state.build))
+ if(!state || !['v23-android','v24-android','v25-android'].includes(state.build))
    return '⚠ Collegamento non ancora verificato. Premi «Verifica servizio Android»: controlliamo la risposta diretta del telefono.';
  if(!state.running)
    return '○ Servizio Android non attivo. Attiva GPS LIVE oppure Pick Pocket, poi verifica di nuovo.';
