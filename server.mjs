@@ -110,7 +110,7 @@ const premiumPlan = user => {
 };
 const premiumActive = user => premiumPlan(user)!=='free';
 const familyActive = user => premiumPlan(user)==='family';
-const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:premiumActive(user),checkin:premiumActive(user),lifeGuard:premiumActive(user),lifeGuardFall:familyActive(user)});
+const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:premiumActive(user),checkin:premiumActive(user),lifeGuard:premiumActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
@@ -241,7 +241,7 @@ function stateFor(id) {
   pickRemoteContacts:familyActive(me)?(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteRingContacts:familyActive(me)?(me.pickRemoteRingContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteLockContacts:familyActive(me)?(me.pickRemoteLockContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
-  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id),lifeGuardFallEnabled:familyActive(me)&&me.lifeGuardFallEnabled===true }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -839,7 +839,7 @@ function startLifeGuardAlert(userId, requested, source, suppliedLocation=null){
  const alert={id:token(12),userId,recipients,startedAt:now(),active:true,hasAudio:false,kind:'sos',source:'lifeguard',reason:source,address:null};
  db.alerts[alert.id]=alert;save();refreshRelated(userId);
  const coords=pos?' Ultima posizione disponibile: '+pos.lat.toFixed(5)+', '+pos.lon.toFixed(5)+'.':' Posizione non disponibile.';
- const message=(source==='fall'?'Possibile caduta o impatto senza conferma.':'Controllo LifeGuard scaduto senza conferma.')+coords+' Contatta la persona e, se necessario, chiama il 112.';
+ const message='Controllo LifeGuard scaduto senza conferma.'+coords+' Contatta la persona e, se necessario, chiama il 112.';
  void sendEventPush(recipients,'🆘 LifeGuard 360: verifica urgente',cleanText(owner.name,36)+': '+message,'sos')
    .catch(err=>console.error('[LifeGuard push]',err.message));
  return {ok:true,id:alert.id,recipientCount:recipients.length};
@@ -902,26 +902,12 @@ app.post('/api/billing/google-notifications',async(req,res)=>{
  }catch{res.sendStatus(503);}
 });
 
-app.post('/api/lifeguard/fall/settings',requireAuth,limit,(req,res)=>{
- if(!familyActive(req.user))return res.status(402).json({error:'Rilevamento cadute disponibile con ZYRO Family.'});
- if(typeof req.body?.enabled!=='boolean')return res.status(400).json({error:'Stato non valido.'});
- req.user.lifeGuardFallEnabled=req.body.enabled;save();
- res.set('Cache-Control','no-store');res.json({ok:true,enabled:req.user.lifeGuardFallEnabled});
+// Fall monitoring was retired at the owner's request.
+// Old Android builds cannot enable it: no sensor SOS alert is sent.
+// The other LifeGuard tools (Accompagnami and Check-in) remain available.
+app.post(['/api/lifeguard/fall/settings','/api/lifeguard/fall'],requireAuth,limit,(_req,res)=>{
+ res.status(410).json({error:'La modalità rilevamento cadute è stata rimossa da Zyro 360.'});
 });
-app.post('/api/lifeguard/fall',requireAuth,limit,(req,res)=>{
- if(!familyActive(req.user)||req.user.lifeGuardFallEnabled!==true)return res.status(403).json({error:'LifeGuard cadute non attivo o Family non verificato.'});
- const t=now();
- if(t-Number(req.user.lastLifeGuardFallAt||0)<180000)return res.status(429).json({error:'Segnalazione precedente ancora recente.'});
- const recipients=(req.user.sosRecipients||[]).filter(id=>sharedCircle(req.user.id,id));
- if(!recipients.length)return res.status(409).json({error:'Seleziona destinatari SOS prima di attivare LifeGuard cadute.'});
- const pos=req.body?.location?validCoords(req.body.location):null;
- const result=startLifeGuardAlert(req.user.id,recipients,'fall',pos);
- if(!result.ok)return res.status(409).json({error:'Allarme non inviato: '+result.reason});
- req.user.lastLifeGuardFallAt=t;save();
- res.json({...result,serverRecorded:true,pushDeliveryGuaranteed:false});
-});
-// Address searches are performed only on explicit user action. The server-side
-// MapTiler key is never sent to the browser or stored with the journey.
 const journeyAddressCooldown=new Map();
 const journeyAddressCache=new Map();
 app.post('/api/journey/geocode',requireAuth,limit,async(req,res)=>{
