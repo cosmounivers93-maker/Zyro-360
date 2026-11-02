@@ -12,7 +12,7 @@ test('Accompagnami asks for street, city and postal code and requires a confirme
  for(const id of ['journeyStreet','journeyCity','journeyPostcode','journeyFindAddress','journeyAddressResults','journeyAddressState','journeyChosenAddress','journeySeePin'])assert.match(html,new RegExp('id="'+id+'"'));
  assert.match(html,/type="text" maxlength="12" autocomplete="postal-code"/);
  assert.match(app,/if\(!destination\)throw Error/);
- assert.match(app,/if\(!journeyTarget\)throw Error/);
+ assert.match(app,/if\(!journeyTarget\|\|!window\.ZyroJourneyAddressConfirmed\?\.\(\)\)throw Error/);
  assert.match(app,/destinationPoint:journeyTarget,autoArrival:auto/);
  assert.match(server,/app\.post\('\/api\/journey\/geocode',requireAuth,limit/);
  assert.match(server,/MAPTILER_API_KEY/);
@@ -53,11 +53,11 @@ test('stop and explicit restart are safe against duplicate or stale journey and 
 test('the how-it-works guide explains address confirmation, contacts, and cancellation',()=>{
  assert.match(html,/Accompagnami: scegli una meta sulla mappa/);
  assert.match(html,/via e numero civico, città e CAP/);
- assert.match(html,/Controlla il puntino blu/);
+ assert.match(html,/Conferma il puntino blu/);
  assert.match(html,/Riattiva Accompagnami/);
  assert.match(html,/Disponibile con Base e Family/);
- assert.match(html,/zyro-journey-address-v1.js\?v=1/);
- assert.match(html,/zyro-journey-address-v1.css\?v=1/);
+ assert.match(html,/zyro-journey-address-v1.js\?v=2/);
+ assert.match(html,/zyro-journey-address-v1.css\?v=2/);
 });
 
 test('Address lookup never fills the separate Casa/Lavoro/Altro description',()=>{
@@ -67,4 +67,22 @@ test('Address lookup never fills the separate Casa/Lavoro/Altro description',()=
  assert.doesNotMatch(js,/el\('journeyDestination'\)\.value=''/);
  assert.doesNotMatch(app,/\$\('journeyDestination'\)\.value=text\.slice/);
  assert.match(html,/il nome non viene compilato dall'indirizzo/i);
+});
+
+test('map selection is explicitly approved; cancel clears only destination, not Casa/Lavoro',()=>{
+ assert.match(html,/id="journeySeePin"[^>]*>Apri sulla mappa/);
+ assert.match(html,/id="journeyCancelDestination"/);
+ assert.match(js,/id='zyroJourneyMapConfirm'/);
+ assert.match(js,/textContent='✓ Imposta'/);
+ assert.match(js,/textContent='Annulla'/);
+ assert.match(js,/addEventListener\('click',confirmOnMap\)/);
+ assert.match(js,/addEventListener\('click',cancelOnMap\)/);
+ assert.match(js,/confirmed=true/);
+ assert.match(js,/window\.ZyroJourneyAddressConfirmed/);
+ assert.match(app,/window\.ZyroJourneyAddressConfirmed\?\.\(\)/);
+ assert.match(js,/clearChoice\(true\)/);
+ assert.match(js,/showView\('modes'\)/);
+ assert.match(js,/addEventListener\('input',\(\)=>clearChoice\(\)\)/);
+ assert.doesNotMatch(js,/el\('journeyDestination'\)\.value=''/);
+ assert.match(html,/premi «Imposta»/);
 });

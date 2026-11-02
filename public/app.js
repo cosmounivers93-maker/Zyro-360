@@ -1630,7 +1630,7 @@ async function v15JourneyStart(){
  requireLifeGuardPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];
  if(!destination)throw Error('Scrivi dove stai andando: ad esempio Casa, Lavoro o Altro.');
- if(!journeyTarget)throw Error('Cerca e conferma un indirizzo o scegli il punto GPS sulla mappa prima di avviare Accompagnami.');
+ if(!journeyTarget||!window.ZyroJourneyAddressConfirmed?.())throw Error('Apri la mappa e premi «Imposta» per confermare il puntino blu prima di avviare Accompagnami.');
  if(!recipients.length)throw Error('Scegli almeno un contatto dalla tua cerchia.');
  const auto=$('journeyAuto').checked;
  if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
