@@ -2217,6 +2217,25 @@ async function init(){
     if(document.visibilityState==='visible' && isZyroNativeAvailable())
       void readNativeSafetyStatus().catch(e=>console.warn('Android monitor:',e.message));
   });
+  // Quick actions jump to the correct settings without resetting or toggling protections.
+  $('modesView').addEventListener('click',event=>{
+    const button=event.target.closest('button[data-mode-target]');
+    if(!button||!$('modesView').contains(button))return;
+    const allowed={sosRecipientsPanel:'zyroSosOptions',pickPanel:null,journeyPanel:'zyroJourneyOptions',checkinPanel:'zyroCheckinOptions'};
+    const targetName=button.dataset.modeTarget;
+    if(!Object.hasOwn(allowed,targetName))return;
+    const target=$(targetName);
+    if(!target)return;
+    const panelId=allowed[targetName];
+    // The SOS contacts and inactive journey/check-in settings open directly.
+    if(panelId){
+      const details=$(panelId);
+      const active=targetName==='journeyPanel'?!$('journeyActive').classList.contains('hidden')
+        :targetName==='checkinPanel'?!$('checkinActive').classList.contains('hidden'):false;
+      if(details&&!active)details.open=true;
+    }
+    target.scrollIntoView({behavior:'auto',block:'start'});
+  });
   $('pickArm').addEventListener('click',()=>action(armPick));
   $('pickTest').addEventListener('click',()=>action(previewSiren));
   $('theftStop').addEventListener('click',()=>action(stopTheft));

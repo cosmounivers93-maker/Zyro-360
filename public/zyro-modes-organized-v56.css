@@ -1,0 +1,116 @@
+/* Zyro 360 · Modalità ordinate V56 — leggibilità, velocità, nessuna funzione rimossa */
+#modesView.modes-page{
+  --mode-ink:#245078;--mode-soft:#527696;--mode-outline:#bdd8ea;
+  --mode-light:linear-gradient(128deg,#fafdff 0%,#e5f7ff 52%,#f0eaff 100%);
+}
+#modesView>.mode-heading{margin-bottom:12px!important}
+#modesView .zyro-modes-quicknav{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;
+  padding:5px 1px 0;margin:10px 0 18px;
+}
+#modesView .zyro-modes-quicknav button{
+  display:flex;align-items:center;gap:10px;min-width:0;min-height:67px;
+  padding:12px;border:1px solid #bad8ee;border-radius:19px;
+  background:linear-gradient(125deg,#fcfeff,#e6f8ff 55%,#eae8ff);
+  box-shadow:0 5px 16px #3567a519;color:#1d4f87;
+  font:inherit;font-size:13px;font-weight:790;line-height:1.2;text-align:left;cursor:pointer;
+  touch-action:manipulation;
+}
+#modesView .zyro-modes-quicknav button:active{transform:scale(.975)}
+#modesView .zyro-modes-quicknav button:focus-visible,
+#modesView .zyro-mode-details summary:focus-visible{
+  outline:3px solid #447cdb;outline-offset:3px;
+}
+#modesView .zyro-modes-quicknav button>span:last-child{display:block;min-width:0;overflow-wrap:anywhere}
+#modesView .zyro-modes-quicknav button small{
+  display:block;margin-top:3px;font-size:11px;font-weight:530;color:#567b9c;
+}
+#modesView .zyro-mode-quick-icon{
+  display:grid;place-items:center;width:38px;height:38px;min-width:38px;border-radius:13px;
+  background:linear-gradient(145deg,#dffaff,#e3e7ff);color:#2a76bb;
+  box-shadow:inset 0 0 0 1px #90bfdf85;font-size:21px;
+}
+#modesView .zyro-modes-group-title{
+  display:flex;align-items:center;gap:12px;margin:26px 0 12px!important;
+  padding:0 2px;color:#214b7d;
+}
+#modesView .zyro-modes-group-title>span{
+  display:grid;place-items:center;width:39px;height:39px;flex:none;border-radius:13px;
+  background:linear-gradient(130deg,#c1eeff,#e3dcff);color:#215f9e;
+  font-size:13px;font-weight:850;border:1px solid #99c9eb91;
+}
+#modesView .zyro-modes-group-title>div{min-width:0;flex:1}
+#modesView .zyro-modes-group-title h2{color:#214c7b;font-size:19px;font-weight:840;line-height:1.25;margin:0 0 3px;letter-spacing:-.35px}
+#modesView .zyro-modes-group-title p{font-size:12px;color:#557b99;line-height:1.4;margin:0}
+#modesView :is(#pickPanel,#sosRecipientsPanel,#journeyPanel,#checkinPanel,#premiumPanel,.circle-location-status){
+  background:var(--mode-light)!important;border:1px solid var(--mode-outline)!important;
+  box-shadow:0 7px 23px #366c9b13!important;border-radius:23px!important;
+  color:var(--mode-ink)!important;
+  scroll-margin-top:90px;
+}
+#modesView .greeting{margin:8px 0 9px!important;gap:8px!important}
+#modesView .greeting h1{font-size:20px!important;margin:3px 0!important;color:#245078!important}
+#modesView .greeting .eyebrow{font-size:10px!important;letter-spacing:1.3px}
+#modesView .greeting .avatar{width:43px!important;height:43px!important}
+#modesView .top-cards{margin:8px 0 11px!important;gap:10px}
+#modesView .top-cards .stat-card{padding:11px!important;border-radius:17px!important;min-width:0}
+#modesView .top-cards .stat-card strong{font-size:20px!important}
+#modesView .top-cards .stat-card small{font-size:11px!important}
+#modesView .circle-location-status{padding:13px 16px!important;margin-bottom:10px!important}
+#modesView .circle-location-status .panel-title{margin:0!important}
+#modesView .circle-location-status h2{font-size:16px!important}
+#modesView .circle-location-status p{font-size:12px!important}
+#modesView .zyro-mode-details{
+  margin:12px 0!important;padding:0!important;overflow:hidden;
+  border:1px solid #bad8e8!important;border-radius:17px!important;
+  background:linear-gradient(125deg,#f7fcff,#e7f6fc 65%,#f1edff)!important;
+  box-shadow:0 4px 12px #4978b10b!important;color:var(--mode-ink)!important;
+}
+#modesView .zyro-mode-details>summary{
+  list-style:none;display:flex;align-items:center;justify-content:space-between;
+  gap:14px;cursor:pointer;min-height:61px;padding:12px 15px;
+  color:#20588b!important;font:inherit;font-weight:800;font-size:14px;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;
+}
+#modesView .zyro-mode-details>summary::-webkit-details-marker{display:none}
+#modesView .zyro-mode-details[open]>summary{
+  border-bottom:1px solid #bfd9e7;
+  background:linear-gradient(100deg,#ddf3ff,#eae7ff);
+}
+#modesView .zyro-mode-summary-label{display:block;min-width:0;line-height:1.35}
+#modesView .zyro-mode-summary-label small{
+  display:block;font-size:11px;font-weight:520;line-height:1.4;margin-top:3px;
+  color:#507799!important;
+}
+#modesView .zyro-mode-chevron{font-size:22px;font-weight:500;color:#3477ad;flex:none;line-height:1}
+#modesView .zyro-mode-details[open] .zyro-mode-chevron{transform:rotate(180deg)}
+#modesView #zyroPickOptions .pick-settings{padding:15px 13px 4px;margin:0!important}
+#modesView #zyroPickOptions .pick-section{padding:13px!important}
+#modesView #pickPanel .pick-control-section{margin:4px 0 12px!important}
+#modesView #pickPanel .pick-limits{font-size:11px!important;line-height:1.5!important;color:#59798d!important;margin-top:10px!important}
+#modesView #zyroSosOptions>.sos-section{margin:14px 13px!important}
+#modesView #zyroSosOptions>#saveSOSRecipients{display:block;width:calc(100% - 26px)!important;margin:0 13px 12px!important}
+#modesView #zyroSosOptions>.sos-push-note{padding:0 13px;font-size:11px!important;line-height:1.5!important;margin-bottom:13px!important}
+#modesView :is(#zyroJourneyOptions,#zyroCheckinOptions)>:not(summary){margin-left:13px;margin-right:13px}
+#modesView :is(#zyroJourneyOptions,#zyroCheckinOptions) .zyro-v15-field,
+#modesView :is(#zyroJourneyOptions,#zyroCheckinOptions) .zyro-v15-subhead{margin-top:14px!important}
+#modesView :is(#zyroJourneyOptions,#zyroCheckinOptions) .zyro-v15-primary{
+  width:calc(100% - 26px)!important;margin:0 13px 15px!important;
+}
+#modesView :is(#zyroJourneyOptions,#zyroCheckinOptions) .zyro-v15-destination{padding:10px 8px!important}
+#modesView #zyroModeContacts{scroll-margin-top:85px}
+#modesView #zyroModeContacts>.section-head{margin:14px!important}
+#modesView #zyroModeContacts>#contactsList{margin:0 12px 14px}
+#modesView #zyroPlanOptions .zyro-plan-stack{padding:14px 11px 0}
+#modesView #zyroPlanOptions :is(#premiumStatus,#premiumDetails,#zyroRestorePurchases,#zyroPlanHelp){margin-left:12px!important;margin-right:12px!important;max-width:calc(100% - 24px)!important}
+#modesView .emergency-card{margin:10px 0 16px!important;scroll-margin-top:85px}
+#modesView .zyro-mode-details[hidden]{display:none!important}
+@media(max-width:380px){
+ #modesView .zyro-modes-quicknav{gap:8px}
+ #modesView .zyro-modes-quicknav button{font-size:12px;padding:10px 8px;gap:7px}
+ #modesView .zyro-mode-quick-icon{width:33px;height:33px;min-width:33px;font-size:18px}
+ #modesView .zyro-modes-group-title h2{font-size:17px}
+}
+@media(prefers-reduced-motion:reduce){
+ #modesView .zyro-modes-quicknav button:active{transform:none}
+}
