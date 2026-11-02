@@ -28,3 +28,6 @@
 #modesView .zyro-lifeguard-optin small{display:block;font-size:11px;line-height:1.55;color:#4e6581;margin-top:6px}
 @media(max-width:400px){#lifeGuardPanel.zyro-lifeguard-panel{padding:16px}#lifeGuardPanel .zyro-lifeguard-title h2{font-size:20px}#lifeGuardPanel .zyro-lifeguard-setting{flex-wrap:wrap}}
 @media(prefers-reduced-motion:reduce){#lifeGuardPanel *{animation:none!important;transition:none!important}}
+
+#modesView .zyro-modes-quicknav button[data-mode-target="lifeGuardPanel"]{grid-column:1/-1;justify-content:center;min-height:58px}
+#lifeGuardPanel{scroll-margin-top:90px}
