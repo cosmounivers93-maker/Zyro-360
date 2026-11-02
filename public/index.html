@@ -289,7 +289,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
 </style>
 <link rel="stylesheet" href="/zyro-welcome-v64.css">
 <style>body.zyro-await-intro{background:#081725}body.zyro-await-intro #authScreen,body.zyro-await-intro #appScreen{visibility:hidden!important}</style>
-  <link rel="stylesheet" href="/zyro-modes-organized-v56.css?v=59.0"><link rel="stylesheet" href="/zyro-lifeguard-v1.css?v=2"><link rel="stylesheet" href="/zyro-journey-address-v1.css?v=1">
+  <link rel="stylesheet" href="/zyro-modes-organized-v56.css?v=59.0"><link rel="stylesheet" href="/zyro-lifeguard-v1.css?v=2"><link rel="stylesheet" href="/zyro-journey-address-v1.css?v=2">
 </head>
 <body class="zyro-await-intro">
 <div id="authScreen" class="auth-shell">
@@ -443,7 +443,8 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
             <button id="journeyFindAddress" type="button" class="zyro-v15-secondary">⌕ Cerca indirizzo sulla mappa</button>
             <div id="journeyAddressResults" class="zyro-journey-results" role="group" aria-label="Risultati indirizzo"></div>
             <p id="journeyAddressState" role="status" aria-live="polite">Nessuna destinazione verificata.</p>
-            <div id="journeyChosenAddress" class="zyro-journey-chosen hidden"><span aria-hidden="true" class="zyro-journey-blue-dot"></span><strong id="journeyChosenLabel"></strong><button id="journeySeePin" type="button" class="zyro-v15-secondary">Vedi puntino blu sulla Home</button></div>
+            <div id="journeyChosenAddress" class="zyro-journey-chosen hidden"><span aria-hidden="true" class="zyro-journey-blue-dot"></span><strong id="journeyChosenLabel"></strong><button id="journeySeePin" type="button" class="zyro-v15-secondary">Apri sulla mappa</button></div>
+            <button id="journeyCancelDestination" type="button" class="zyro-v15-secondary zyro-journey-clear-destination">Annulla destinazione</button>
           </div>
           <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, Lavoro, Palestra, Altro" autocomplete="off"><small>Scrivi soltanto un nome per la meta. La via, la città e il CAP servono a individuare il punto sulla mappa.</small></label>
           <label class="zyro-v15-field">Tempo previsto<select id="journeyMinutes"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e mezza</option><option value="120">2 ore</option><option value="240">4 ore</option></select></label>
@@ -659,7 +660,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
         </div></details>
         <details><summary>Accompagnami: scegli una meta sulla mappa <span aria-hidden="true">＋</span></summary><div class="how-content">
           <p><strong>1. Inserisci la destinazione:</strong> apri Modalità → LifeGuard 360 → Accompagnami → «Prepara il percorso». Scrivi via e numero civico, città e CAP, quindi premi «Cerca indirizzo sulla mappa».</p>
-          <p><strong>2. Controlla il puntino blu:</strong> scegli uno dei risultati trovati e premi «Vedi puntino blu sulla Home». Controlla visivamente che il luogo sia corretto; se non lo è, correggi l’indirizzo. Puoi anche scegliere manualmente il centro della mappa. La ricerca necessita di Internet e del servizio indirizzi attivo.</p>
+          <p><strong>2. Conferma il puntino blu:</strong> scegli il risultato e premi «Apri sulla mappa». Sulla mappa controlla il puntino blu, poi premi «Imposta» per confermare la meta oppure «Annulla» per scartarla. Se cambi idea puoi anche usare «Annulla destinazione» direttamente nella sezione Accompagnami. La ricerca necessita di Internet e del servizio indirizzi attivo.</p>
           <p><strong>3. Scrivi soltanto un nome alla meta:</strong> nella casella «Dove stai andando?» scrivi, per esempio, «Casa», «Lavoro», «Palestra» oppure «Altro». Il nome non viene compilato dall'indirizzo ed è indipendente dalla posizione scelta sulla mappa.</p>
           <p><strong>4. Scegli chi ti accompagna:</strong> imposta il tempo previsto, seleziona i contatti della cerchia e premi «Avvia Accompagnami». Il GPS LIVE deve essere abilitato per la condivisione; l’arrivo automatico è facoltativo e dipende dal monitoraggio GPS.</p>
           <p><strong>5. Concludi o riparti:</strong> premi «Sono arrivato/a» a destinazione oppure «Interrompi percorso» per annullare. Dopo un’interruzione puoi scegliere «Riattiva Accompagnami»: verrà avviato un nuovo percorso verso la stessa meta, con un nuovo orario e un nuovo avviso ai contatti. Per cambiare meta o contatti prepara invece un nuovo percorso.</p>
@@ -737,7 +738,7 @@ html[data-theme="dark"] #appScreen>.bottom-nav{background:#0c2231!important;bord
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
 <script src="/app.js?v=70.0" defer></script><script src="/zyro-lifeguard-v1.js?v=2" defer></script>
-<script src="/zyro-journey-address-v1.js?v=1" defer></script>
+<script src="/zyro-journey-address-v1.js?v=2" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
 </html>
