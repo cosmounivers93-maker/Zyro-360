@@ -108,7 +108,7 @@ const premiumPlan = user => {
 };
 const premiumActive = user => premiumPlan(user)!=='free';
 const familyActive = user => premiumPlan(user)==='family';
-const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
+const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
@@ -172,8 +172,8 @@ function remoteAccessFor(owner,id){
   const ring=owner?.pickRemoteRingContacts??legacy;
   const lock=owner?.pickRemoteLockContacts??legacy;
   return {
-    ring:!!circle && owner.pickRemoteEnabled===true && ring.includes(id) && premiumActive(owner),
-    lock:!!circle && owner.pickRemoteEnabled===true && lock.includes(id) && premiumActive(owner)
+    ring:!!circle && owner.pickRemoteEnabled===true && ring.includes(id) && familyActive(owner),
+    lock:!!circle && owner.pickRemoteEnabled===true && lock.includes(id) && familyActive(owner)
   };
 }
 function sosAudioAccessFor(owner,id){
@@ -231,9 +231,9 @@ function stateFor(id) {
   })).sort((a,b) => b.startedAt - a.startedAt);
   return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)),
   sosAudioRecipients:(me.sosAudioRecipients||[]).filter(x=>sharedCircle(id,x)),
-  pickRemoteContacts:(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)),
-  pickRemoteRingContacts:(me.pickRemoteRingContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)),
-  pickRemoteLockContacts:(me.pickRemoteLockContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)),
+  pickRemoteContacts:familyActive(me)?(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)):[],
+  pickRemoteRingContacts:familyActive(me)?(me.pickRemoteRingContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
+  pickRemoteLockContacts:familyActive(me)?(me.pickRemoteLockContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
   sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
@@ -918,8 +918,8 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
           .filter(id=>sharedCircle(req.user.id,id))),
         lock=new Set((req.user.pickRemoteLockContacts??req.user.pickRemoteContacts??[])
           .filter(id=>sharedCircle(req.user.id,id)));
-  if((req.body.remoteRing===true||req.body.remoteLock===true)&&!premiumActive(req.user))
-    return res.status(402).json({error:'Controllo remoto incluso soltanto in Premium e Family.'});
+  if((req.body.remoteRing===true||req.body.remoteLock===true)&&!familyActive(req.user))
+    return res.status(402).json({error:'Squillo e blocco da remoto sono inclusi soltanto in ZYRO Family.'});
   if(req.body.listenSosAudio===true&&!familyActive(req.user))
     return res.status(402).json({error:'Ascolto audio SOS incluso soltanto in Family.'});
   req.body.shareGps?gps.add(otherId):gps.delete(otherId);
@@ -1124,15 +1124,15 @@ app.post('/api/sos/stop', requireAuth, (req,res) => {
 const pickRemoteCooldown=new Map();
 app.get('/api/pickpocket/remote/settings',requireAuth,(req,res)=>{
   res.set('Cache-Control','no-store');
-  res.json({enabled:req.user.pickRemoteEnabled===true,
+  res.json({enabled:familyActive(req.user)&&req.user.pickRemoteEnabled===true,
     contacts:(req.user.pickRemoteContacts||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)),
     ringContacts:(req.user.pickRemoteRingContacts??req.user.pickRemoteContacts??[]).filter(id=>sharedCircle(id,req.user.id)),
     lockContacts:(req.user.pickRemoteLockContacts??req.user.pickRemoteContacts??[]).filter(id=>sharedCircle(id,req.user.id)),
-    premium:premiumActive(req.user)});
+    premium:premiumActive(req.user),family:familyActive(req.user)});
 });
 app.post('/api/pickpocket/remote/settings',requireAuth,limit,(req,res)=>{
-  if(!premiumActive(req.user))
-    return res.status(402).json({error:'Pick Pocket avanzato richiede ZYRO Premium o Family.'});
+  if(req.body?.enabled===true&&!familyActive(req.user))
+    return res.status(402).json({error:'Il controllo remoto Pick Pocket richiede ZYRO Family.'});
   const enabled=req.body?.enabled;
   const contacts=req.body?.contacts;
   if(typeof enabled!=='boolean'||!Array.isArray(contacts)||contacts.length>60 ||
@@ -1157,7 +1157,7 @@ app.post('/api/pickpocket/remote/request',requireAuth,limit,async(req,res)=>{
   const owner=db.users[ownerId];
   const alert=owner&&currentAlert(ownerId);
   if(!owner||req.user.id===ownerId||!['lock','ring'].includes(action)||
-     !premiumActive(owner)||owner.pickRemoteEnabled!==true||
+     !familyActive(owner)||owner.pickRemoteEnabled!==true||
      !remoteAccessFor(owner,req.user.id)[action]||
      !sharedCircle(ownerId,req.user.id)||!alert||alert.kind!=='pickpocket'||
      !alert.active||!alert.recipients?.includes(req.user.id))
@@ -1198,7 +1198,7 @@ app.post('/api/pickpocket/remote/consume',requireAuth,(req,res)=>{
   const alert=currentAlert(req.user.id);
   const valid=command.expiresAt>now() && alert?.active &&
      alert.id===command.alertId && alert.kind==='pickpocket' &&
-     req.user.pickRemoteEnabled===true && premiumActive(req.user) &&
+     req.user.pickRemoteEnabled===true && familyActive(req.user) &&
      remoteAccessFor(req.user,command.by)[command.action] &&
      alert.recipients?.includes(command.by) && sharedCircle(req.user.id,command.by);
   save();
