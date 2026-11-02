@@ -170,3 +170,59 @@
 #modesView #zyroPlanOptions>summary:focus-visible{outline:3px solid #417cbb;outline-offset:-3px}
 #modesView #zyroPlanOptions[open]>summary{border-radius:17px 17px 0 0}
 #modesView #zyroPlanOptions>.zyro-plans-free{margin:13px 12px 0!important}
+
+/* V59 — Entry point never moves with the premium panel into profile settings. */
+#modesView #zyroOpenSubscriptionPlans{
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ gap:12px!important;width:100%!important;box-sizing:border-box!important;
+ margin:7px 0 14px!important;min-height:76px!important;padding:15px 16px!important;
+ border:1px solid #aed2eb!important;border-radius:18px!important;
+ background:linear-gradient(115deg,#e6f8ff,#ece8ff)!important;color:#24517d!important;
+ font:inherit!important;text-align:left!important;cursor:pointer!important;
+ box-shadow:0 4px 14px #396daf19!important;touch-action:manipulation!important;
+}
+#modesView .zyro-subscription-entry-copy-v146{display:flex!important;flex-direction:column!important;flex:1;min-width:0;gap:4px}
+#modesView .zyro-subscription-entry-copy-v146 strong{color:#24517d!important;font-size:15px!important;font-weight:800!important;line-height:1.3}
+#modesView .zyro-subscription-entry-copy-v146 small{font-size:11px!important;color:#587793!important;line-height:1.5!important}
+#modesView .zyro-subscription-entry-chevron-v146{
+ flex:none!important;display:grid!important;place-items:center!important;
+ width:38px!important;height:38px!important;border:1px solid #b4d0e9!important;
+ border-radius:12px!important;background:#ffffffbb!important;
+ color:#307db2!important;font-size:27px!important;font-weight:600!important;line-height:1!important;
+}
+#modesView #zyroOpenSubscriptionPlans:focus-visible{outline:3px solid #277bc4!important;outline-offset:2px}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions{
+ display:block!important;margin:0 0 14px!important;padding:0!important;overflow:hidden!important;
+ background:linear-gradient(130deg,#fafdff,#e6f7ff 55%,#f1ecff)!important;
+ border:1px solid #b1d4e9!important;border-radius:19px!important;
+}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions>summary{
+ display:flex!important;align-items:center!important;justify-content:space-between!important;
+ gap:14px!important;list-style:none!important;padding:17px 16px!important;min-height:72px!important;
+ background:linear-gradient(120deg,#e1f7ff,#ece5ff)!important;color:#244e79!important;
+ font:inherit!important;cursor:pointer!important;touch-action:manipulation!important;
+}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions>summary::marker{content:''}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions>summary::-webkit-details-marker{display:none!important}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions>summary .zyro-mode-summary-label{
+ display:flex!important;flex-direction:column!important;flex:1!important;gap:5px!important;min-width:0!important;
+ font-size:16px!important;font-weight:800!important;line-height:1.3!important;
+}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions>summary .zyro-mode-summary-label strong{font-size:16px!important;color:#254f7d!important}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions>summary .zyro-mode-summary-label small{
+ display:block!important;margin:0!important;font-size:12px!important;font-weight:500!important;
+ color:#59738e!important;line-height:1.45!important;
+}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions>summary .zyro-mode-chevron{
+ flex:none!important;display:grid!important;place-items:center!important;
+ width:36px!important;height:36px!important;border-radius:11px!important;
+ border:1px solid #b8d2eb!important;background:#ffffffc7!important;
+ color:#2975b0!important;font-size:26px!important;line-height:1!important;
+ transform:none!important;transition:transform .14s ease!important;
+}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions[open]>summary .zyro-mode-chevron{transform:rotate(90deg)!important}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions .zyro-plan-stack{
+ display:grid!important;grid-template-columns:minmax(0,1fr)!important;gap:14px!important;
+ padding:14px 12px!important;
+}
+html[data-theme] body #profileSettingsDrawer #zyroPlanOptions .zyro-plans-free{margin:14px 12px 0!important}
