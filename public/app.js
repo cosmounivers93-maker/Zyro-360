@@ -1624,7 +1624,7 @@ function renderV15(){if(!current)return;
  updateMarkupIfChanged($('journeyContactsStatus'),others.map(x=>`<p class="zyro-v15-contact-status">🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)} · ${x.status==='late'?'In ritardo':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso annullato':'Arrivo previsto '+v15Time(x.dueAt)}</p>`).join(''));
  const checks=(current.checkins||[]).filter(x=>x.userId!==me.id);
  updateMarkupIfChanged($('checkinContactsStatus'),checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join(''));
- window.ZyroLifeGuardRender?.();
+ window.ZyroLifeGuardRender?.();window.ZyroJourneyRestore?.();
 }
 async function v15JourneyStart(){
  requireLifeGuardPlan();
@@ -1633,7 +1633,7 @@ async function v15JourneyStart(){
  if(!recipients.length)throw Error('Scegli almeno un contatto dalla tua cerchia.');
  const auto=$('journeyAuto').checked;
  if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
- const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:journeyTarget,autoSos:$('journeyAutoSos').checked});
+ const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:journeyTarget,autoArrival:auto,autoSos:$('journeyAutoSos').checked});
  await refresh();toast(result.ok?'Accompagnami attivo. I contatti scelti vedono il percorso se hai attivato la posizione.':'Percorso non avviato.');
 }
 async function v15JourneyEnd(arrived){
