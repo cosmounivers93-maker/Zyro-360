@@ -36,3 +36,12 @@
 #liveMap #zyroJourneyMapApply{background:linear-gradient(130deg,#b8e9ff,#9de9da);color:#23547b;border:1px solid #62c5c8}
 #liveMap #zyroJourneyMapCancel{background:#fff;color:#636c9a;border:1px solid #adb7dc}
 #liveMap .zyro-journey-map-actions button:focus-visible{outline:3px solid #347bb4;outline-offset:2px}
+
+/* v153: confirmation bar uses viewport portal, dynamically above GPS/SOS cards. */
+#zyroJourneyMapConfirm.zyro-journey-map-confirm{position:fixed!important;left:12px!important;right:12px!important;top:auto!important;bottom:320px;z-index:2147483000!important;display:grid!important;gap:10px!important;padding:13px!important;background:linear-gradient(120deg,#f1f7fff8,#e6faf4f8)!important;border:1px solid #85bfd6!important;border-radius:19px!important;box-shadow:0 12px 35px #24486d45!important;color:#244b75!important;box-sizing:border-box!important;max-width:580px!important;margin:0 auto!important;backdrop-filter:blur(14px)!important}
+#zyroJourneyMapConfirm.zyro-journey-map-confirm.hidden{display:none!important}
+#zyroJourneyMapConfirm.zyro-journey-map-confirm p{font-size:12px!important;line-height:1.45!important;font-weight:740!important;color:#2b537b!important;margin:0!important;overflow-wrap:anywhere!important}
+#zyroJourneyMapConfirm .zyro-journey-map-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important}
+#zyroJourneyMapConfirm .zyro-journey-map-actions button{min-width:0!important;min-height:48px!important;font-size:14px!important;font-weight:800!important;cursor:pointer!important;border-radius:12px!important;touch-action:manipulation!important}
+#zyroJourneyMapConfirm #zyroJourneyMapApply{color:#23547b!important;border:1px solid #62c5c8!important;background:linear-gradient(115deg,#b8e9ff,#9de9da)!important}
+#zyroJourneyMapConfirm #zyroJourneyMapCancel{color:#636c9a!important;border:1px solid #adb7dc!important;background:#fff!important}
