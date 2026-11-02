@@ -1684,7 +1684,7 @@ function setupProfileSettings(){
    const pane=document.createElement('section');pane.className='zyro-settings-pane';pane.dataset.pane=key;pane.hidden=true;
    if(key==='invitees'){
       const info=document.createElement('p');info.className='setting-description';
-      info.textContent='Scegli chi vede la tua posizione e chi riceve i tuoi SOS. Solo tu puoi avviare GPS e microfono.';
+      info.textContent='Da qui puoi decidere chi e cosa vuoi abilitare della tua cerchia.';
       pane.append(info);
       const list=document.createElement('div');list.id='savedInvitees';list.className='zyro-saved-invitees';pane.append(list);
    } else if(candidates[key])pane.append(candidates[key]);
@@ -1925,33 +1925,7 @@ function renderInvitedPeople(){
    byId.get(member.id).circles.add(circle.name);
  }
  root.replaceChildren();
- // Preserve independent, explicit microphone consent in a compact disclosure.
- // Checking 'all permissions' for an invitee never starts the microphone.
- const micBox=document.createElement('details');micBox.className='zyro-invitees-mic-compact';
- const summary=document.createElement('summary');
- summary.innerHTML='<span>🎙️ Consenso microfono SOS <small>Solo Family · funzione avanzata</small></span><span aria-hidden="true">＋</span>';
- micBox.append(summary);
- const micLabel=document.createElement('label');micLabel.className='zyro-access-toggle zyro-sos-mic-toggle';
- const micCopy=document.createElement('span');
- const micTitle=document.createElement('strong');micTitle.textContent='Consenti audio durante SOS';
- const micExplanation=document.createElement('small');
- micExplanation.textContent='Solo durante un SOS, verso i contatti autorizzati. Il collegamento di riserva tramite server non è crittografato end-to-end.';
- micCopy.append(micTitle,micExplanation);
- const micInput=document.createElement('input');micInput.type='checkbox';micInput.id='sosAudioConsent';
- micInput.checked=hasFamilyPlan()&&current.me.sosAudioConsent===true;micInput.disabled=!hasFamilyPlan();
- micInput.setAttribute('aria-label','Consenti la trasmissione audio durante SOS');
- micLabel.append(micCopy,micInput);
- const micHint=document.createElement('p');micHint.className='zyro-sos-mic-note';
- micHint.textContent='Richiede il permesso Android. L’audio può interrompersi a schermo spento. Puoi revocare il consenso quando vuoi.';
- const micTest=document.createElement('button');micTest.type='button';micTest.id='zyroTestMic';
- micTest.className='zyro-sos-mic-test';micTest.textContent='Verifica microfono';micTest.disabled=!micInput.checked;
- const micNative=document.createElement('button');micNative.type='button';
- micNative.id='zyroMicNativeCheck';micNative.className='zyro-sos-mic-test';
- micNative.textContent='Diagnostica microfono Android';micNative.disabled=!micInput.checked;
- const micResult=document.createElement('p');micResult.id='zyroMicDiagnosticResult';
- micResult.className='zyro-mic-diagnostic-result';micResult.hidden=true;
- micResult.setAttribute('role','status');micResult.setAttribute('aria-live','polite');
- micBox.append(micLabel,micHint,micTest,micNative,micResult);root.append(micBox);
+ // Il consenso generale all'audio SOS è accessibile nelle opzioni del contatto, non in un riquadro separato.
  if(!byId.size){
    const p=document.createElement('p');p.className='zyro-invitees-empty';
    p.textContent='Nessuna persona collegata. Invita amici e familiari dalla sezione Cerchie.';
@@ -2017,6 +1991,25 @@ function renderInvitedPeople(){
    addToggle('gps','Può vedere il mio GPS','Solo quando attivo la posizione LIVE.',sets.gps.has(member.id));
    addToggle('sos','Riceve i miei SOS','Notifiche di emergenza selezionate da te.',sets.sos.has(member.id));
    addToggle('audio','Può ascoltare il mio microfono durante SOS','Solo Family: richiede SOS e consenso microfono generale.',sets.audio.has(member.id));
+   if(family){
+     // Il consenso è generale, ma l'utente lo gestisce dentro le opzioni della cerchia.
+     // Non si attiva con "Abilita tutte le opzioni": serve un gesto esplicito.
+     const consentRow=document.createElement('label');
+     consentRow.className='zyro-access-toggle zyro-contact-audio-consent';
+     const consentText=document.createElement('span');
+     const consentTitle=document.createElement('strong');
+     consentTitle.textContent='Consento l’audio del microfono durante i miei SOS';
+     const consentHelp=document.createElement('small');
+     consentHelp.textContent='Consenso generale Family: solo durante un SOS e solo ai contatti autorizzati. Non parte mai con la sola attivazione dei permessi.';
+     consentText.append(consentTitle,consentHelp);
+     const consentToggle=document.createElement('input');consentToggle.type='checkbox';
+     consentToggle.dataset.sosAudioConsent='true';
+     consentToggle.checked=current.me.sosAudioConsent===true;
+     consentToggle.disabled=!!current.me.sos;
+     consentToggle.setAttribute('aria-label','Consenti o revoca la trasmissione audio durante SOS');
+     consentRow.append(consentText,consentToggle);
+     options.append(consentRow);
+   }
    addToggle('ring','Può far squillare il mio telefono','Solo Family: durante un vero allarme Pick Pocket.',sets.ring.has(member.id));
    addToggle('lock','Può bloccare il mio telefono da remoto','Solo Family: richiede anche l’autorizzazione amministratore Android.',sets.lock.has(member.id));
    card.append(options);root.append(card);
@@ -2120,7 +2113,7 @@ async function init(){
     void refreshPermissionStates();
   });
   $('savedInvitees').addEventListener('change',e=>{
-    if(e.target.id==='sosAudioConsent'){
+    if(e.target.matches('input[data-sos-audio-consent]')){
       const input=e.target, enabled=input.checked;
       if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede ZYRO Family.',true);return;}
       input.disabled=true;
