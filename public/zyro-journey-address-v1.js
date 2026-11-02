@@ -6,7 +6,19 @@
  const el=id=>document.getElementById(id);
  function valid(p){return p&&Number.isFinite(Number(p.lat))&&Number.isFinite(Number(p.lon))&&Math.abs(Number(p.lat))<=85&&Math.abs(Number(p.lon))<=180;}
  function status(message,kind=''){const e=el('journeyAddressState');if(e){e.textContent=message;e.dataset.state=kind;}}
- function ensureMapActions(){
+ function positionMapActions(){
+   const bar=document.getElementById('zyroJourneyMapConfirm');
+   if(!bar||bar.classList.contains('hidden'))return;
+   const controls=document.querySelector('#homeView .zyro-command-row');
+   const r=controls?.getBoundingClientRect();
+   const barHeight=bar.getBoundingClientRect().height||114;
+   const desired=r&&r.top>0?window.innerHeight-r.top+18:320;
+   const maximum=Math.max(130,window.innerHeight-barHeight-100);
+   bar.style.bottom=Math.min(Math.max(desired,150),maximum)+'px';
+ }
+ window.addEventListener('resize',positionMapActions);
+ window.addEventListener('orientationchange',positionMapActions);
+  function ensureMapActions(){
    const mapHost=el('liveMap');if(!mapHost)return null;
    let bar=el('zyroJourneyMapConfirm');
    if(!bar){
@@ -17,7 +29,7 @@
      const actions=document.createElement('div');actions.className='zyro-journey-map-actions';
      const apply=document.createElement('button');apply.id='zyroJourneyMapApply';apply.type='button';apply.textContent='✓ Imposta';
      const cancel=document.createElement('button');cancel.id='zyroJourneyMapCancel';cancel.type='button';cancel.textContent='Annulla';
-     actions.append(apply,cancel);bar.append(title,actions);mapHost.append(bar);
+     actions.append(apply,cancel);bar.append(title,actions);document.body.append(bar); // Portal above map controls and navigation overlays.
      apply.addEventListener('click',confirmOnMap);
      cancel.addEventListener('click',cancelOnMap);
    }
@@ -116,6 +128,7 @@
      bar.classList.remove('hidden');
    }
    showView('home');
+   requestAnimationFrame(positionMapActions);setTimeout(positionMapActions,120);
    renderMap();
    renderPin();
    // Native vector maps can initialize asynchronously; the next render will focus.
