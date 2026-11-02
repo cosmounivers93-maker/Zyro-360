@@ -557,7 +557,7 @@ app.post('/api/chat/groups/invite', requireAuth, limit, (req,res) => {
   save();res.json({code,expiresInHours:24,multipleUses:true});
 });
 app.post('/api/chat/groups/join', requireAuth, limit, (req,res) => {
-  const code=String(req.body?.code||'').replace(/[\\s-]/g,'').toUpperCase();
+  const code=String(req.body?.code||'').replace(/[\s-]/g,'').toUpperCase();
   if(!/^G[A-F0-9]{18}$/.test(code))
     return res.status(400).json({error:'Codice gruppo non valido.'});
   const inv=db.invites[hash(code)],group=inv&&db.circles[inv.circleId];
