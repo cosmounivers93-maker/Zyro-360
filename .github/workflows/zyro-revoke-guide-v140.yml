@@ -1,0 +1,20 @@
+name: ZYRO Android Admin Revocation Guide
+on:
+  push:
+    branches: ['feat/zyro-admin-revoke-guide-v140']
+    paths: ['public/index.html','tests/help-advanced-safety-v140.test.mjs','.github/workflows/zyro-revoke-guide-v140.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  guide:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Android administrator and uninstall instructions
+        run: node --test tests/help-advanced-safety-v140.test.mjs
+      - run: node --check public/app.js
+      - run: node --check server.mjs
