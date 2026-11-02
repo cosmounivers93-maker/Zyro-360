@@ -1385,16 +1385,17 @@ class ZyroRasterMap{
   if(!current)return;
   const places=[];for(const c of uniqueContacts())if(mapValidPoint(c.location))places.push({id:'contact:'+c.id,p:c.location,user:c,alert:!!c.sos,own:false});
   if(mapValidPoint(lastCoords))places.push({id:'me',p:lastCoords,user:current.me,own:true});
+   if(mapValidPoint(journeyTarget))places.push({id:'journey:destination',p:journeyTarget,destination:true});
   const present=new Set();
   for(const p of places){
    const pos=toWorld(p.p.lat,p.p.lon,this.zoom);let dx=pos.x-center.x;const world=worldWidth(this.zoom);
    if(dx>world/2)dx-=world;if(dx< -world/2)dx+=world;
    const x=w/2+dx,y=h/2+pos.y-center.y;present.add(p.id);
-   let pin=this.pinNodes.get(p.id);if(!pin){pin=stableMarker(p.own,p.p.heading,p.user,p.alert);pin.classList.add('zyro-raster-pin');this.pinNodes.set(p.id,pin);this.pinLayer.appendChild(pin);}
+   let pin=this.pinNodes.get(p.id);if(!pin){if(p.destination){pin=document.createElement('div');pin.className='zyro-journey-map-pin';pin.title='Destinazione Accompagnami';pin.textContent='●';}else pin=stableMarker(p.own,p.p.heading,p.user,p.alert);pin.classList.add('zyro-raster-pin');this.pinNodes.set(p.id,pin);this.pinLayer.appendChild(pin);}
    pin.style.transform=`translate3d(${Math.round(x)}px,${Math.round(y)}px,0) ${p.own?'translate(-50%,-50%)':'translate(-50%,-22px)'}`;
    pin.style.display=(x< -70||x>w+70||y< -70||y>h+70)?'none':'';
    pin.classList.toggle('zyro-contact-alert',!!p.alert);
-   updateMapAvatar(pin,p.user,p.own);
+   if(!p.destination)updateMapAvatar(pin,p.user,p.own);
    if(p.own)updateGlassHeading(pin,p.p.heading);
   }
   for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
@@ -1426,7 +1427,7 @@ function ensureStableMap(){
 function renderMap(){
  if(!current||$('homeView').classList.contains('hidden'))return;
  mapLink();ensureStableMap();if(!stableMap)return;
- syncStableMarkers();
+ syncStableMarkers();window.ZyroJourneyPinRender?.();
  if(mapValidPoint(lastCoords)){
   if(!ownCentered){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
   if(stableMapState==='ready')mapStatus(`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`);
@@ -1612,6 +1613,9 @@ function renderV15(){if(!current)return;
  }
  const j=me.journey,onJ=j&&['active','late'].includes(j.status);
  $('journeyInactive').classList.toggle('hidden',!!onJ);$('journeyActive').classList.toggle('hidden',!onJ);
+  const canResume=j?.status==='cancelled';
+  $('journeyRestart').classList.toggle('hidden',!canResume);
+  if(canResume)$('journeyRestartText').textContent='Percorso interrotto verso '+j.destination+'. Puoi riattivarlo con gli stessi contatti e un nuovo orario.';
  if(onJ){$('journeyStatus').textContent=j.status==='late'?'Orario previsto superato: contatta i tuoi familiari':'Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination} · Previsto entro ${v15Time(j.dueAt)}${j.autoArrival?' · Rilevamento GPS attivo':''}${j.autoSos?' · SOS automatico dopo 2 min senza risposta':''}`;}
  const c=me.checkin,onC=c&&['pending','late'].includes(c.status);
  $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
@@ -1624,13 +1628,28 @@ function renderV15(){if(!current)return;
 }
 async function v15JourneyStart(){
  requireLifeGuardPlan();
- const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
+ const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];
+ if(!destination||!journeyTarget)throw Error('Cerca e conferma un indirizzo o scegli il punto GPS sulla mappa prima di avviare Accompagnami.');
+ if(!recipients.length)throw Error('Scegli almeno un contatto dalla tua cerchia.');
  const auto=$('journeyAuto').checked;
  if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
- const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:auto?journeyTarget:null,autoSos:$('journeyAutoSos').checked});
+ const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:journeyTarget,autoSos:$('journeyAutoSos').checked});
  await refresh();toast(result.ok?'Accompagnami attivo. I contatti scelti vedono il percorso se hai attivato la posizione.':'Percorso non avviato.');
 }
-async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere il percorso?'))return;await post('/api/journey/end',{arrived});journeyTarget=null;$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato.');}
+async function v15JourneyEnd(arrived){
+ if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere Accompagnami e avvisare i contatti?'))return;
+ await post('/api/journey/end',{arrived});
+ if(arrived){journeyTarget=null;$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';window.ZyroJourneyAddressClear?.();}
+ await refresh();renderMap();toast(arrived?'Arrivo confermato nel server.':'Percorso annullato: i contatti sono stati avvisati. Puoi riattivarlo.');
+}
+async function v15JourneyResume(){
+ const journey=current?.me?.journey;
+ if(!journey||journey.status!=='cancelled')throw Error('Nessun percorso interrotto da riattivare.');
+ if(!confirm('Riattivare Accompagnami verso '+journey.destination+' con gli stessi contatti? Verrà creato un nuovo orario e i destinatari riceveranno un nuovo avviso.'))return;
+ const result=await post('/api/journey/resume',{previousId:journey.id});
+ if(result.journey?.destinationPoint)journeyTarget={...result.journey.destinationPoint};
+ await refresh();renderMap();toast('Accompagnami riattivato. Nuovo orario comunicato ai contatti.');
+}
 async function v15CheckinStart(){requireLifeGuardPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected],autoSos:$('checkinAutoSos').checked});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
@@ -2240,10 +2259,17 @@ async function init(){
   $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();if(isZyroNativeAvailable()){try{await nativeBackgroundSync();}catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}}toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
   $('journeyRecipients').addEventListener('change',e=>{if(e.target.matches('[data-journey-to]')){e.target.checked?journeySelected.add(e.target.dataset.journeyTo):journeySelected.delete(e.target.dataset.journeyTo);}});
   $('checkinRecipients').addEventListener('change',e=>{if(e.target.matches('[data-checkin-to]')){e.target.checked?checkinSelected.add(e.target.dataset.checkinTo):checkinSelected.delete(e.target.dataset.checkinTo);}});
-  $('journeySetTarget').addEventListener('click',()=>{if(!stableMap){toast('Apri prima la Home e carica la mappa.',true);return;}journeyTarget={lat:stableMap.center.lat,lon:stableMap.center.lon};$('journeyAuto').checked=true;$('journeyTargetInfo').textContent=`Meta impostata: ${journeyTarget.lat.toFixed(5)}, ${journeyTarget.lon.toFixed(5)}`;toast('Meta GPS salvata dal centro della mappa.');});
+  $('journeySetTarget').addEventListener('click',()=>{if(!stableMap){toast('Apri prima la Home e carica la mappa.',true);return;}
+ const center=stableMap.center||stableMap.map?.getCenter();if(!center||!mapValidPoint(center)){toast('Mappa non ancora pronta.',true);return;}
+ journeyTarget={lat:Number(center.lat),lon:Number(center.lon)};
+ const text=`Punto scelto sulla mappa (${journeyTarget.lat.toFixed(5)}, ${journeyTarget.lon.toFixed(5)})`;
+ $('journeyDestination').value=text.slice(0,70);$('journeyTargetInfo').textContent=text;
+ window.ZyroJourneyAddressSelected?.(journeyTarget,text,true);renderMap();toast('Meta manuale selezionata. Controlla il puntino blu sulla Home.');
+ });
   $('journeyStart').addEventListener('click',()=>action(v15JourneyStart));
   $('journeyArrived').addEventListener('click',()=>action(()=>v15JourneyEnd(true)));
   $('journeyCancel').addEventListener('click',()=>action(()=>v15JourneyEnd(false)));
+ $('journeyResume').addEventListener('click',()=>action(v15JourneyResume));
   $('checkinStart').addEventListener('click',()=>action(v15CheckinStart));
   $('checkinConfirm').addEventListener('click',()=>action(()=>v15CheckinEnd(true)));
   $('checkinCancel').addEventListener('click',()=>action(()=>v15CheckinEnd(false)));
