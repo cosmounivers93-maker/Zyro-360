@@ -1912,36 +1912,37 @@ function closeProfileSettings(){
  document.body.classList.remove('zyro-settings-open');
  if(profileMenuLastFocus?.isConnected)profileMenuLastFocus.focus();
 }
+let inviteeExpandedId=null;
 function renderInvitedPeople(){
- const root=$('savedInvitees');if(!root || !current)return;
- const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.premiumPlan,current.me.gpsRecipients,current.me.sosRecipients,current.me.sosAudioRecipients,current.me.pickRemoteRingContacts,current.me.pickRemoteLockContacts,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.invitedByMe])])]);
+ const root=$('savedInvitees');if(!root||!current)return;
+ const sig=JSON.stringify([current.me.id,current.me.sharing,current.me.sos,current.me.sosAudioConsent,current.me.premiumPlan,current.me.gpsRecipients,current.me.sosRecipients,current.me.sosAudioRecipients,current.me.pickRemoteRingContacts,current.me.pickRemoteLockContacts,(current.circles||[]).map(c=>[c.name,(c.members||[]).map(m=>[m.id,m.name,m.avatar||'',m.invitedByMe])])]);
  if(root._zyroSig===sig&&root.children.length)return;
  root._zyroSig=sig;
  const byId=new Map();
- for(const circle of current.circles||[]){
-   for(const member of circle.members||[]){
-     if(member.id===current.me.id)continue;
-     if(!byId.has(member.id))byId.set(member.id,{member,circles:new Set()});
-     byId.get(member.id).circles.add(circle.name);
-   }
+ for(const circle of current.circles||[])for(const member of circle.members||[]){
+   if(member.id===current.me.id)continue;
+   if(!byId.has(member.id))byId.set(member.id,{member,circles:new Set()});
+   byId.get(member.id).circles.add(circle.name);
  }
  root.replaceChildren();
- // Only place that controls emergency microphone opt-in:
- // Profilo > Persone invitate, alongside per-contact GPS/SOS permissions.
- const micBox=document.createElement('section');
- micBox.className='zyro-sos-mic-choice';
+ // Preserve independent, explicit microphone consent in a compact disclosure.
+ // Checking 'all permissions' for an invitee never starts the microphone.
+ const micBox=document.createElement('details');micBox.className='zyro-invitees-mic-compact';
+ const summary=document.createElement('summary');
+ summary.innerHTML='<span>🎙️ Consenso microfono SOS <small>Solo Family · funzione avanzata</small></span><span aria-hidden="true">＋</span>';
+ micBox.append(summary);
  const micLabel=document.createElement('label');micLabel.className='zyro-access-toggle zyro-sos-mic-toggle';
  const micCopy=document.createElement('span');
- const micTitle=document.createElement('strong');micTitle.textContent='Abilita microfono durante SOS';
+ const micTitle=document.createElement('strong');micTitle.textContent='Consenti audio durante SOS';
  const micExplanation=document.createElement('small');
- micExplanation.textContent='Se attivo, premendo SOS il microfono può trasmettere audio in diretta esclusivamente ai destinatari autorizzati anche all’ascolto audio che toccano «Ascolta». Se la connessione diretta fallisce, l’audio può transitare temporaneamente sul server per arrivare al destinatario: non viene registrato né conservato, ma questo percorso non è crittografato end-to-end. Puoi disattivare questa funzione in qualsiasi momento.';
+ micExplanation.textContent='Solo durante un SOS, verso i contatti autorizzati. Il collegamento di riserva tramite server non è crittografato end-to-end.';
  micCopy.append(micTitle,micExplanation);
  const micInput=document.createElement('input');micInput.type='checkbox';micInput.id='sosAudioConsent';
  micInput.checked=hasFamilyPlan()&&current.me.sosAudioConsent===true;micInput.disabled=!hasFamilyPlan();
- micInput.setAttribute('aria-label','Consenti audio in diretta automatico durante SOS');
+ micInput.setAttribute('aria-label','Consenti la trasmissione audio durante SOS');
  micLabel.append(micCopy,micInput);
  const micHint=document.createElement('p');micHint.className='zyro-sos-mic-note';
- micHint.textContent='Incluso in ZYRO Family. Scegli prima di usare SOS. Android richiede il permesso microfono. L’audio può interrompersi con lo schermo spento; lo stato sarà indicato nella Home.';
+ micHint.textContent='Richiede il permesso Android. L’audio può interrompersi a schermo spento. Puoi revocare il consenso quando vuoi.';
  const micTest=document.createElement('button');micTest.type='button';micTest.id='zyroTestMic';
  micTest.className='zyro-sos-mic-test';micTest.textContent='Verifica microfono';micTest.disabled=!micInput.checked;
  const micNative=document.createElement('button');micNative.type='button';
@@ -1957,24 +1958,19 @@ function renderInvitedPeople(){
    root.append(p);return;
  }
  const gpsInfo=document.createElement('div');gpsInfo.className='zyro-invitees-intro';
- const description=document.createElement('p');
- description.textContent='Condividi la tua posizione soltanto con i contatti che autorizzi.';
+ const description=document.createElement('p');description.textContent='Condividi la tua posizione soltanto con i contatti che autorizzi.';
  const gpsButton=document.createElement('button');gpsButton.type='button';gpsButton.id='zyroInviteesGpsGlobal';
- gpsButton.className='btn btn-outline btn-wide';
- gpsButton.textContent=current.me.sharing?'Disattiva GPS LIVE':'Attiva GPS LIVE';
+ gpsButton.className='btn btn-outline btn-wide';gpsButton.textContent=current.me.sharing?'Disattiva GPS LIVE':'Attiva GPS LIVE';
  gpsButton.disabled=!!current.me.sos;
- const status=document.createElement('strong');status.className='zyro-access-status';status.textContent=current.me.sharing?'Posizione LIVE attiva':'Posizione LIVE disattivata';
- const hint=document.createElement('small');hint.textContent='Solo i contatti autorizzati qui sotto possono vedere il tuo GPS mentre LIVE è attivo.';
+ const status=document.createElement('strong');status.className='zyro-access-status';
+ status.textContent=current.me.sharing?'Posizione LIVE attiva':'Posizione LIVE disattivata';
+ const hint=document.createElement('small');hint.textContent='I permessi dei contatti non attivano automaticamente il GPS LIVE.';
  gpsInfo.append(description,status,gpsButton,hint);root.append(gpsInfo);
- const gpsSet=new Set(current.me.gpsRecipients||[]);
- const sosSet=new Set(current.me.sosRecipients||[]);
- const audioSet=new Set(current.me.sosAudioRecipients||[]);
- const ringSet=new Set(current.me.pickRemoteRingContacts||[]);
- const lockSet=new Set(current.me.pickRemoteLockContacts||[]);
+ const sets={gps:new Set(current.me.gpsRecipients||[]),sos:new Set(current.me.sosRecipients||[]),audio:new Set(current.me.sosAudioRecipients||[]),ring:new Set(current.me.pickRemoteRingContacts||[]),lock:new Set(current.me.pickRemoteLockContacts||[])};
  for(const {member,circles} of byId.values()){
-   const card=document.createElement('article');card.className='zyro-access-card';
+   const card=document.createElement('article');card.className='zyro-access-card zyro-access-card-compact';
    const top=document.createElement('div');top.className='zyro-access-top';
-   const avatar=document.createElement('span');avatar.className='zyro-invitee-avatar';avatar.textContent=initials(member.name);
+   const avatar=document.createElement('span');avatar.className='zyro-invitee-avatar';avatar.innerHTML=avatarHTML(member);
    const name=document.createElement('div');name.className='zyro-access-name';
    const title=document.createElement('strong');title.textContent=member.name;
    const meta=document.createElement('small');meta.textContent=[...circles].join(' · ');
@@ -1982,6 +1978,28 @@ function renderInvitedPeople(){
    const flag=document.createElement('span');flag.className='zyro-invitee-flag';
    flag.textContent=member.invitedByMe?'Invitato da te':'Nella cerchia';
    top.append(avatar,name,flag);card.append(top);
+   const expand=document.createElement('button');expand.type='button';
+   expand.className='zyro-invitee-expand';expand.dataset.accessExpand=member.id;
+   expand.setAttribute('aria-expanded',String(inviteeExpandedId===member.id));
+   expand.textContent=inviteeExpandedId===member.id?'Nascondi opzioni':'Abilita opzioni';
+   card.append(expand);
+   const options=document.createElement('div');options.className='zyro-invitee-options';
+   options.dataset.accessOptions=member.id;options.hidden=inviteeExpandedId!==member.id;
+   const family=hasFamilyPlan();
+   const available=family?['gps','sos','audio','ring','lock']:['gps','sos'];
+   const enabledCount=available.filter(key=>sets[key].has(member.id)).length;
+   const allLabel=document.createElement('label');allLabel.className='zyro-access-toggle zyro-access-all';
+   const allText=document.createElement('span');
+   const allTitle=document.createElement('strong');allTitle.textContent='Abilita tutte le opzioni';
+   const allHint=document.createElement('small');
+   allHint.textContent='Oppure disattivale tutte. Le opzioni sotto restano modificabili singolarmente.';
+   allText.append(allTitle,allHint);
+   const all=document.createElement('input');all.type='checkbox';
+   all.dataset.accessAll=member.id;all.checked=enabledCount===available.length;
+   all.indeterminate=enabledCount>0&&enabledCount<available.length;
+   all.disabled=!!current.me.sos;
+   all.setAttribute('aria-label','Abilita o disabilita tutte le autorizzazioni per '+member.name);
+   allLabel.append(allText,all);options.append(allLabel);
    const addToggle=(type,labelText,help,checked)=>{
      const row=document.createElement('label');row.className='zyro-access-toggle';
      const info=document.createElement('span');
@@ -1991,28 +2009,40 @@ function renderInvitedPeople(){
      const input=document.createElement('input');input.type='checkbox';
      input.dataset.accessUser=member.id;input.dataset.accessType=type;
      input.checked=checked;
-     input.disabled=!!current.me.sos || (type==='audio' && (!hasFamilyPlan()||!sosSet.has(member.id))) ||
-       ((type==='ring'||type==='lock') && !hasFamilyPlan());
+     input.disabled=!!current.me.sos||(type==='audio'&&(!family||!sets.sos.has(member.id)))||
+       ((type==='ring'||type==='lock')&&!family);
      input.setAttribute('aria-label',labelText+' per '+member.name);
-     row.append(info,input);card.append(row);
+     row.append(info,input);options.append(row);
    };
-   addToggle('gps','Può vedere il mio GPS',
-       'Solo quando attivo la posizione LIVE.',gpsSet.has(member.id));
-   addToggle('sos','Riceve i miei SOS',
-       'Notifiche di emergenza selezionate da te.',sosSet.has(member.id));
-   addToggle('audio','Può ascoltare il mio microfono durante SOS',
-       'Solo Family: richiede anche SOS abilitato, il consenso microfono generale e la mia attivazione SOS.',audioSet.has(member.id));
-   addToggle('ring','Può far squillare il mio telefono',
-       'Solo Family: durante un vero allarme Pick Pocket e con consenso preventivo.',ringSet.has(member.id));
-   addToggle('lock','Può bloccare il mio telefono da remoto',
-       'Solo Family: durante un allarme Pick Pocket; richiede autorizzazione amministratore Android.',lockSet.has(member.id));
-   root.append(card);
+   addToggle('gps','Può vedere il mio GPS','Solo quando attivo la posizione LIVE.',sets.gps.has(member.id));
+   addToggle('sos','Riceve i miei SOS','Notifiche di emergenza selezionate da te.',sets.sos.has(member.id));
+   addToggle('audio','Può ascoltare il mio microfono durante SOS','Solo Family: richiede SOS e consenso microfono generale.',sets.audio.has(member.id));
+   addToggle('ring','Può far squillare il mio telefono','Solo Family: durante un vero allarme Pick Pocket.',sets.ring.has(member.id));
+   addToggle('lock','Può bloccare il mio telefono da remoto','Solo Family: richiede anche l’autorizzazione amministratore Android.',sets.lock.has(member.id));
+   card.append(options);root.append(card);
  }
- if(current.me.sos){
-   const n=document.createElement('p');n.className='setting-description';
-   n.textContent='Per cambiare i contatti, termina prima il SOS attivo.';
-   root.append(n);
+ if(current.me.sos){const n=document.createElement('p');n.className='setting-description';
+   n.textContent='Per modificare le autorizzazioni, termina prima il SOS attivo.';root.append(n);}
+}
+async function changeAllContactAccess(target){
+ if(!current)return;
+ const id=target.dataset.accessAll,contact=uniqueContacts().find(c=>c.id===id);
+ if(!contact){await refresh();throw Error('Questo contatto non appartiene più alla tua cerchia.');}
+ const enabled=target.checked,family=hasFamilyPlan();
+ if(enabled&&family&&!confirm('Vuoi autorizzare per '+contact.name+' GPS, SOS, ascolto audio e comandi remoti Pick Pocket? Il microfono richiede comunque il tuo consenso generale; GPS e SOS non si avviano automaticamente.')){
+   await refresh();return;
  }
+ const response=await post('/api/settings/contact-access',{
+   userId:id,shareGps:enabled,receiveSos:enabled,
+   listenSosAudio:enabled&&family,remoteRing:enabled&&family,remoteLock:enabled&&family
+ });
+ current.me.gpsRecipients=response.gpsRecipients;
+ current.me.sosRecipients=response.sosRecipients;
+ current.me.sosAudioRecipients=response.sosAudioRecipients;
+ current.me.pickRemoteRingContacts=response.pickRemoteRingContacts;
+ current.me.pickRemoteLockContacts=response.pickRemoteLockContacts;
+ sosPending=null;await refresh();
+ toast(enabled?'Opzioni del contatto abilitate. GPS LIVE e microfono richiedono attivazione separata.':'Tutte le autorizzazioni del contatto disabilitate.');
 }
 async function changeContactAccess(target){
  if(!current)return;
@@ -2112,6 +2142,12 @@ async function init(){
       });
       return;
     }
+    if(e.target.matches('input[data-access-all]')){
+      const input=e.target;input.disabled=true;
+      void action(async()=>{try{await changeAllContactAccess(input);}catch(err){input.checked=!input.checked;throw err;}
+        finally{if(input.isConnected)input.disabled=false;}});
+      return;
+    }
     if(!e.target.matches('input[data-access-user]'))return;
     const input=e.target;input.disabled=true;
     void action(async()=>{
@@ -2121,6 +2157,19 @@ async function init(){
     });
   });
   $('savedInvitees').addEventListener('click',e=>{
+    const expand=e.target.closest('button[data-access-expand]');
+    if(expand){
+      inviteeExpandedId=inviteeExpandedId===expand.dataset.accessExpand?null:expand.dataset.accessExpand;
+      $('savedInvitees').querySelectorAll('[data-access-options]').forEach(node=>{
+        node.hidden=node.dataset.accessOptions!==inviteeExpandedId;
+      });
+      $('savedInvitees').querySelectorAll('button[data-access-expand]').forEach(button=>{
+        const open=button.dataset.accessExpand===inviteeExpandedId;
+        button.textContent=open?'Nascondi opzioni':'Abilita opzioni';
+        button.setAttribute('aria-expanded',String(open));
+      });
+      return;
+    }
     if(e.target.id!=='zyroTestMic'&&e.target.id!=='zyroMicNativeCheck')return;
     const button=e.target,native=e.target.id==='zyroMicNativeCheck';
     button.disabled=true;
