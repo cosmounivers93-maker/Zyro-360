@@ -2414,7 +2414,6 @@ function renderBillingActions(){
   b.disabled=!(android&&ready);
   b.textContent=!ready?'Abbonamenti non ancora disponibili':android?(current.me.premiumActive?'Gestisci abbonamento':'Scegli con Google Play'):'Acquista dall’app Android aggiornata';
  });
- const restore=$('zyroRestorePurchases');if(restore)restore.hidden=!(android&&ready);
 }
 async function openPlayBilling(){
  if(!current?.billingReady)throw Error('Gli acquisti non sono ancora disponibili.');
@@ -2422,7 +2421,6 @@ async function openPlayBilling(){
  await zyroNativeRequest('billing');
 }
 document.querySelectorAll('[data-billing-open]').forEach(b=>b.addEventListener('click',()=>action(openPlayBilling)));
-$('zyroRestorePurchases')?.addEventListener('click',()=>action(openPlayBilling));
 window.addEventListener('zyro:android-ready',renderBillingActions);
 window.addEventListener('focus',()=>{if(current)void action(refresh);});
 
