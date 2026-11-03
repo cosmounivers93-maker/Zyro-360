@@ -900,6 +900,42 @@ app.post('/api/billing/google-notifications',async(req,res)=>{
  }catch{res.sendStatus(503);}
 });
 
+// Explicit address lookup only. No autocomplete: preserve privacy and provider quotas.
+// Configure ZYRO_DESTINATION_GEOCODER_ENABLED=true and a production geocoding
+// provider URL before deploying at scale. Queries go to the selected provider.
+let lastDestinationSearchAt=0;
+app.post('/api/journey/geocode',requireAuth,limit,async(req,res)=>{
+ if(!familyActive(req.user))return res.status(402).json({error:'Accompagnami richiede Family.'});
+ if(process.env.ZYRO_DESTINATION_GEOCODER_ENABLED!=='true')
+  return res.status(503).json({error:'Ricerca indirizzi non ancora configurata. Puoi scegliere il centro della mappa.'});
+ const street=cleanText(req.body?.street,110),city=cleanText(req.body?.city,90),
+  postal=cleanText(req.body?.postal,10);
+ if(street.length<4||city.length<2||postal&&!/^[A-Za-z0-9 -]{3,10}$/.test(postal))
+  return res.status(400).json({error:'Inserisci via e città valide, e verifica il CAP.'});
+ if(Date.now()-lastDestinationSearchAt<1200)
+  return res.status(429).json({error:'Troppe ricerche: riprova dopo qualche secondo.'});
+ lastDestinationSearchAt=Date.now();
+ try{
+  const url=new URL(process.env.ZYRO_DESTINATION_GEOCODER_URL||'https://nominatim.openstreetmap.org/search');
+  if(url.protocol!=='https:')return res.status(503).json({error:'Il servizio indirizzi richiede HTTPS.'});
+  url.searchParams.set('format','jsonv2');
+  url.searchParams.set('street',street);url.searchParams.set('city',city);
+  if(postal)url.searchParams.set('postalcode',postal);
+  url.searchParams.set('limit','3');url.searchParams.set('addressdetails','0');
+  const response=await fetch(url,{headers:{
+   'User-Agent':'ZYRO360/1.0 (+https://zyro-360.onrender.com)',
+   'Referer':'https://zyro-360.onrender.com/',
+   'Accept-Language':'it'
+  },signal:AbortSignal.timeout(4500)});
+  if(!response.ok)return res.status(502).json({error:'Servizio indirizzi momentaneamente non disponibile.'});
+  const raw=await response.json();
+  const items=(Array.isArray(raw)?raw:[]).map(x=>{
+    const point=validCoords(x);
+    return point?{label:cleanText(x.display_name,160),lat:point.lat,lon:point.lon}:null;
+  }).filter(Boolean).slice(0,3);
+  return res.json({items,provider:'OpenStreetMap / servizio di geocodifica configurato'});
+ }catch{return res.status(502).json({error:'Impossibile cercare l’indirizzo. Verifica la connessione.'});}
+});
 app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients);
