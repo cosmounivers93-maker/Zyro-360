@@ -1305,7 +1305,15 @@ class ZyroRasterMap{
   this.failed=0;this.loaded=0;this.removed=false;this.pending=null;this.pointers=new Map();this.pinNodes=new Map();this.pinchStart=0;
   this.layer=document.createElement('div');this.layer.className='zyro-raster-tiles';
   this.pinLayer=document.createElement('div');this.pinLayer.className='zyro-raster-markers';
-  this.el.replaceChildren(this.layer,this.pinLayer);
+  this.routeLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  this.routeLayer.setAttribute('aria-hidden','true');
+  this.routeLayer.classList.add('zyro-journey-map-line');
+  this.routeLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+  this.routeStart=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  this.routeEnd=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  this.routeStart.setAttribute('r','8');this.routeEnd.setAttribute('r','9');
+  this.routeLayer.append(this.routeLine,this.routeStart,this.routeEnd);
+  this.el.replaceChildren(this.layer,this.routeLayer,this.pinLayer);
   this.onDown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(this.pointers.size===2)this.pinchStart=0;try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
   this.onMove=e=>{
    if(!this.pointers.has(e.pointerId))return;
@@ -1406,7 +1414,35 @@ class ZyroRasterMap{
    const inRange=this.positionTile(img,left,top,w,h);
    if(canPrune||!inRange||this.tiles.size>180){img.remove();this.tiles.delete(key);}
   }
+  this.drawJourneyRoute(w,h,center);
   this.drawPins(w,h,center);
+ }
+ drawJourneyRoute(w,h,center){
+  const approved=(current?.journeys||[]).find(j=>j.userId!==current.me.id &&
+   j.response==='accepted' && ['active','late'].includes(j.status) &&
+   mapValidPoint(j.currentPoint) && mapValidPoint(j.destinationPoint));
+  const preview=$('journeyMapOverlay')&&!$('journeyMapOverlay').classList.contains('hidden');
+  if(!approved&&!preview){this.routeLayer.style.display='none';return;}
+  this.routeLayer.style.display='';
+  this.routeLayer.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  const project=p=>{
+   const pos=toWorld(p.lat,p.lon,this.zoom),world=worldWidth(this.zoom);
+   let dx=pos.x-center.x;
+   if(dx>world/2)dx-=world;
+   if(dx< -world/2)dx+=world;
+   return {x:w/2+dx,y:h/2+pos.y-center.y};
+  };
+  if(preview&&!approved){
+   this.routeLine.style.display='none';this.routeStart.style.display='none';
+   this.routeEnd.style.display='';
+   this.routeEnd.setAttribute('cx',String(w/2));this.routeEnd.setAttribute('cy',String(h/2));return;
+  }
+  const from=project(approved.currentPoint),to=project(approved.destinationPoint);
+  this.routeLine.style.display='';this.routeStart.style.display='';this.routeEnd.style.display='';
+  this.routeLine.setAttribute('x1',String(from.x));this.routeLine.setAttribute('y1',String(from.y));
+  this.routeLine.setAttribute('x2',String(to.x));this.routeLine.setAttribute('y2',String(to.y));
+  this.routeStart.setAttribute('cx',String(from.x));this.routeStart.setAttribute('cy',String(from.y));
+  this.routeEnd.setAttribute('cx',String(to.x));this.routeEnd.setAttribute('cy',String(to.y));
  }
  drawPins(w,h,center){
   if(!current)return;
@@ -1695,6 +1731,7 @@ function openJourneyMapPreview(point){
   if(journeyMapCandidate&&stableMap)focusStableMap(journeyMapCandidate.lat,journeyMapCandidate.lon,16);
  });
  $('journeyPreviewCancel').focus();
+ stableMap?.schedule();
 }
 function closeJourneyMapPreview(savePoint){
  const point=stableMap?.center||journeyMapCandidate;
@@ -1711,6 +1748,7 @@ function closeJourneyMapPreview(savePoint){
   toast('Punto sulla mappa confermato. Ora scegli un contatto e invia la richiesta.');
  }
  journeyMapCandidate=null;
+ stableMap?.schedule();
  showView('modes');
  $('zyroJourneyOptions').open=true;
  requestAnimationFrame(()=>$('journeyPanel').scrollIntoView({block:'start',behavior:'auto'}));
