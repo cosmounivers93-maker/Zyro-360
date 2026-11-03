@@ -49,6 +49,7 @@ let chatRoom=null, chatPhotoData=null;
 let sosPending=null;
 const journeySelected=new Set(),checkinSelected=new Set();
 let journeyTarget=null;
+let journeyAddressResults=[],journeyAddressChoice=null,journeyMapCandidate=null;
 let inviteFromLink=null;
 // Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
 let mapTracking=false, ownCentered=false;
@@ -1670,15 +1671,59 @@ async function answerJourney(button){
  await refresh();
  toast(yes?'Richiesta accettata. Puoi seguire la posizione e vedere la mappa.':'Richiesta rifiutata. Nessun percorso condiviso.');
 }
+async function searchJourneyAddress(){
+ const street=$('journeyStreet').value.trim(),city=$('journeyCity').value.trim(),postal=$('journeyPostal').value.trim();
+ if(street.length<4||city.length<2)throw Error('Inserisci via, numero civico e città prima della ricerca.');
+ const result=await post('/api/journey/geocode',{street,city,postal});
+ journeyAddressResults=Array.isArray(result.items)?result.items:[];
+ journeyAddressChoice=null;journeyTarget=null;
+ $('journeyTargetInfo').textContent='Nessuna meta GPS impostata';
+ $('journeyViewMap').disabled=true;
+ const root=$('journeyAddressResults');
+ root.hidden=false;
+ root.innerHTML=journeyAddressResults.length
+  ?'<strong>Indirizzo trovato · scegli il risultato corretto</strong>'+journeyAddressResults.map((item,index)=>`<button type="button" data-journey-address-index="${index}" aria-pressed="false">${escapeHtml(item.label)}</button>`).join('')
+  :'<p>Non è stato trovato nessun indirizzo. Verifica via, città e CAP.</p>';
+}
+function openJourneyMapPreview(point){
+ journeyMapCandidate=mapValidPoint(point)?{lat:Number(point.lat),lon:Number(point.lon)}:null;
+ showView('home');
+ const overlay=$('journeyMapOverlay');overlay.classList.remove('hidden');overlay.setAttribute('aria-hidden','false');
+ // The center of the visible Home map is the proposed destination; users may drag it.
+ requestAnimationFrame(()=>{
+  ensureStableMap();
+  if(journeyMapCandidate&&stableMap)focusStableMap(journeyMapCandidate.lat,journeyMapCandidate.lon,16);
+ });
+ $('journeyPreviewCancel').focus();
+}
+function closeJourneyMapPreview(savePoint){
+ const point=stableMap?.center||journeyMapCandidate;
+ const overlay=$('journeyMapOverlay');overlay.classList.add('hidden');overlay.setAttribute('aria-hidden','true');
+ if(savePoint){
+  if(!mapValidPoint(point))throw Error('La mappa non ha un punto valido. Riprova.');
+  journeyTarget={lat:Number(point.lat),lon:Number(point.lon)};
+  $('journeyTargetInfo').textContent='Meta confermata: '+journeyTarget.lat.toFixed(5)+', '+journeyTarget.lon.toFixed(5);
+  if(!$('journeyDestination').value.trim()){
+   $('journeyDestination').value=journeyAddressChoice
+    ?[$('journeyStreet').value.trim(),$('journeyCity').value.trim()].filter(Boolean).join(', ').slice(0,70)
+    :'Destinazione sulla mappa';
+  }
+  toast('Punto sulla mappa confermato. Ora scegli un contatto e invia la richiesta.');
+ }
+ journeyMapCandidate=null;
+ showView('modes');
+ $('zyroJourneyOptions').open=true;
+ requestAnimationFrame(()=>$('journeyPanel').scrollIntoView({block:'start',behavior:'auto'}));
+}
 async function v15JourneyStart(){
  requireFamilyPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
  const auto=$('journeyAuto').checked;
- if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
+ if(!journeyTarget)throw Error('Prima cerca un indirizzo, poi premi Guarda sulla mappa e Imposta.');
  const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:journeyTarget||null,autoArrival:auto});
  await refresh();toast(result.ok?'Richiesta Accompagnami inviata. La posizione del percorso sarà visibile solo ai contatti che accettano.':'Richiesta non inviata.');
 }
-async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere il percorso?'))return;await post('/api/journey/end',{arrived});journeyTarget=null;$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
+async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere il percorso?'))return;await post('/api/journey/end',{arrived});journeyTarget=null;journeyAddressChoice=null;journeyAddressResults=[];$('journeyAddressResults').hidden=true;$('journeyAddressResults').replaceChildren();$('journeyViewMap').disabled=true;['journeyStreet','journeyCity','journeyPostal'].forEach(id=>$(id).value='');$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
 async function v15CheckinStart(){requireFamilyPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
@@ -2298,7 +2343,18 @@ async function init(){
   $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();if(isZyroNativeAvailable()){try{await nativeBackgroundSync();}catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}}toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
   $('journeyRecipients').addEventListener('change',e=>{if(e.target.matches('[data-journey-to]')){e.target.checked?journeySelected.add(e.target.dataset.journeyTo):journeySelected.delete(e.target.dataset.journeyTo);}});
   $('checkinRecipients').addEventListener('change',e=>{if(e.target.matches('[data-checkin-to]')){e.target.checked?checkinSelected.add(e.target.dataset.checkinTo):checkinSelected.delete(e.target.dataset.checkinTo);}});
-  $('journeySetTarget').addEventListener('click',()=>{if(!stableMap){toast('Apri prima la Home e carica la mappa.',true);return;}journeyTarget={lat:stableMap.center.lat,lon:stableMap.center.lon};$('journeyAuto').checked=true;$('journeyTargetInfo').textContent=`Meta impostata: ${journeyTarget.lat.toFixed(5)}, ${journeyTarget.lon.toFixed(5)}`;toast('Meta GPS salvata dal centro della mappa.');});
+  $('journeyFindAddress').addEventListener('click',()=>void action(searchJourneyAddress));
+  $('journeyAddressResults').addEventListener('click',e=>{
+   const item=e.target.closest('[data-journey-address-index]');if(!item)return;
+   const index=Number(item.dataset.journeyAddressIndex);
+   journeyAddressChoice=journeyAddressResults[index]||null;
+   $('journeyViewMap').disabled=!journeyAddressChoice;
+   $('journeyAddressResults').querySelectorAll('[data-journey-address-index]').forEach(button=>button.setAttribute('aria-pressed',String(button===item)));
+  });
+  $('journeyViewMap').addEventListener('click',()=>{if(journeyAddressChoice)openJourneyMapPreview(journeyAddressChoice);});
+  $('journeySetTarget').addEventListener('click',()=>openJourneyMapPreview(journeyTarget||lastCoords||DEFAULT_CENTER));
+  $('journeyPreviewCancel').addEventListener('click',()=>closeJourneyMapPreview(false));
+  $('journeyPreviewSet').addEventListener('click',()=>action(()=>closeJourneyMapPreview(true)));
   $('journeyContactsStatus').addEventListener('click',e=>{
    const reply=e.target.closest('[data-journey-answer]');
    if(reply){reply.disabled=true;void action(()=>answerJourney(reply));return;}
