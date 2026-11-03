@@ -78,6 +78,11 @@ export class PlayBilling{
  async verifyUnlocked(userId,token,key){
   if(this.deletedUsers?.has(userId))throw Error('Account eliminato.');
   const existing=await this.repo.get(key);if(existing&&existing.userId!==userId)throw new Error('Acquisto già associato a un altro account.');
+  // A replaced purchase token cannot be reactivated by delayed Google events or sweeps.
+  if(existing?.state==='REPLACED'){
+   await this.refreshUser(userId);
+   return {active:false,plan:existing.plan,state:'REPLACED'};
+  }
   let purchase;
   try{purchase=await this.google.get(token);}catch(error){
    if(existing&&[404,410].includes(error.googleStatus)){await this.repo.put({...existing,active:false,state:'UNAVAILABLE',checkedAt:this.clock()});await this.refreshUser(userId);return {active:false,state:'UNAVAILABLE'};}throw error;
@@ -90,8 +95,24 @@ export class PlayBilling{
   if(data.active&&purchase.acknowledgementState==='ACKNOWLEDGEMENT_STATE_PENDING')await this.google.acknowledge(token,data.productId);
   if(data.active&&!['ACKNOWLEDGEMENT_STATE_PENDING','ACKNOWLEDGEMENT_STATE_ACKNOWLEDGED'].includes(purchase.acknowledgementState))throw new Error('Conferma acquisto Google Play non disponibile.');
   await this.repo.put(row);
-  // Reverify the linked receipt so a replaced Family plan cannot outlive an upgrade/downgrade.
-  if(purchase.linkedPurchaseToken){const old=await this.repo.get(digest(purchase.linkedPurchaseToken));if(old){try{const prior=await this.google.get(purchase.linkedPurchaseToken);const priorData=evaluatePurchase(prior,userId,this.clock());await this.repo.put({...old,...priorData,checkedAt:this.clock()});}catch{await this.repo.put({...old,active:false,checkedAt:this.clock()});}}}
+  // With an active replacement, the old plan no longer confers entitlement.
+  // Marking it REPLACED also prevents a late RTDN re-enabling Family features.
+  if(purchase.linkedPurchaseToken){
+   const old=await this.repo.get(digest(purchase.linkedPurchaseToken));
+   if(old){
+    if(data.active){
+     await this.repo.put({...old,active:false,state:'REPLACED',checkedAt:this.clock()});
+    }else{
+     try{
+      const prior=await this.google.get(purchase.linkedPurchaseToken);
+      const priorData=evaluatePurchase(prior,userId,this.clock());
+      await this.repo.put({...old,...priorData,checkedAt:this.clock()});
+     }catch{
+      await this.repo.put({...old,active:false,checkedAt:this.clock()});
+     }
+    }
+   }
+  }
   await this.refreshUser(userId);return {active:data.active,plan:data.plan,expiresAt:data.expiresAt,state:data.state,autoRenew:data.autoRenew};
  }
  async sweep(){if(this.sweeping)return;this.sweeping=true;try{for(const row of await this.repo.due(this.clock())){if((this.retryAt.get(row.tokenHash)||0)>this.clock())continue;try{await this.verify(row.userId,this.cipher.decrypt(row.encryptedToken));this.retryAt.delete(row.tokenHash);}catch{this.retryAt.set(row.tokenHash,this.clock()+300000);}}}finally{this.sweeping=false;}}
