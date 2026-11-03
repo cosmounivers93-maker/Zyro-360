@@ -124,11 +124,11 @@ function journeyAccessFor(ownerId,viewer){
 const publicJourney = (j,viewer) => {
  if(!j)return null;
  const owner=j.userId===viewer;
- if(!owner && !(j.recipients||[]).includes(viewer))return null;
+ if(!owner && (!(j.recipients||[]).includes(viewer)||!sharedCircle(j.userId,viewer)))return null;
  const response=owner?'owner':journeyDecision(j,viewer);
  if(response==='declined')return null;
- const visible=owner||response==='accepted';
  const active=['active','late'].includes(j.status);
+ const visible=owner||(response==='accepted'&&active);
  const gps=locations.get(j.userId);
  return {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',
   destination:j.destination,dueAt:j.dueAt,startedAt:j.startedAt,status:j.status,
