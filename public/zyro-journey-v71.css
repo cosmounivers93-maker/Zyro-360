@@ -154,3 +154,29 @@
 #journeyPanel #journeyDueAt{display:block;width:100%;max-width:100%;box-sizing:border-box;min-height:50px;padding:10px 12px;border-radius:14px;border:1px solid #b0c6e4;background:rgba(255,255,255,.95);color:#244766;font:inherit;font-size:16px;color-scheme:light}
 #journeyPanel #journeyDueAt:focus-visible{outline:3px solid #886ae8;outline-offset:2px}
 #journeyPanel #journeyDeadlineHelp{display:block;margin:10px 0 14px;line-height:1.5;color:#4f6b82;font-size:12px}
+
+/* Foreground Accompagnami invitation; uses the existing light Zyro glass palette. */
+.zyro-journey-incoming{
+ position:fixed;z-index:2100;left:50%;bottom:calc(114px + env(safe-area-inset-bottom,0px));
+ transform:translateX(-50%);width:min(448px,calc(100vw - 28px));box-sizing:border-box;
+ padding:18px 18px 16px;border-radius:24px;
+ background:linear-gradient(145deg,rgba(255,255,255,.98),rgba(232,241,255,.97) 70%,rgba(238,228,255,.98));
+ border:1px solid #c3d4ea;box-shadow:0 14px 44px rgba(42,62,111,.25);
+ color:#243e62;backdrop-filter:blur(16px);
+}
+.zyro-journey-incoming[hidden]{display:none!important}
+.zyro-journey-incoming-header{display:flex;align-items:center;gap:10px;font-size:17px;color:#264c79}
+.zyro-journey-incoming-header span{font-size:24px}
+.zyro-journey-incoming p{margin:10px 0 8px;line-height:1.5;font-size:15px}
+.zyro-journey-incoming small{display:block;font-size:12px;line-height:1.45;color:#526b85}
+.zyro-journey-incoming-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px}
+.zyro-journey-incoming-actions button{
+ min-width:0;min-height:45px;border-radius:14px;font-size:14px;font-weight:750;cursor:pointer;
+ border:1px solid #b8cae4;background:#f7faff;color:#294966;
+}
+.zyro-journey-incoming-actions button:first-child{
+ background:linear-gradient(115deg,#158be5,#725eeb);color:#fff;border-color:transparent;
+}
+.zyro-journey-incoming-actions button:last-child{grid-column:1/-1;background:rgba(255,255,255,.65)}
+.zyro-journey-incoming-actions button:focus-visible{outline:3px solid #795ee9;outline-offset:2px}
+@media(max-height:650px){.zyro-journey-incoming{bottom:calc(80px + env(safe-area-inset-bottom,0px));max-height:75vh;overflow:auto}}
