@@ -1899,11 +1899,11 @@ async function v15JourneyStart(){
  requireFamilyPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
  const etaInput=$('journeyDueAt');
- const dueAt=etaInput.value?new Date(etaInput.value).getTime():NaN;
- if(!Number.isFinite(dueAt)||dueAt<Date.now()+5*60000||dueAt>Date.now()+24*3600000)
+ const dueAt=etaInput.value?new Date(etaInput.value).getTime():null;
+ if(dueAt!==null&&(!Number.isFinite(dueAt)||dueAt<Date.now()+5*60000||dueAt>Date.now()+24*3600000))
   throw Error('Scegli un orario previsto di arrivo tra 5 minuti e 24 ore.');
  if(!journeyTarget)throw Error('Prima cerca un indirizzo, poi premi Guarda sulla mappa e Imposta.');
- const result=await post('/api/journey/start',{destination,recipients,destinationPoint:journeyTarget,dueAt});
+ const result=await post('/api/journey/start',{destination,recipients,destinationPoint:journeyTarget,...(dueAt===null?{}:{dueAt})});
  await refresh();
  if(result.ok&&current?.me?.journey&&['active','late'].includes(current.me.journey.status)){
   $('journeyActive').scrollIntoView({block:'start',behavior:'smooth'});
