@@ -76,12 +76,12 @@ test('no new SOS is created if another alarm already exists',async()=>{
 });
 test('deadline is explicit, bounded and does not inherit legacy automatic GPS arrival',()=>{
  const start=server.slice(server.indexOf("app.post('/api/journey/start'"),server.indexOf("app.post('/api/journey/respond'"));
- assert.match(start,/Number\(req\.body\?\.dueAt\)/);
+ assert.match(start,/requestedDeadline\?Number\(req\.body\.dueAt\):null/);
  assert.match(start,/dueAt,autoArrival:false/);
  assert.match(start,/storageKind!=='postgres'/);
  assert.match(start,/ZYRO_JOURNEY_SOS_ALWAYS_ON/);
  assert.match(start,/!fcmReady&&!configuredPush/);
  assert.match(html,/type="datetime-local"/);
  assert.doesNotMatch(html,/id="journeyAuto"/);
- assert.match(client,/post\('\/api\/journey\/start',\{destination,recipients,destinationPoint:journeyTarget,dueAt\}\)/);
+ assert.match(client,/post\('\/api\/journey\/start',\{destination,recipients,destinationPoint:journeyTarget,\.\.\.\(dueAt===null\?\{\}:\{dueAt\}\)\}\)/);
 });
