@@ -43,7 +43,7 @@ jobs:
                grep -q 'title:enabled.*Autorizza tutte le funzioni' /tmp/zyro-live-app.js &&
                grep -q "filter(c=>c.kind==='chat')" /tmp/zyro-live-app.js &&
                [ "$(curl --silent --show-error --location --max-time 28 --output /dev/null --write-out '%{http_code}' --request POST --header 'Content-Type: application/json' --data '{}' 'https://zyro-360.onrender.com/api/journey/respond')" = "401" ]; then
-              echo 'SUCCESS: Accompagnami v74, pulsanti di fine percorso visibili anche prima dell'avvio e operativi dopo.'
+              echo "SUCCESS: Accompagnami v74, pulsanti visibili prima della partenza e operativi dopo."
               exit 0
             fi
             echo "La versione v74 non risulta ancora online; verifica $attempt/18"
