@@ -83,13 +83,13 @@ test('Address search selects first valid result and enables map button immediate
  assert.match(nodes.journeyAddressResults.innerHTML,/aria-pressed="true"/);
 });
 
-test('Map preview displays purple centered destination, compact controls away from SOS',()=>{
+test('Map preview displays geographically anchored violet destination and compact controls above SOS',()=>{
  assert.match(html,/id="journeyPreviewPin"[^>]*zyro-journey-preview-pin hidden/);
  assert.match(app,/\$\('journeyPreviewPin'\)\.classList\.remove\('hidden'\)/);
  assert.match(app,/\$\('journeyPreviewPin'\)\.classList\.add\('hidden'\)/);
- assert.match(css,/\.zyro-journey-map-overlay:not\(\.hidden\)[\s\S]*?align-items:flex-start/);
+ assert.match(css,/\.zyro-journey-map-overlay:not\(\.hidden\)[\s\S]*?align-items:flex-end/);
  assert.match(css,/\.zyro-journey-preview-pin:not\(\.hidden\)/);
- assert.match(css,/top:50%/);
+ assert.match(css,/position:absolute;left:0;top:0/);
  assert.match(html,/id="journeyPreviewCancel"/);
  assert.match(html,/id="journeyPreviewSet"/);
 });
@@ -126,12 +126,51 @@ test('Accompagnami never asks for Tempo previsto or sends a deadline',()=>{
  assert.match(html,/id="journeyArrived"/);
  assert.match(html,/id="journeyCancel"/);
 });
-test('Searched destination remains fixed when user touches the map, manual selection remains adjustable',()=>{
+test('Searched destination retains geographic coordinates while map can pan, manual selection remains adjustable',()=>{
  assert.match(app,/let journeyPreviewPositionLocked=false/);
- assert.match(app,/this\.onDown=e=>\{if\(journeyPreviewPositionLocked\)\{e\.preventDefault\(\);return;\}/);
- assert.match(app,/this\.onMove=e=>\{\s*if\(journeyPreviewPositionLocked\)\{e\.preventDefault\(\);return;\}/);
+ assert.doesNotMatch(app,/this\.onDown=e=>\{if\(journeyPreviewPositionLocked\)/);
+ assert.doesNotMatch(app,/this\.onMove=e=>\{\s*if\(journeyPreviewPositionLocked\)/);
  assert.match(app,/const point=journeyPreviewPositionLocked \? journeyMapCandidate : \(stableMap\?\.center\|\|journeyMapCandidate\)/);
  assert.match(app,/openJourneyMapPreview\(journeyAddressChoice,true\)/);
  assert.match(app,/openJourneyMapPreview\(journeyTarget\|\|lastCoords\|\|DEFAULT_CENTER,false\)/);
  assert.match(html,/id="journeyMapHint"/);
+});
+
+test('Map projection follows geocoordinates rather than keeping the pin in the viewport center',()=>{
+ const start=app.indexOf(' drawPreviewDestination(w,h,center){');
+ const end=app.indexOf('\n drawPins(w,h,center){',start);
+ assert.ok(start>0&&end>start,'map marker draw method must exist');
+ const pin={
+  classList:{contains:()=>false},
+  style:{},
+  parentElement:{getBoundingClientRect:()=>({left:0,top:0})}
+ };
+ const context={
+  $:()=>pin,
+  mapValidPoint:p=>Number.isFinite(p?.lat)&&Number.isFinite(p?.lon),
+  journeyMapCandidate:{lat:45.4,lon:9.1},
+  journeyPreviewPositionLocked:true,
+  toWorld:(lat,lon)=>({x:lon*100,y:lat*100}),
+  worldWidth:()=>100000
+ };
+ const draw=vm.runInNewContext('({'+app.slice(start,end).trim()+'}).drawPreviewDestination',context);
+ const raster={el:{getBoundingClientRect:()=>({left:0,top:0})},zoom:16};
+ // First render: destination at the center of the viewport.
+ draw.call(raster,400,800,{x:910,y:4540});
+ assert.match(pin.style.transform,/translate3d\(200px,400px,0\)/);
+ // Drag the map by 100 map-pixels: same geographic destination, different pixel x.
+ draw.call(raster,400,800,{x:1010,y:4540});
+ assert.match(pin.style.transform,/translate3d\(100px,400px,0\)/);
+ // Manual selection retains intentionally centered crosshair behavior.
+ context.journeyPreviewPositionLocked=false;
+ draw.call(raster,400,800,{x:1010,y:4540});
+ assert.match(pin.style.transform,/translate3d\(200px,400px,0\)/);
+});
+test('Map confirmation floats directly above live GPS/SOS action buttons',()=>{
+ assert.match(app,/function positionJourneyPreviewDialog\(\)/);
+ assert.match(app,/document\.querySelector\('#homeView \.zyro-command-row'\)/);
+ assert.match(app,/window\.innerHeight-top\+12/);
+ assert.match(app,/--zyro-journey-panel-bottom/);
+ assert.match(css,/padding:0 14px var\(--zyro-journey-panel-bottom/);
+ assert.match(css,/align-items:flex-end/);
 });
