@@ -1315,7 +1315,35 @@ class ZyroRasterMap{
   this.routeEnd=document.createElementNS('http://www.w3.org/2000/svg','circle');
   this.routeStart.setAttribute('r','8');this.routeEnd.setAttribute('r','9');
   this.routeLayer.append(this.routeLine,this.routeStart,this.routeEnd);
-  this.el.replaceChildren(this.layer,this.routeLayer,this.pinLayer);
+  // Dedicated SVG overlay avoids Android WebView visibility/stacking problems
+  // caused by moving the old HTML marker between map containers.
+  const ns='http://www.w3.org/2000/svg';
+  this.previewSvg=document.createElementNS(ns,'svg');
+  this.previewSvg.setAttribute('aria-label','Destinazione selezionata');
+  this.previewSvg.setAttribute('role','img');
+  this.previewSvg.classList.add('zyro-destination-svg-layer');
+  Object.assign(this.previewSvg.style,{
+   position:'absolute',left:'0',top:'0',width:'100%',height:'100%',
+   display:'none',overflow:'visible',pointerEvents:'none',zIndex:'50'
+  });
+  this.previewGroup=document.createElementNS(ns,'g');
+  this.previewGroup.setAttribute('id','journeyDestinationSvgPin');
+  const node=(tag,attrs)=>{
+   const element=document.createElementNS(ns,tag);
+   for(const [key,value] of Object.entries(attrs))element.setAttribute(key,String(value));
+   return element;
+  };
+  this.previewGroup.append(
+   node('circle',{cx:0,cy:0,r:27,fill:'#8a57e8','fill-opacity':'.19'}),
+   node('circle',{cx:0,cy:0,r:17,fill:'#7850d9',stroke:'#fff','stroke-width':5}),
+   node('circle',{cx:0,cy:0,r:8,fill:'#c7a2ff'}),
+   node('rect',{x:-57,y:33,width:114,height:29,rx:15,fill:'#faf7ff',stroke:'#bea6ed','stroke-width':1}),
+  );
+  const caption=node('text',{x:0,y:52,'text-anchor':'middle',fill:'#452882','font-family':'Arial, sans-serif','font-size':13,'font-weight':700});
+  caption.textContent='Destinazione';
+  this.previewGroup.append(caption);
+  this.previewSvg.append(this.previewGroup);
+  this.el.replaceChildren(this.layer,this.routeLayer,this.pinLayer,this.previewSvg);
   this.onDown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(this.pointers.size===2)this.pinchStart=0;try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
   this.onMove=e=>{
    if(!this.pointers.has(e.pointerId))return;
@@ -1444,11 +1472,14 @@ class ZyroRasterMap{
   this.routeEnd.setAttribute('cx',String(to.x));this.routeEnd.setAttribute('cy',String(to.y));
  }
  drawPreviewDestination(w,h,center){
-  const pin=$('journeyPreviewPin');
-  if(!pin||pin.classList.contains('hidden')||!mapValidPoint(journeyMapCandidate))return;
+  const previewOpen=!$('journeyMapOverlay').classList.contains('hidden');
+  if(!previewOpen||!mapValidPoint(journeyMapCandidate)){
+   this.previewSvg.style.display='none';
+   return;
+  }
   let x=w/2,y=h/2;
-  // For an address returned by geocoding, the purple pin belongs to the
-  // destination's geographic coordinates, not the screen's center.
+  // The searched place is a geographic marker, not a screen-space crosshair.
+  // Users can pan/zoom without changing the accepted destination.
   if(journeyPreviewPositionLocked){
    const pos=toWorld(journeyMapCandidate.lat,journeyMapCandidate.lon,this.zoom);
    const world=worldWidth(this.zoom);
@@ -1457,15 +1488,13 @@ class ZyroRasterMap{
    if(dx< -world/2)dx+=world;
    x+=dx;y+=pos.y-center.y;
   }
-  // Place the marker in the same native map marker layer as the GPS pins.
-  // This avoids the sibling overlay's differing positioning/stacking context
-  // on Android WebView and keeps it visible directly above the map tiles.
-  if(pin.parentElement!==this.pinLayer)this.pinLayer.appendChild(pin);
-  pin.style.left=`${Math.round(x)}px`;
-  pin.style.top=`${Math.round(y)}px`;
-  pin.style.transform='translate(-50%,-50%)';
-  pin.style.visibility=(x< -50||x>w+50||y< -50||y>h+50)?'hidden':'visible';
+  this.previewSvg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  const visible=Number.isFinite(x)&&Number.isFinite(y)&&
+   x>=-60&&x<=w+60&&y>=-60&&y<=h+60;
+  this.previewSvg.style.display=visible?'block':'none';
+  if(visible)this.previewGroup.setAttribute('transform',`translate(${Math.round(x)} ${Math.round(y)})`);
  }
+
  drawPins(w,h,center){
   if(!current)return;
   const places=[];for(const c of uniqueContacts())if(mapValidPoint(c.location))places.push({id:'contact:'+c.id,p:c.location,user:c,alert:!!c.sos,own:false});
@@ -1485,9 +1514,6 @@ class ZyroRasterMap{
   for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
  }
  remove(){
-  // Keep the public preview marker alive when the raster layer is recreated.
-  const previewPin=this.pinLayer.querySelector('#journeyPreviewPin');
-  if(previewPin)$('liveMap')?.appendChild(previewPin);
   this.removed=true;this.sizeObserver?.disconnect();if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
 }
 function syncStableMarkers(){stableMap?.schedule();}
@@ -1797,10 +1823,8 @@ function openJourneyMapPreview(point,locked=true){
  $('journeyMapHint').textContent=locked?'Il puntino viola resta fisso sull’indirizzo trovato: premi Imposta per confermare.':'Selezione manuale: sposta la mappa e premi Imposta per scegliere il centro.';
  showView('home');
  const overlay=$('journeyMapOverlay');overlay.classList.remove('hidden');overlay.setAttribute('aria-hidden','false');
- // A geocoded address is pinned to its real coordinates, even while the
- // user drags the map. Manual destination selection follows the map center.
- $('journeyPreviewPin').classList.remove('hidden');
- $('journeyPreviewPin').style.visibility='visible';
+ // Render the violet destination using a dedicated SVG layer above the tiles,
+ // never reparent a CSS-hidden HTML element.
  positionJourneyPreviewDialog();
  requestAnimationFrame(()=>{
   // The Home view becomes measurable on the next frame.
@@ -1817,10 +1841,7 @@ function openJourneyMapPreview(point,locked=true){
 function closeJourneyMapPreview(savePoint){
  const point=journeyPreviewPositionLocked ? journeyMapCandidate : (stableMap?.center||journeyMapCandidate);
  const overlay=$('journeyMapOverlay');overlay.classList.add('hidden');overlay.setAttribute('aria-hidden','true');
- const previewPin=$('journeyPreviewPin');
- previewPin.classList.add('hidden');
- // Restore the marker to the permanent map container between previews.
- if(previewPin.parentElement!==$('liveMap'))$('liveMap').appendChild(previewPin);
+ if(stableMap?.previewSvg)stableMap.previewSvg.style.display='none';
  if(savePoint){
   if(!mapValidPoint(point))throw Error('La mappa non ha un punto valido. Riprova.');
   journeyTarget={lat:Number(point.lat),lon:Number(point.lon)};
@@ -1835,10 +1856,6 @@ function closeJourneyMapPreview(savePoint){
  journeyMapCandidate=null;
  journeyPreviewPositionLocked=false;
  journeyPreviewMapFocused=false;
- $('journeyPreviewPin').style.visibility='';
- $('journeyPreviewPin').style.transform='';
- $('journeyPreviewPin').style.left='';
- $('journeyPreviewPin').style.top='';
  stableMap?.schedule();
  showView('modes');
  $('zyroJourneyOptions').open=true;

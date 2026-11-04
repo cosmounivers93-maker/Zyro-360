@@ -83,17 +83,16 @@ test('Address search selects first valid result and enables map button immediate
  assert.match(nodes.journeyAddressResults.innerHTML,/aria-pressed="true"/);
 });
 
-test('Map preview displays geographically anchored violet destination and compact controls above SOS',()=>{
- assert.match(html,/id="journeyPreviewPin"[^>]*zyro-journey-preview-pin hidden/);
- assert.match(app,/\$\('journeyPreviewPin'\)\.classList\.remove\('hidden'\)/);
- assert.match(app,/previewPin\.classList\.add\('hidden'\)/);
+test('Map preview displays a native violet SVG destination and leaves SOS dialog placement unchanged',()=>{
+ assert.doesNotMatch(html,/id="journeyPreviewPin"/);
+ assert.match(app,/this\.previewGroup\.setAttribute\('id','journeyDestinationSvgPin'\)/);
+ assert.match(app,/this\.previewSvg\.append\(this\.previewGroup\)/);
+ assert.match(app,/this\.el\.replaceChildren\(this\.layer,this\.routeLayer,this\.pinLayer,this\.previewSvg\)/);
+ assert.match(app,/zIndex:'50'/);
  assert.match(css,/\.zyro-journey-map-overlay:not\(\.hidden\)[\s\S]*?align-items:flex-end/);
- assert.match(css,/\.zyro-journey-preview-pin:not\(\.hidden\)/);
- assert.match(css,/position:absolute;left:0;top:0/);
  assert.match(html,/id="journeyPreviewCancel"/);
  assert.match(html,/id="journeyPreviewSet"/);
 });
-
 test('Preparation shows both journey-ending commands but disables them until a trip is active',()=>{
  const prepStart=html.indexOf('id="journeyInactive"');
  const prepEnd=html.indexOf('id="journeyContactsStatus"',prepStart);
@@ -136,39 +135,36 @@ test('Searched destination retains geographic coordinates while map can pan, man
  assert.match(html,/id="journeyMapHint"/);
 });
 
-test('Map preview is visible in the actual raster marker layer and follows address coordinates',()=>{
+test('Violet SVG stays visible and geographically anchored while map moves',()=>{
  const start=app.indexOf(' drawPreviewDestination(w,h,center){');
  const end=app.indexOf('\n drawPins(w,h,center){',start);
- assert.ok(start>0&&end>start,'map marker draw method must exist');
- const pin={classList:{contains:()=>false},style:{},parentElement:null};
- const layer={
-  appendChild(node){node.parentElement=this;}
- };
- const context={
-  $:()=>pin,
+ assert.ok(start>0&&end>start);
+ const mapNode={classList:{contains:()=>false}};
+ const svg={style:{},viewBox:'',setAttribute(name,value){this[name]=value;}};
+ const group={transform:'',setAttribute(name,value){this[name]=value;}};
+ const ctx={
+  $:()=>mapNode,
   mapValidPoint:p=>Number.isFinite(p?.lat)&&Number.isFinite(p?.lon),
   journeyMapCandidate:{lat:45.4,lon:9.1},
   journeyPreviewPositionLocked:true,
   toWorld:(lat,lon)=>({x:lon*100,y:lat*100}),
   worldWidth:()=>100000
  };
- const draw=vm.runInNewContext('({'+app.slice(start,end).trim()+'}).drawPreviewDestination',context);
- const raster={pinLayer:layer,zoom:16};
- // First render: found address in middle of screen.
+ const draw=vm.runInNewContext('({'+app.slice(start,end).trim()+'}).drawPreviewDestination',ctx);
+ const raster={previewSvg:svg,previewGroup:group,zoom:16};
  draw.call(raster,400,800,{x:910,y:4540});
- assert.equal(pin.parentElement,layer,'violet pin must be attached to the same rendered marker layer as GPS');
- assert.equal(pin.style.left,'200px');
- assert.equal(pin.style.top,'400px');
- assert.equal(pin.style.visibility,'visible');
- // Scrolling map 100 pixels keeps geographic point unchanged, shifts visual position.
+ assert.equal(svg.style.display,'block');
+ assert.equal(svg.viewBox,'0 0 400 800');
+ assert.equal(group.transform,'translate(200 400)');
  draw.call(raster,400,800,{x:1010,y:4540});
- assert.equal(pin.style.left,'100px');
- assert.equal(pin.style.top,'400px');
- assert.equal(pin.style.visibility,'visible');
- // Manual map selection is intentionally centered.
- context.journeyPreviewPositionLocked=false;
+ assert.equal(group.transform,'translate(100 400)');
+ ctx.journeyPreviewPositionLocked=false;
  draw.call(raster,400,800,{x:1010,y:4540});
- assert.equal(pin.style.left,'200px');
+ assert.equal(group.transform,'translate(200 400)');
+ // When confirmation closes, no destination marker should remain.
+ mapNode.classList.contains=()=>true;
+ draw.call(raster,400,800,{x:1010,y:4540});
+ assert.equal(svg.style.display,'none');
 });
 test('GPS recentering never hides the destination marker during Accompagnami preview',()=>{
  const start=app.indexOf('function renderMap(){');
