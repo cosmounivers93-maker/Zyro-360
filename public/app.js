@@ -1344,6 +1344,27 @@ class ZyroRasterMap{
   this.previewGroup.append(caption);
   this.previewSvg.append(this.previewGroup);
   this.el.replaceChildren(this.layer,this.routeLayer,this.pinLayer,this.previewSvg);
+  // Render the confirmation pin in the outer map stacking context on Android.
+  // Nested SVG layers can disappear behind WebView-composited map tiles.
+  this.previewPin=null;
+  const previewHost=this.el.closest('#liveMap');
+  if(previewHost){
+   const pin=document.createElement('div');
+   pin.className='zyro-journey-preview-pin';
+   pin.setAttribute('role','img');
+   pin.setAttribute('aria-label','Destinazione selezionata');
+   const dot=document.createElement('span');
+   dot.className='zyro-journey-preview-pin-center';
+   dot.setAttribute('aria-hidden','true');
+   const label=document.createElement('span');
+   label.className='zyro-journey-preview-pin-label';
+   label.textContent='Destinazione';
+   pin.append(dot,label);
+   pin.style.display='none';
+   pin.style.zIndex='90';
+   previewHost.appendChild(pin);
+   this.previewPin=pin;
+  }
   this.onDown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(this.pointers.size===2)this.pinchStart=0;try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
   this.onMove=e=>{
    if(!this.pointers.has(e.pointerId))return;
@@ -1475,6 +1496,7 @@ class ZyroRasterMap{
   const previewOpen=!$('journeyMapOverlay').classList.contains('hidden');
   if(!previewOpen||!mapValidPoint(journeyMapCandidate)){
    this.previewSvg.style.display='none';
+   if(this.previewPin)this.previewPin.style.display='none';
    return;
   }
   let x=w/2,y=h/2;
@@ -1491,8 +1513,19 @@ class ZyroRasterMap{
   this.previewSvg.setAttribute('viewBox',`0 0 ${w} ${h}`);
   const visible=Number.isFinite(x)&&Number.isFinite(y)&&
    x>=-60&&x<=w+60&&y>=-60&&y<=h+60;
-  this.previewSvg.style.display=visible?'block':'none';
-  if(visible)this.previewGroup.setAttribute('transform',`translate(${Math.round(x)} ${Math.round(y)})`);
+  if(this.previewPin){
+   // HTML marker is painted above the whole map, never under Android tiles.
+   this.previewPin.style.display=visible?'flex':'none';
+   if(visible){
+    this.previewPin.style.left=`${Math.round(x)}px`;
+    this.previewPin.style.top=`${Math.round(y)}px`;
+   }
+   this.previewSvg.style.display='none';
+  }else{
+   // SVG fallback for standalone map instances, tests and older layouts.
+   this.previewSvg.style.display=visible?'block':'none';
+   if(visible)this.previewGroup.setAttribute('transform',`translate(${Math.round(x)} ${Math.round(y)})`);
+  }
  }
 
  drawPins(w,h,center){
@@ -1514,7 +1547,7 @@ class ZyroRasterMap{
   for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
  }
  remove(){
-  this.removed=true;this.sizeObserver?.disconnect();if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
+  this.removed=true;this.previewPin?.remove();this.sizeObserver?.disconnect();if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
 }
 function syncStableMarkers(){stableMap?.schedule();}
 function focusStableMap(lat,lon,zoom=16){if(!stableMap||!mapValidPoint({lat,lon}))return;stableMap.easeTo({center:[Number(lon),Number(lat)],zoom});}
@@ -1842,6 +1875,7 @@ function closeJourneyMapPreview(savePoint){
  const point=journeyPreviewPositionLocked ? journeyMapCandidate : (stableMap?.center||journeyMapCandidate);
  const overlay=$('journeyMapOverlay');overlay.classList.add('hidden');overlay.setAttribute('aria-hidden','true');
  if(stableMap?.previewSvg)stableMap.previewSvg.style.display='none';
+ if(stableMap?.previewPin)stableMap.previewPin.style.display='none';
  if(savePoint){
   if(!mapValidPoint(point))throw Error('La mappa non ha un punto valido. Riprova.');
   journeyTarget={lat:Number(point.lat),lon:Number(point.lon)};
