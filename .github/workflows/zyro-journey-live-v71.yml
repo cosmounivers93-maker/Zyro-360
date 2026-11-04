@@ -1,4 +1,4 @@
-name: ZYRO 360 - Verifica live Accompagnami e chat private v76
+name: ZYRO 360 - Verifica live Accompagnami e chat private v77
 on:
   push:
     branches: [main]
@@ -24,7 +24,7 @@ jobs:
           set -euo pipefail
           for attempt in $(seq 1 18); do
             if curl --fail --silent --show-error --location --max-time 28 'https://zyro-360.onrender.com/' -o /tmp/zyro-live-index.html &&
-               curl --fail --silent --show-error --location --max-time 28 'https://zyro-360.onrender.com/app.js?v=75.0' -o /tmp/zyro-live-app.js &&
+               curl --fail --silent --show-error --location --max-time 28 'https://zyro-360.onrender.com/app.js?v=77.0' -o /tmp/zyro-live-app.js &&
                grep -q 'id="journeyViewMap"' /tmp/zyro-live-index.html &&
                grep -q 'id="journeyPreviewSet"' /tmp/zyro-live-index.html &&
                grep -q 'id="journeyArrived"' /tmp/zyro-live-index.html &&
@@ -33,13 +33,15 @@ jobs:
                grep -q 'id="journeyPendingActions"' /tmp/zyro-live-index.html &&
                grep -q 'disponibile quando il percorso è attivo' /tmp/zyro-live-index.html &&
                grep -q 'Annulla percorso' /tmp/zyro-live-index.html &&
-               grep -q 'id="journeyPreviewPin"' /tmp/zyro-live-index.html &&
+               ! grep -q 'id="journeyPreviewPin"' /tmp/zyro-live-index.html &&
+               grep -q '/app.js?v=77.0' /tmp/zyro-live-index.html &&
                ! grep -q 'id="journeyMinutes"' /tmp/zyro-live-index.html &&
                grep -q 'id="journeyMapHint"' /tmp/zyro-live-index.html &&
                grep -q 'journeyPreviewPositionLocked' /tmp/zyro-live-app.js &&
                grep -q 'drawPreviewDestination(w,h,center)' /tmp/zyro-live-app.js &&
                grep -q 'journeyPreviewMapFocused' /tmp/zyro-live-app.js &&
-               grep -q 'this.pinLayer.appendChild(pin)' /tmp/zyro-live-app.js &&
+               grep -q 'journeyDestinationSvgPin' /tmp/zyro-live-app.js &&
+               grep -q 'this.previewSvg.append(this.previewGroup)' /tmp/zyro-live-app.js &&
                grep -q 'function positionJourneyPreviewDialog()' /tmp/zyro-live-app.js &&
                grep -q "document.querySelector('#homeView .zyro-command-row')" /tmp/zyro-live-app.js &&
                grep -q 'journeyOptions.hidden=onJ' /tmp/zyro-live-app.js &&
@@ -48,11 +50,11 @@ jobs:
                grep -q 'title:enabled.*Autorizza tutte le funzioni' /tmp/zyro-live-app.js &&
                grep -q "filter(c=>c.kind==='chat')" /tmp/zyro-live-app.js &&
                [ "$(curl --silent --show-error --location --max-time 28 --output /dev/null --write-out '%{http_code}' --request POST --header 'Content-Type: application/json' --data '{}' 'https://zyro-360.onrender.com/api/journey/respond')" = "401" ]; then
-              echo "SUCCESS: Accompagnami v76, pulsanti visibili prima della partenza e operativi dopo."
+              echo "SUCCESS: Accompagnami v77, pulsanti visibili prima della partenza e operativi dopo."
               exit 0
             fi
-            echo "La versione v76 non risulta ancora online; verifica $attempt/18"
+            echo "La versione v77 non risulta ancora online; verifica $attempt/18"
             sleep 8
           done
-          echo "::error::Le correzioni v76 non sono pubblicate sul sito Zyro 360."
+          echo "::error::Le correzioni v77 non sono pubblicate sul sito Zyro 360."
           exit 1
