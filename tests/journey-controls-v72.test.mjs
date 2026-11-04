@@ -118,7 +118,7 @@ test('Accompagnami offers an expected arrival date and server-backed SOS deadlin
  assert.match(html,/id="journeyCancel"/);
  const journeyStart=app.slice(app.indexOf('async function v15JourneyStart('),app.indexOf('async function v15JourneyEnd('));
  assert.match(journeyStart,/new Date\(etaInput.value\).getTime\(\)/);
- assert.match(journeyStart,/post\('\/api\/journey\/start',\{destination,recipients,destinationPoint:journeyTarget,dueAt\}\)/);
+ assert.match(journeyStart,/post\('\/api\/journey\/start',\{destination,recipients,destinationPoint:journeyTarget,\.\.\.\(dueAt===null\?\{\}:\{dueAt\}\)\}\)/);
  const postStart=server.slice(server.indexOf("app.post('/api/journey/start'"),server.indexOf("app.post('/api/journey/respond'"));
  assert.match(postStart,/req.body\?\.dueAt/);
  assert.match(postStart,/dueAt,autoArrival:false/);
