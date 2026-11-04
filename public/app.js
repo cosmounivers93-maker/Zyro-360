@@ -1777,7 +1777,7 @@ function renderV15(){if(!current)return;
  if(onJ)journeyOptions.open=false;
  $('journeyInactive').classList.toggle('hidden',onJ);
  $('journeyActive').classList.toggle('hidden',!onJ);
- if(onJ){$('journeyStatus').textContent='Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination}${j.autoArrival?' · Rilevamento GPS attivo':''}`;}
+ if(onJ){$('journeyStatus').textContent=j.status==='late'?'Orario scaduto · verifica SOS':'Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination}${j.dueAt?' · Arrivo previsto: '+new Date(j.dueAt).toLocaleString('it-IT',{dateStyle:'short',timeStyle:'short'}):''}${j.autoSosTriggeredAt?' · SOS automatico attivato (recapito non garantito)':''}`;}
  const c=me.checkin,onC=c&&['pending','late'].includes(c.status);
  $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
  if(onC){$('checkinStatus').textContent=c.status==='late'?'Orario scaduto: conferma appena puoi':'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.`;}
@@ -1898,16 +1898,19 @@ function closeJourneyMapPreview(savePoint){
 async function v15JourneyStart(){
  requireFamilyPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
- const auto=$('journeyAuto').checked;
+ const etaInput=$('journeyDueAt');
+ const dueAt=etaInput.value?new Date(etaInput.value).getTime():NaN;
+ if(!Number.isFinite(dueAt)||dueAt<Date.now()+5*60000||dueAt>Date.now()+24*3600000)
+  throw Error('Scegli un orario previsto di arrivo tra 5 minuti e 24 ore.');
  if(!journeyTarget)throw Error('Prima cerca un indirizzo, poi premi Guarda sulla mappa e Imposta.');
- const result=await post('/api/journey/start',{destination,recipients,destinationPoint:journeyTarget||null,autoArrival:auto});
+ const result=await post('/api/journey/start',{destination,recipients,destinationPoint:journeyTarget,dueAt});
  await refresh();
  if(result.ok&&current?.me?.journey&&['active','late'].includes(current.me.journey.status)){
   $('journeyActive').scrollIntoView({block:'start',behavior:'smooth'});
  }
  toast(result.ok?'Richiesta Accompagnami inviata. Puoi confermare l’arrivo o annullare il percorso in qualsiasi momento.':'Richiesta non inviata.');
 }
-async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato a destinazione?':'Vuoi annullare il percorso? I contatti che lo seguono saranno avvisati.'))return;await post('/api/journey/end',{arrived});journeyTarget=null;journeyAddressChoice=null;journeyAddressResults=[];$('journeyAddressResults').hidden=true;$('journeyAddressResults').replaceChildren();$('journeyViewMap').disabled=true;['journeyStreet','journeyCity','journeyPostal'].forEach(id=>$(id).value='');$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
+async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato a destinazione?':'Vuoi annullare il percorso? I contatti che lo seguono saranno avvisati.'))return;await post('/api/journey/end',{arrived});journeyTarget=null;journeyAddressChoice=null;journeyAddressResults=[];$('journeyAddressResults').hidden=true;$('journeyAddressResults').replaceChildren();$('journeyViewMap').disabled=true;['journeyStreet','journeyCity','journeyPostal'].forEach(id=>$(id).value='');$('journeyDueAt').value='';$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
 async function v15CheckinStart(){requireFamilyPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
