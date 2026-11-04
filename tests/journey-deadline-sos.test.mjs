@@ -79,6 +79,7 @@ test('deadline is explicit, bounded and does not inherit legacy automatic GPS ar
  assert.match(start,/Number\(req\.body\?\.dueAt\)/);
  assert.match(start,/dueAt,autoArrival:false/);
  assert.match(start,/storageKind!=='postgres'/);
+ assert.match(start,/ZYRO_JOURNEY_SOS_ALWAYS_ON/);
  assert.match(start,/!fcmReady&&!configuredPush/);
  assert.match(html,/type="datetime-local"/);
  assert.doesNotMatch(html,/id="journeyAuto"/);
