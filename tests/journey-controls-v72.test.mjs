@@ -123,7 +123,7 @@ test('Accompagnami offers an expected arrival date and server-backed SOS deadlin
  assert.match(postStart,/req.body\?\.dueAt/);
  assert.match(postStart,/dueAt,autoArrival:false/);
  const scheduled=server.slice(server.indexOf('function overdueCheck(){'),server.indexOf("app.get('/api/premium/status'"));
- assert.match(scheduled,/j\.dueAt<=t/);
+ assert.match(scheduled,/j\.dueAt>t\)continue/);
  assert.match(scheduled,/kind:'sos',source:'journey-deadline'/);
  assert.match(scheduled,/j\.autoSosPushStatus='pending'/);
  assert.match(scheduled,/c\.dueAt/);
