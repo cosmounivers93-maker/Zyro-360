@@ -85,3 +85,29 @@ test('deadline is explicit, bounded and does not inherit legacy automatic GPS ar
  assert.doesNotMatch(html,/id="journeyAuto"/);
  assert.match(client,/post\('\/api\/journey\/start',\{destination,recipients,destinationPoint:journeyTarget,\.\.\.\(dueAt===null\?\{\}:\{dueAt\}\)\}\)/);
 });
+
+test('confirming arrival closes only the SOS created by that same journey',async()=>{
+ const x=fixture({delay:-60000});
+ x.tick();await x.flush();
+ const trip=x.db.journeys.owner,auto=x.db.alerts[trip.autoSosAlertId];
+ assert.equal(auto.active,true);
+ const start=server.indexOf("app.post('/api/journey/end'");
+ const end=server.indexOf("app.post('/api/checkin/start'",start);
+ let handler=null;
+ const ctx={
+  app:{post(_path,_auth,callback){handler=callback;}},requireAuth(){},
+  db:x.db,now:()=>x.time,
+  alertAudience:a=>new Set([a.userId,...a.recipients]),
+  connections:()=>[],sendSocket:()=>{},save:()=>{},refreshRelated:()=>{},
+  journeyDecision:(j,id)=>j.responseBy[id]||'pending',
+  sendEventPush:async()=>({accepted:1,attempted:1})
+ };
+ vm.runInNewContext(server.slice(start,end),ctx);
+ let result=null;
+ handler({user:{id:'owner',name:'Persona protetta'},body:{arrived:true}},
+  {status(){return this;},json(value){result=value;return this;}});
+ assert.equal(result.ok,true);
+ assert.equal(trip.status,'arrived');
+ assert.equal(auto.active,false);
+ assert.equal(trip.autoSosPushStatus,'provider-accepted');
+});
