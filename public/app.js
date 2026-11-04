@@ -51,6 +51,7 @@ const journeySelected=new Set(),checkinSelected=new Set();
 let journeyTarget=null;
 let journeyAddressResults=[],journeyAddressChoice=null,journeyMapCandidate=null;
 let journeyPreviewPositionLocked=false;
+let journeyPreviewMapFocused=false;
 let inviteFromLink=null;
 // Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
 let mapTracking=false, ownCentered=false;
@@ -1456,11 +1457,13 @@ class ZyroRasterMap{
    if(dx< -world/2)dx+=world;
    x+=dx;y+=pos.y-center.y;
   }
-  // The viewport normally fills liveMap, but use measured offsets if a
-  // map layout ever adds padding or shifts the raster canvas.
-  const mapRect=this.el.getBoundingClientRect();
-  const parentRect=pin.parentElement.getBoundingClientRect();
-  pin.style.transform=`translate3d(${Math.round(x+mapRect.left-parentRect.left)}px,${Math.round(y+mapRect.top-parentRect.top)}px,0) translate(-50%,-50%)`;
+  // Place the marker in the same native map marker layer as the GPS pins.
+  // This avoids the sibling overlay's differing positioning/stacking context
+  // on Android WebView and keeps it visible directly above the map tiles.
+  if(pin.parentElement!==this.pinLayer)this.pinLayer.appendChild(pin);
+  pin.style.left=`${Math.round(x)}px`;
+  pin.style.top=`${Math.round(y)}px`;
+  pin.style.transform='translate(-50%,-50%)';
   pin.style.visibility=(x< -50||x>w+50||y< -50||y>h+50)?'hidden':'visible';
  }
  drawPins(w,h,center){
@@ -1509,6 +1512,17 @@ function renderMap(){
  if(!current||$('homeView').classList.contains('hidden'))return;
  mapLink();ensureStableMap();if(!stableMap)return;
  syncStableMarkers();
+ // Preview has priority over automatic GPS recentering. Otherwise a delayed
+ // GPS update/tile reload can move the map away from the searched address,
+ // leaving the geo-anchored violet marker outside the viewport.
+ const previewOpen=!$('journeyMapOverlay').classList.contains('hidden');
+ if(previewOpen&&mapValidPoint(journeyMapCandidate)){
+  if(!journeyPreviewMapFocused){
+   focusStableMap(journeyMapCandidate.lat,journeyMapCandidate.lon,16);
+   journeyPreviewMapFocused=true;
+  }
+  return;
+ }
  if(mapValidPoint(lastCoords)){
   if(!ownCentered){focusStableMap(lastCoords.lat,lastCoords.lon,16);ownCentered=true;}
   if(stableMapState==='ready')mapStatus(`GPS · precisione ±${Math.round(lastCoords.accuracy||0)} m`);
@@ -1775,6 +1789,7 @@ function openJourneyMapPreview(point,locked=true){
  if(!mapValidPoint(point)){toast('Scegli una destinazione valida prima di aprire la mappa.',true);return;}
  journeyMapCandidate={lat:Number(point.lat),lon:Number(point.lon)};
  journeyPreviewPositionLocked=locked;
+ journeyPreviewMapFocused=false;
  $('journeyMapHint').textContent=locked?'Il puntino viola resta fisso sull’indirizzo trovato: premi Imposta per confermare.':'Selezione manuale: sposta la mappa e premi Imposta per scegliere il centro.';
  showView('home');
  const overlay=$('journeyMapOverlay');overlay.classList.remove('hidden');overlay.setAttribute('aria-hidden','false');
@@ -1784,8 +1799,12 @@ function openJourneyMapPreview(point,locked=true){
  $('journeyPreviewPin').style.visibility='visible';
  positionJourneyPreviewDialog();
  requestAnimationFrame(()=>{
-  ensureStableMap();
-  if(journeyMapCandidate&&stableMap)focusStableMap(journeyMapCandidate.lat,journeyMapCandidate.lon,16);
+  // The Home view becomes measurable on the next frame.
+  renderMap();
+  stableMap?.drawPreviewDestination(
+   stableMap.viewportWidth,stableMap.viewportHeight,
+   stableMap&&toWorld(stableMap.center.lat,stableMap.center.lon,stableMap.zoom)
+  );
   positionJourneyPreviewDialog();
  });
  $('journeyPreviewCancel').focus();
@@ -1808,8 +1827,11 @@ function closeJourneyMapPreview(savePoint){
  }
  journeyMapCandidate=null;
  journeyPreviewPositionLocked=false;
+ journeyPreviewMapFocused=false;
  $('journeyPreviewPin').style.visibility='';
  $('journeyPreviewPin').style.transform='';
+ $('journeyPreviewPin').style.left='';
+ $('journeyPreviewPin').style.top='';
  stableMap?.schedule();
  showView('modes');
  $('zyroJourneyOptions').open=true;
