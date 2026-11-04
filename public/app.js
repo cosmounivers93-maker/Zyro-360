@@ -1777,7 +1777,7 @@ function renderV15(){if(!current)return;
  if(onJ)journeyOptions.open=false;
  $('journeyInactive').classList.toggle('hidden',onJ);
  $('journeyActive').classList.toggle('hidden',!onJ);
- if(onJ){$('journeyStatus').textContent='Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination}${j.autoArrival?' · Rilevamento GPS attivo':''}`;}
+ if(onJ){$('journeyStatus').textContent=j.status==='late'?(j.autoSosTriggeredAt?'Orario scaduto · SOS creato':'Orario scaduto · SOS non attivato'):'Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination}${j.dueAt?' · Arrivo previsto: '+new Date(j.dueAt).toLocaleString('it-IT',{dateStyle:'short',timeStyle:'short'}):''}${j.autoSosTriggeredAt?' · SOS creato per mancato arrivo'+(j.autoSosPushAccepted>0?' · Notifica accettata dal servizio, recapito non confermato':' · Notifica non confermata'):''}`;}
  const c=me.checkin,onC=c&&['pending','late'].includes(c.status);
  $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
  if(onC){$('checkinStatus').textContent=c.status==='late'?'Orario scaduto: conferma appena puoi':'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.`;}
@@ -1789,6 +1789,7 @@ function renderV15(){if(!current)return;
   const distance=route?Math.round(zyroJourneyMeters(x.currentPoint,x.destinationPoint)):null;
   return `<article class="zyro-journey-request"><strong>🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)}</strong>
    <p>${pending?'Ti chiede di seguire il suo percorso. Accetta o rifiuta prima di vedere la posizione.':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso terminato':'In viaggio verso la destinazione'}</p>
+   ${x.dueAt?`<p>Arrivo previsto: ${v15Time(x.dueAt)}. Se non conferma, il server tenterà un SOS automatico.</p>`:''}
    ${pending?`<div class="zyro-journey-request-actions"><button type="button" data-journey-answer="yes" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Accetta</button><button type="button" data-journey-answer="no" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Rifiuta</button></div>`:''}
    ${accepted?`<p>Accompagnamento accettato${distance!==null?' · Distanza in linea d’aria: '+(distance>=1000?(distance/1000).toFixed(1)+' km':distance+' m'):''}.</p><div class="zyro-journey-request-actions"><button type="button" data-journey-answer="no" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Smetti di seguire</button></div>`:''}
    ${route?`<div class="zyro-journey-request-actions"><button type="button" data-journey-map="${escapeHtml(x.userId)}">Guarda sulla mappa</button><a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(x.destinationPoint.lat+','+x.destinationPoint.lon)}" target="_blank" rel="noopener noreferrer">Apri navigazione stradale</a></div>`:''}
@@ -1898,16 +1899,19 @@ function closeJourneyMapPreview(savePoint){
 async function v15JourneyStart(){
  requireFamilyPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
- const auto=$('journeyAuto').checked;
+ const etaInput=$('journeyDueAt');
+ const dueAt=etaInput.value?new Date(etaInput.value).getTime():null;
+ if(dueAt!==null&&(!Number.isFinite(dueAt)||dueAt<Date.now()+5*60000||dueAt>Date.now()+24*3600000))
+  throw Error('Scegli un orario previsto di arrivo tra 5 minuti e 24 ore.');
  if(!journeyTarget)throw Error('Prima cerca un indirizzo, poi premi Guarda sulla mappa e Imposta.');
- const result=await post('/api/journey/start',{destination,recipients,destinationPoint:journeyTarget||null,autoArrival:auto});
+ const result=await post('/api/journey/start',{destination,recipients,destinationPoint:journeyTarget,...(dueAt===null?{}:{dueAt})});
  await refresh();
  if(result.ok&&current?.me?.journey&&['active','late'].includes(current.me.journey.status)){
   $('journeyActive').scrollIntoView({block:'start',behavior:'smooth'});
  }
  toast(result.ok?'Richiesta Accompagnami inviata. Puoi confermare l’arrivo o annullare il percorso in qualsiasi momento.':'Richiesta non inviata.');
 }
-async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato a destinazione?':'Vuoi annullare il percorso? I contatti che lo seguono saranno avvisati.'))return;await post('/api/journey/end',{arrived});journeyTarget=null;journeyAddressChoice=null;journeyAddressResults=[];$('journeyAddressResults').hidden=true;$('journeyAddressResults').replaceChildren();$('journeyViewMap').disabled=true;['journeyStreet','journeyCity','journeyPostal'].forEach(id=>$(id).value='');$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
+async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato a destinazione?':'Vuoi annullare il percorso? I contatti che lo seguono saranno avvisati.'))return;await post('/api/journey/end',{arrived});journeyTarget=null;journeyAddressChoice=null;journeyAddressResults=[];$('journeyAddressResults').hidden=true;$('journeyAddressResults').replaceChildren();$('journeyViewMap').disabled=true;['journeyStreet','journeyCity','journeyPostal'].forEach(id=>$(id).value='');$('journeyDueAt').value='';$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
 async function v15CheckinStart(){requireFamilyPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 

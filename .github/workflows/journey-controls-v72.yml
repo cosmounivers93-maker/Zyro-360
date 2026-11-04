@@ -1,11 +1,11 @@
 name: ZYRO 360 - Controlli Accompagnami v72
 on:
   push:
-    branches: ['fix/zyro-journey-visible-svg-pin-v77','main']
-    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','tests/journey-marker-browser-smoke.mjs','.github/workflows/journey-controls-v72.yml']
+    branches: ['fix/zyro-journey-visible-svg-pin-v77','fix/accompagnami-orario-sos-v79','main']
+    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','tests/journey-deadline-sos.test.mjs','server.mjs','tests/journey-marker-browser-smoke.mjs','.github/workflows/journey-controls-v72.yml']
   pull_request:
     branches: [main]
-    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','tests/journey-marker-browser-smoke.mjs','.github/workflows/journey-controls-v72.yml']
+    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','tests/journey-deadline-sos.test.mjs','server.mjs','tests/journey-marker-browser-smoke.mjs','.github/workflows/journey-controls-v72.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,6 +24,10 @@ jobs:
       - name: Verifica controlli esistenti
         run: |
           node --test tests/journey-consent-v71.test.mjs
+      - name: Verifica SOS automatico e avvio server
+        run: |
+          node --check server.mjs
+          node --test tests/journey-deadline-sos.test.mjs
       - name: Verifica puntino viola effettivamente visibile in browser
         run: |
           npm install --no-save --ignore-scripts --no-package-lock playwright-core@1.56.1
