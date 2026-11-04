@@ -707,7 +707,9 @@ async function sendFcm(recipients,title,body,kind='general') {
         android:{
           priority:'high',ttl:kind==='sos'?300000:120000,
           notification:{
-            channelId:kind==='sos'||kind==='pickpocket'?'zyro_sos_v2':kind==='journey'?'zyro_journey_v1':kind==='chat'?'zyro_chat_v2':'zyro_updates',
+            // Use existing Android updates channel for journey until all installed APKs
+            // support zyro_journey_v1. An unknown channel can suppress background FCM.
+            channelId:kind==='sos'||kind==='pickpocket'?'zyro_sos_v2':kind==='chat'?'zyro_chat_v2':'zyro_updates',
             priority:kind==='sos'||kind==='pickpocket'||kind==='journey'?'high':'default',
             defaultSound:true,defaultVibrateTimings:true,
             visibility:'private'
