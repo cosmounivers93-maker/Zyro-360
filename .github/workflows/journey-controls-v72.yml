@@ -1,11 +1,11 @@
 name: ZYRO 360 - Controlli Accompagnami v72
 on:
   push:
-    branches: ['fix/zyro-accompagnami-actions-map-20261104','main']
-    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','.github/workflows/journey-controls-v72.yml']
+    branches: ['fix/zyro-journey-visible-svg-pin-v77','main']
+    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','tests/journey-marker-browser-smoke.mjs','.github/workflows/journey-controls-v72.yml']
   pull_request:
     branches: [main]
-    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','.github/workflows/journey-controls-v72.yml']
+    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','tests/journey-marker-browser-smoke.mjs','.github/workflows/journey-controls-v72.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -24,3 +24,14 @@ jobs:
       - name: Verifica controlli esistenti
         run: |
           node --test tests/journey-consent-v71.test.mjs
+      - name: Verifica puntino viola effettivamente visibile in browser
+        run: |
+          npm install --no-save --ignore-scripts --no-package-lock playwright-core@1.56.1
+          CHROME_BIN="$(command -v google-chrome || command -v chromium)" node tests/journey-marker-browser-smoke.mjs
+      - name: Conserva screenshot segnaposto viola
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zyro-journey-violet-pin-visual-test
+          path: zyro-journey-destination-browser-smoke.png
+          if-no-files-found: ignore
