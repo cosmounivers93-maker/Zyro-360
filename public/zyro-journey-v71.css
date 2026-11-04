@@ -46,9 +46,9 @@
 }
 .zyro-journey-map-overlay:not(.hidden){
   position:fixed;inset:0;
-  z-index:9900;pointer-events:none;display:flex;justify-content:center;align-items:flex-start;
-  /* Put the confirmation above the map, never over SOS/GPS controls at the bottom. */
-  padding:clamp(164px,19vh,230px) 14px 0;box-sizing:border-box;
+  z-index:9900;pointer-events:none;display:flex;justify-content:center;align-items:flex-end;
+  /* Bottom edge is measured from the real GPS/SOS row so neither control is covered. */
+  padding:0 14px var(--zyro-journey-panel-bottom,clamp(210px,23vh,350px));box-sizing:border-box;
 }
 .zyro-journey-map-overlay-card{
   width:min(460px,100%);border:1px solid rgba(136,184,214,.8);border-radius:19px;
@@ -96,10 +96,10 @@
 #journeyPanel .zyro-journey-active-card>small{
   display:block;margin-top:11px;color:#56728b;line-height:1.5;font-size:12px;
 }
-/* Destination pin is a child of liveMap, independent of async tile rendering.
-   It remains at the map center while the map is dragged. */
+/* Destination pin is projected from its actual map latitude/longitude
+   each redraw. It is NOT a fixed crosshair tied to the screen center. */
 #liveMap .zyro-journey-preview-pin:not(.hidden){
-  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  position:absolute;left:0;top:0;transform:translate(-50%,-50%);
   z-index:90;display:flex;align-items:center;flex-direction:column;
   pointer-events:none;overflow:visible;filter:drop-shadow(0 3px 8px rgba(72,37,132,.35));
 }
@@ -119,7 +119,8 @@
  #journeyPanel .zyro-journey-active-card>.zyro-v15-actions{grid-template-columns:1fr}
 }
 @media(max-height:640px) and (orientation:landscape){
- .zyro-journey-map-overlay:not(.hidden){padding-top:65px}
+ .zyro-journey-map-overlay:not(.hidden){padding-bottom:var(--zyro-journey-panel-bottom,175px)}
+ .zyro-journey-map-overlay-card{max-height:45vh;overflow:auto}
 }
 
 /* V73: make it clear that arrival/cancel controls exist, but never let
