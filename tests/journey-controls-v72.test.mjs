@@ -136,14 +136,13 @@ test('Searched destination retains geographic coordinates while map can pan, man
  assert.match(html,/id="journeyMapHint"/);
 });
 
-test('Map projection follows geocoordinates rather than keeping the pin in the viewport center',()=>{
+test('Map preview is visible in the actual raster marker layer and follows address coordinates',()=>{
  const start=app.indexOf(' drawPreviewDestination(w,h,center){');
  const end=app.indexOf('\n drawPins(w,h,center){',start);
  assert.ok(start>0&&end>start,'map marker draw method must exist');
- const pin={
-  classList:{contains:()=>false},
-  style:{},
-  parentElement:{getBoundingClientRect:()=>({left:0,top:0})}
+ const pin={classList:{contains:()=>false},style:{},parentElement:null};
+ const layer={
+  appendChild(node){node.parentElement=this;}
  };
  const context={
   $:()=>pin,
@@ -154,17 +153,41 @@ test('Map projection follows geocoordinates rather than keeping the pin in the v
   worldWidth:()=>100000
  };
  const draw=vm.runInNewContext('({'+app.slice(start,end).trim()+'}).drawPreviewDestination',context);
- const raster={el:{getBoundingClientRect:()=>({left:0,top:0})},zoom:16};
- // First render: destination at the center of the viewport.
+ const raster={pinLayer:layer,zoom:16};
+ // First render: found address in middle of screen.
  draw.call(raster,400,800,{x:910,y:4540});
- assert.match(pin.style.transform,/translate3d\(200px,400px,0\)/);
- // Drag the map by 100 map-pixels: same geographic destination, different pixel x.
+ assert.equal(pin.parentElement,layer,'violet pin must be attached to the same rendered marker layer as GPS');
+ assert.equal(pin.style.left,'200px');
+ assert.equal(pin.style.top,'400px');
+ assert.equal(pin.style.visibility,'visible');
+ // Scrolling map 100 pixels keeps geographic point unchanged, shifts visual position.
  draw.call(raster,400,800,{x:1010,y:4540});
- assert.match(pin.style.transform,/translate3d\(100px,400px,0\)/);
- // Manual selection retains intentionally centered crosshair behavior.
+ assert.equal(pin.style.left,'100px');
+ assert.equal(pin.style.top,'400px');
+ assert.equal(pin.style.visibility,'visible');
+ // Manual map selection is intentionally centered.
  context.journeyPreviewPositionLocked=false;
  draw.call(raster,400,800,{x:1010,y:4540});
- assert.match(pin.style.transform,/translate3d\(200px,400px,0\)/);
+ assert.equal(pin.style.left,'200px');
+});
+test('GPS recentering never hides the destination marker during Accompagnami preview',()=>{
+ const start=app.indexOf('function renderMap(){');
+ const end=app.indexOf('function onOrientation(',start);
+ assert.ok(start>0&&end>start);
+ const ctx={
+  current:{me:{}}, stableMap:{center:{lat:45.2,lon:9.2}},ownCentered:false,
+  journeyPreviewMapFocused:false,journeyMapCandidate:{lat:45.4,lon:9.1},
+  $:id=>id==='homeView'?{classList:{contains:()=>false}}:{classList:{contains:()=>false}},
+  mapValidPoint:p=>p!=null&&Number.isFinite(p.lat)&&Number.isFinite(p.lon),
+  mapLink(){},ensureStableMap(){},syncStableMarkers(){},
+  focusStableMap(lat,lon,zoom){ctx.focusCalls.push([lat,lon,zoom]);},
+  focusCalls:[],lastCoords:{lat:45.7,lon:9.7},stableMapState:'ready',
+  mapStatus(){}, geolocationError:'',uniqueContacts:()=>[]
+ };
+ const render=vm.runInNewContext(app.slice(start,end)+'\nrenderMap',ctx);
+ render();render();
+ assert.deepEqual(ctx.focusCalls,[[45.4,9.1,16]],'preview must be centered once on searched address, not on owner GPS');
+ assert.equal(ctx.journeyPreviewMapFocused,true);
 });
 test('Map confirmation floats directly above live GPS/SOS action buttons',()=>{
  assert.match(app,/function positionJourneyPreviewDialog\(\)/);
