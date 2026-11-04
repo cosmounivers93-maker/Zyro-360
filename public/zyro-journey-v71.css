@@ -148,3 +148,9 @@
 @media(max-width:380px){
  #journeyPanel .zyro-journey-pending-actions .zyro-v15-actions{grid-template-columns:1fr}
 }
+
+/* V79: accessible local arrival time picker; replaces the legacy auto-arrival toggle. */
+#journeyPanel .zyro-journey-deadline-label{display:grid;gap:10px;color:#294a71;font-weight:800;font-size:16px;line-height:1.4}
+#journeyPanel #journeyDueAt{display:block;width:100%;max-width:100%;box-sizing:border-box;min-height:50px;padding:10px 12px;border-radius:14px;border:1px solid #b0c6e4;background:rgba(255,255,255,.95);color:#244766;font:inherit;font-size:16px;color-scheme:light}
+#journeyPanel #journeyDueAt:focus-visible{outline:3px solid #886ae8;outline-offset:2px}
+#journeyPanel #journeyDeadlineHelp{display:block;margin:10px 0 14px;line-height:1.5;color:#4f6b82;font-size:12px}
