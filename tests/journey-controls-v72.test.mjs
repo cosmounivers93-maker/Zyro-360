@@ -86,7 +86,7 @@ test('Address search selects first valid result and enables map button immediate
 test('Map preview displays geographically anchored violet destination and compact controls above SOS',()=>{
  assert.match(html,/id="journeyPreviewPin"[^>]*zyro-journey-preview-pin hidden/);
  assert.match(app,/\$\('journeyPreviewPin'\)\.classList\.remove\('hidden'\)/);
- assert.match(app,/\$\('journeyPreviewPin'\)\.classList\.add\('hidden'\)/);
+ assert.match(app,/previewPin\.classList\.add\('hidden'\)/);
  assert.match(css,/\.zyro-journey-map-overlay:not\(\.hidden\)[\s\S]*?align-items:flex-end/);
  assert.match(css,/\.zyro-journey-preview-pin:not\(\.hidden\)/);
  assert.match(css,/position:absolute;left:0;top:0/);
