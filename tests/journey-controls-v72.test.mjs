@@ -110,3 +110,28 @@ test('Preparation shows both journey-ending commands but disables them until a t
  assert.match(active,/<button id="journeyArrived"[^>]*>✓ Sono arrivato a destinazione<\/button>/);
  assert.match(active,/<button id="journeyCancel"[^>]*>Annulla percorso<\/button>/);
 });
+
+test('Accompagnami never asks for Tempo previsto or sends a deadline',()=>{
+ const server=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
+ assert.doesNotMatch(html,/id="journeyMinutes"/);
+ assert.doesNotMatch(html,/>Tempo previsto</);
+ assert.match(html,/Destinazione e contatti fidati/);
+ const journeyStart=app.slice(app.indexOf('async function v15JourneyStart('),app.indexOf('async function v15JourneyEnd('));
+ assert.doesNotMatch(journeyStart,/journeyMinutes/);
+ const postStart=server.slice(server.indexOf("app.post('/api/journey/start'"),server.indexOf("app.post('/api/journey/respond'"));
+ assert.doesNotMatch(postStart,/req\.body\.minutes|mins\*60000|dueAt:/);
+ const scheduled=server.slice(server.indexOf('function overdueCheck(){'),server.indexOf("app.get('/api/premium/status'"));
+ assert.doesNotMatch(scheduled,/Percorso in ritardo|j\.dueAt/);
+ assert.match(scheduled,/c\.dueAt/); // Check-in reminders remain enabled.
+ assert.match(html,/id="journeyArrived"/);
+ assert.match(html,/id="journeyCancel"/);
+});
+test('Searched destination remains fixed when user touches the map, manual selection remains adjustable',()=>{
+ assert.match(app,/let journeyPreviewPositionLocked=false/);
+ assert.match(app,/this\.onDown=e=>\{if\(journeyPreviewPositionLocked\)\{e\.preventDefault\(\);return;\}/);
+ assert.match(app,/this\.onMove=e=>\{\s*if\(journeyPreviewPositionLocked\)\{e\.preventDefault\(\);return;\}/);
+ assert.match(app,/const point=journeyPreviewPositionLocked \? journeyMapCandidate : \(stableMap\?\.center\|\|journeyMapCandidate\)/);
+ assert.match(app,/openJourneyMapPreview\(journeyAddressChoice,true\)/);
+ assert.match(app,/openJourneyMapPreview\(journeyTarget\|\|lastCoords\|\|DEFAULT_CENTER,false\)/);
+ assert.match(html,/id="journeyMapHint"/);
+});
