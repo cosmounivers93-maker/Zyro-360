@@ -1011,8 +1011,8 @@ app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  const minDeadline=now()+5*60000,maxDeadline=now()+24*3600000;
  if(!Number.isSafeInteger(dueAt)||dueAt<minDeadline||dueAt>maxDeadline)
   return res.status(400).json({error:'Scegli un orario previsto di arrivo tra 5 minuti e 24 ore da adesso.'});
- if(storageKind!=='postgres'||(!fcmReady&&!configuredPush))
-  return res.status(503).json({error:'SOS automatico non disponibile: servono database persistente e notifiche server configurate.'});
+ if(storageKind!=='postgres'||(!fcmReady&&!configuredPush)||process.env.ZYRO_JOURNEY_SOS_ALWAYS_ON!=='true')
+  return res.status(503).json({error:'SOS automatico non attivato: sono necessari database persistente, notifiche server e un servizio di controllo sempre attivo, confermato in configurazione.'});
  if(currentAlert(req.user.id))
   return res.status(409).json({error:'Termina prima un SOS o Pick Pocket attivo.'});
  const point=req.body.destinationPoint?validCoords(req.body.destinationPoint):null;
