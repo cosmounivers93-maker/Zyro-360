@@ -1743,6 +1743,7 @@ function openJourneyMapPreview(point,locked=true){
  if(!mapValidPoint(point)){toast('Scegli una destinazione valida prima di aprire la mappa.',true);return;}
  journeyMapCandidate={lat:Number(point.lat),lon:Number(point.lon)};
  journeyPreviewPositionLocked=locked;
+ $('journeyMapHint').textContent=locked?'Il puntino viola resta fisso sull’indirizzo trovato: premi Imposta per confermare.':'Selezione manuale: sposta la mappa e premi Imposta per scegliere il centro.';
  showView('home');
  const overlay=$('journeyMapOverlay');overlay.classList.remove('hidden');overlay.setAttribute('aria-hidden','false');
  // A searched destination remains fixed: no accidental map-drag can alter it.
