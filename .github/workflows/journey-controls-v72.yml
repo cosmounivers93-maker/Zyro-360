@@ -1,0 +1,26 @@
+name: ZYRO 360 - Controlli Accompagnami v72
+on:
+  push:
+    branches: ['fix/zyro-accompagnami-actions-map-20261104','main']
+    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','.github/workflows/journey-controls-v72.yml']
+  pull_request:
+    branches: [main]
+    paths: ['public/app.js','public/index.html','public/zyro-journey-v71.css','tests/journey-controls-v72.test.mjs','.github/workflows/journey-controls-v72.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  journey-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verifica sintassi app e test
+        run: |
+          node --check public/app.js
+          node --test tests/journey-controls-v72.test.mjs
+      - name: Verifica controlli esistenti
+        run: |
+          node --test tests/journey-consent-v71.test.mjs
