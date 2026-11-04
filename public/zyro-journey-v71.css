@@ -1,0 +1,71 @@
+/* Zyro 360 v71 — Accompagnami search, consent requests and live map guidance. */
+#journeyPanel .zyro-journey-address {
+  margin:12px 0 20px;padding:20px 18px;border-radius:25px;
+  border:1px solid rgba(99,154,211,.35);
+  background:linear-gradient(135deg,rgba(240,250,255,.94),rgba(244,235,255,.8));
+  color:#244963;box-shadow:0 8px 28px rgba(75,92,152,.07);
+}
+#journeyPanel .zyro-journey-address h3{font-size:22px;line-height:1.3;margin:0 0 6px;color:#244568}
+#journeyPanel .zyro-journey-address p{margin:0 0 17px;font-size:14px;line-height:1.55}
+#journeyPanel .zyro-journey-address-grid{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(100px,1fr);gap:10px}
+#journeyPanel .zyro-journey-address :is(input,button){max-width:100%;box-sizing:border-box}
+#journeyPanel #journeyFindAddress,
+#journeyPanel #journeyViewMap{width:100%;margin:10px 0 0;border-radius:17px;min-height:48px;font-weight:700}
+#journeyPanel #journeyFindAddress{background:linear-gradient(125deg,#e9f5ff,#eae6ff);color:#21496c}
+#journeyPanel #journeyViewMap:not(:disabled){background:linear-gradient(100deg,#168eeb,#7765e4);color:#fff}
+#journeyPanel #journeyViewMap:disabled{opacity:.5;cursor:not-allowed}
+#journeyPanel #journeyAddressResults:not([hidden]){
+  display:grid;gap:10px;padding:14px 0 6px;
+}
+#journeyPanel #journeyAddressResults strong{font-size:14px;color:#27567d}
+#journeyPanel #journeyAddressResults button{
+  border:1px solid #afcddc;border-radius:17px;
+  background:rgba(255,255,255,.94);color:#2b526f;
+  padding:14px;text-align:left;line-height:1.5;min-height:52px;
+}
+#journeyPanel #journeyAddressResults button[aria-pressed="true"]{
+  border:2px solid #168fe8;box-shadow:0 0 0 3px rgba(27,149,236,.1);
+}
+#journeyPanel .zyro-journey-provider-note{font-size:11px!important;line-height:1.5!important;color:#55728b;margin:12px 0 0!important}
+.zyro-journey-request{
+  border:1px solid #c4dcea;border-radius:19px;padding:15px;
+  background:linear-gradient(135deg,rgba(250,253,255,.96),rgba(240,235,255,.86));
+  margin:12px 0;color:#294862;box-shadow:0 8px 20px rgba(41,84,138,.06);
+}
+.zyro-journey-request strong{display:block;overflow-wrap:anywhere}
+.zyro-journey-request p{margin:10px 0;line-height:1.5}
+.zyro-journey-request-actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:12px}
+.zyro-journey-request-actions :is(button,a){
+  flex:1 1 125px;text-decoration:none;text-align:center;
+  border-radius:14px;border:1px solid #a5cde7;color:#22517c;
+  padding:12px 14px;min-height:44px;font-weight:700;
+  background:linear-gradient(115deg,#edf9ff,#eae6ff);
+}
+.zyro-journey-request-actions button[data-journey-answer="yes"]{
+  color:white;background:linear-gradient(115deg,#1597e4,#7462e4);border:0;
+}
+.zyro-journey-map-overlay:not(.hidden){
+  position:fixed;inset:env(safe-area-inset-top) 0 env(safe-area-inset-bottom) 0;
+  z-index:9900;pointer-events:none;display:flex;justify-content:center;align-items:flex-end;
+  padding:14px 16px max(24px,env(safe-area-inset-bottom));box-sizing:border-box;
+}
+.zyro-journey-map-overlay-card{
+  width:min(540px,100%);border:1px solid rgba(136,184,214,.8);border-radius:24px;
+  padding:20px;box-sizing:border-box;pointer-events:auto;color:#21486a;
+  background:linear-gradient(140deg,rgba(250,253,255,.97),rgba(240,236,255,.97));
+  box-shadow:0 12px 45px rgba(35,57,115,.23);
+}
+.zyro-journey-map-overlay-card h3{font-size:20px;line-height:1.35;margin:0 0 8px}
+.zyro-journey-map-overlay-card p{font-size:14px;line-height:1.5;margin:0 0 16px}
+.zyro-journey-map-overlay-actions{display:flex;gap:12px}
+.zyro-journey-map-overlay-actions button{
+  flex:1;min-height:52px;border-radius:16px;border:1px solid #aac9dc;
+  background:linear-gradient(115deg,#f4fbff,#eaeaff);color:#27577a;
+  font-weight:700;font-size:16px;
+}
+#journeyPreviewSet{color:white;background:linear-gradient(115deg,#128ee5,#7866e5);border:0}
+.zyro-journey-map-line{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:hidden}
+.zyro-journey-map-line line{stroke:#7360e5;stroke-width:4;stroke-dasharray:9 7;filter:drop-shadow(0 1px 4px #e5dfff)}
+.zyro-journey-map-line circle{fill:#178fea;stroke:white;stroke-width:3;filter:drop-shadow(0 1px 3px #7b83b0)}
+@media(max-width:350px){#journeyPanel .zyro-journey-address-grid{grid-template-columns:1fr}}
+@media(prefers-reduced-motion:reduce){.zyro-journey-map-overlay-card{animation:none!important}}

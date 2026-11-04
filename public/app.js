@@ -49,6 +49,7 @@ let chatRoom=null, chatPhotoData=null;
 let sosPending=null;
 const journeySelected=new Set(),checkinSelected=new Set();
 let journeyTarget=null;
+let journeyAddressResults=[],journeyAddressChoice=null,journeyMapCandidate=null;
 let inviteFromLink=null;
 // Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
 let mapTracking=false, ownCentered=false;
@@ -470,7 +471,7 @@ function renderCircles(){
   const sig=JSON.stringify([current.me.id,current.me.name,(current.circles||[]).map(c=>[c.id,c.name,c.mine,(c.members||[]).map(m=>[m.id,m.name])]),[...inviteCodes.entries()]]);
   if(list._zyroSig===sig&&list.children.length)return;
   list._zyroSig=sig;
-  list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions"><button type="button" data-chatcircle="${escapeHtml(c.id)}">💬 Chat gruppo</button>${c.kind==='chat'?'':'<button type="button" data-invite="'+escapeHtml(c.id)+'">✚ Genera codice invito</button>'}${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
+  list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions">${c.kind==='chat'?'<button type="button" data-chatcircle="'+escapeHtml(c.id)+'">💬 Apri gruppo</button>':''}${c.kind==='chat'?'':'<button type="button" data-invite="'+escapeHtml(c.id)+'">✚ Genera codice invito</button>'}${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
   list.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
     const r=await post('/api/invites',{circleId:b.dataset.invite});
     const target=b.closest('.circle-card').querySelector('.invite-target');
@@ -560,7 +561,8 @@ const roomGroupIcon=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
 const roomChatIcon=`<svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg>`;
 function renderChatRooms(){
   if(!current)return;
-  const circles=current.circles||[], contacts=uniqueContacts();
+  // Only groups explicitly created from 'Crea gruppo' appear as group conversations.
+  const circles=(current.circles||[]).filter(c=>c.kind==='chat'), contacts=uniqueContacts();
   const list=$('chatRooms');
   const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.kind,c.mine,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
   if(list._zyroSig===sig&&list.children.length)return;
@@ -1303,7 +1305,15 @@ class ZyroRasterMap{
   this.failed=0;this.loaded=0;this.removed=false;this.pending=null;this.pointers=new Map();this.pinNodes=new Map();this.pinchStart=0;
   this.layer=document.createElement('div');this.layer.className='zyro-raster-tiles';
   this.pinLayer=document.createElement('div');this.pinLayer.className='zyro-raster-markers';
-  this.el.replaceChildren(this.layer,this.pinLayer);
+  this.routeLayer=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  this.routeLayer.setAttribute('aria-hidden','true');
+  this.routeLayer.classList.add('zyro-journey-map-line');
+  this.routeLine=document.createElementNS('http://www.w3.org/2000/svg','line');
+  this.routeStart=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  this.routeEnd=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  this.routeStart.setAttribute('r','8');this.routeEnd.setAttribute('r','9');
+  this.routeLayer.append(this.routeLine,this.routeStart,this.routeEnd);
+  this.el.replaceChildren(this.layer,this.routeLayer,this.pinLayer);
   this.onDown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(this.pointers.size===2)this.pinchStart=0;try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
   this.onMove=e=>{
    if(!this.pointers.has(e.pointerId))return;
@@ -1404,7 +1414,35 @@ class ZyroRasterMap{
    const inRange=this.positionTile(img,left,top,w,h);
    if(canPrune||!inRange||this.tiles.size>180){img.remove();this.tiles.delete(key);}
   }
+  this.drawJourneyRoute(w,h,center);
   this.drawPins(w,h,center);
+ }
+ drawJourneyRoute(w,h,center){
+  const approved=(current?.journeys||[]).find(j=>j.userId!==current.me.id &&
+   j.response==='accepted' && ['active','late'].includes(j.status) &&
+   mapValidPoint(j.currentPoint) && mapValidPoint(j.destinationPoint));
+  const preview=$('journeyMapOverlay')&&!$('journeyMapOverlay').classList.contains('hidden');
+  if(!approved&&!preview){this.routeLayer.style.display='none';return;}
+  this.routeLayer.style.display='';
+  this.routeLayer.setAttribute('viewBox',`0 0 ${w} ${h}`);
+  const project=p=>{
+   const pos=toWorld(p.lat,p.lon,this.zoom),world=worldWidth(this.zoom);
+   let dx=pos.x-center.x;
+   if(dx>world/2)dx-=world;
+   if(dx< -world/2)dx+=world;
+   return {x:w/2+dx,y:h/2+pos.y-center.y};
+  };
+  if(preview&&!approved){
+   this.routeLine.style.display='none';this.routeStart.style.display='none';
+   this.routeEnd.style.display='';
+   this.routeEnd.setAttribute('cx',String(w/2));this.routeEnd.setAttribute('cy',String(h/2));return;
+  }
+  const from=project(approved.currentPoint),to=project(approved.destinationPoint);
+  this.routeLine.style.display='';this.routeStart.style.display='';this.routeEnd.style.display='';
+  this.routeLine.setAttribute('x1',String(from.x));this.routeLine.setAttribute('y1',String(from.y));
+  this.routeLine.setAttribute('x2',String(to.x));this.routeLine.setAttribute('y2',String(to.y));
+  this.routeStart.setAttribute('cx',String(from.x));this.routeStart.setAttribute('cy',String(from.y));
+  this.routeEnd.setAttribute('cx',String(to.x));this.routeEnd.setAttribute('cy',String(to.y));
  }
  drawPins(w,h,center){
   if(!current)return;
@@ -1642,19 +1680,99 @@ function renderV15(){if(!current)return;
  $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
  if(onC){$('checkinStatus').textContent=c.status==='late'?'Orario scaduto: conferma appena puoi':'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.`;}
  const others=(current.journeys||[]).filter(x=>x.userId!==me.id);
- updateMarkupIfChanged($('journeyContactsStatus'),others.map(x=>`<p class="zyro-v15-contact-status">🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)} · ${x.status==='late'?'In ritardo':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso annullato':'Arrivo previsto '+v15Time(x.dueAt)}</p>`).join(''));
+ updateMarkupIfChanged($('journeyContactsStatus'),others.map(x=>{
+  const pending=x.response==='pending' && ['active','late'].includes(x.status);
+  const accepted=x.response==='accepted' && ['active','late'].includes(x.status);
+  const route=accepted&&mapValidPoint(x.currentPoint)&&mapValidPoint(x.destinationPoint);
+  const distance=route?Math.round(zyroJourneyMeters(x.currentPoint,x.destinationPoint)):null;
+  return `<article class="zyro-journey-request"><strong>🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)}</strong>
+   <p>${pending?'Ti chiede di seguire il suo percorso. Accetta o rifiuta prima di vedere la posizione.':x.status==='late'?'Orario previsto superato':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso terminato':'Arrivo previsto '+v15Time(x.dueAt)}</p>
+   ${pending?`<div class="zyro-journey-request-actions"><button type="button" data-journey-answer="yes" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Accetta</button><button type="button" data-journey-answer="no" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Rifiuta</button></div>`:''}
+   ${accepted?`<p>Accompagnamento accettato${distance!==null?' · Distanza in linea d’aria: '+(distance>=1000?(distance/1000).toFixed(1)+' km':distance+' m'):''}.</p><div class="zyro-journey-request-actions"><button type="button" data-journey-answer="no" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Smetti di seguire</button></div>`:''}
+   ${route?`<div class="zyro-journey-request-actions"><button type="button" data-journey-map="${escapeHtml(x.userId)}">Guarda sulla mappa</button><a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(x.destinationPoint.lat+','+x.destinationPoint.lon)}" target="_blank" rel="noopener noreferrer">Apri navigazione stradale</a></div>`:''}
+  </article>`;
+ }).join(''));
  const checks=(current.checkins||[]).filter(x=>x.userId!==me.id);
  updateMarkupIfChanged($('checkinContactsStatus'),checks.map(x=>`<p class="zyro-v15-contact-status">⌛ ${escapeHtml(x.name)}: ${x.status==='late'?'Check-in scaduto':x.status==='confirmed'?'Confermato':x.status==='cancelled'?'Annullato':'Atteso '+v15Time(x.dueAt)}</p>`).join(''));
+}
+function zyroJourneyMeters(a,b){
+ const r=Math.PI/180,dlat=(b.lat-a.lat)*r,dlon=(b.lon-a.lon)*r;
+ const q=Math.sin(dlat/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dlon/2)**2;
+ return 12742000*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));
+}
+async function answerJourney(button){
+ const yes=button.dataset.journeyAnswer==='yes';
+ await post('/api/journey/respond',{userId:button.dataset.journeyUser,
+  journeyId:button.dataset.journeyId,accept:yes});
+ await refresh();
+ toast(yes?'Richiesta accettata. Puoi seguire la posizione e vedere la mappa.':'Accompagnamento non condiviso. Nessuna posizione del percorso visibile.');
+}
+async function searchJourneyAddress(){
+ const street=$('journeyStreet').value.trim(),city=$('journeyCity').value.trim(),postal=$('journeyPostal').value.trim();
+ if(street.length<4||city.length<2)throw Error('Inserisci via, numero civico e città prima della ricerca.');
+ let result=null;
+ // Android's on-device geocoder is available from the trusted, origin-bound
+ // bridge. It avoids requiring a separate hosted geocoding subscription.
+ if(typeof hasZyroNativeBridge==='function' && hasZyroNativeBridge() &&
+    typeof zyroNativeRequest==='function'){
+  try {
+   const native=await zyroNativeRequest('journey-geocode',{street,city,postcode:postal});
+   if(native?.ok && Array.isArray(native.results) && native.results.length)
+    result={items:native.results};
+  } catch {}
+ }
+ if(!result)result=await post('/api/journey/geocode',{street,city,postal});
+ journeyAddressResults=(Array.isArray(result.items)?result.items:[]).filter(p=>mapValidPoint(p)).slice(0,5);
+ journeyAddressChoice=null;journeyTarget=null;
+ $('journeyTargetInfo').textContent='Nessuna meta GPS impostata';
+ $('journeyViewMap').disabled=true;
+ const root=$('journeyAddressResults');
+ root.hidden=false;
+ root.innerHTML=journeyAddressResults.length
+  ?'<strong>Indirizzo trovato · scegli il risultato corretto</strong>'+journeyAddressResults.map((item,index)=>`<button type="button" data-journey-address-index="${index}" aria-pressed="false">${escapeHtml(item.label)}</button>`).join('')
+  :'<p>Non è stato trovato nessun indirizzo. Verifica via, città e CAP.</p>';
+}
+function openJourneyMapPreview(point){
+ journeyMapCandidate=mapValidPoint(point)?{lat:Number(point.lat),lon:Number(point.lon)}:null;
+ showView('home');
+ const overlay=$('journeyMapOverlay');overlay.classList.remove('hidden');overlay.setAttribute('aria-hidden','false');
+ // The center of the visible Home map is the proposed destination; users may drag it.
+ requestAnimationFrame(()=>{
+  ensureStableMap();
+  if(journeyMapCandidate&&stableMap)focusStableMap(journeyMapCandidate.lat,journeyMapCandidate.lon,16);
+ });
+ $('journeyPreviewCancel').focus();
+ stableMap?.schedule();
+}
+function closeJourneyMapPreview(savePoint){
+ const point=stableMap?.center||journeyMapCandidate;
+ const overlay=$('journeyMapOverlay');overlay.classList.add('hidden');overlay.setAttribute('aria-hidden','true');
+ if(savePoint){
+  if(!mapValidPoint(point))throw Error('La mappa non ha un punto valido. Riprova.');
+  journeyTarget={lat:Number(point.lat),lon:Number(point.lon)};
+  $('journeyTargetInfo').textContent='Meta confermata: '+journeyTarget.lat.toFixed(5)+', '+journeyTarget.lon.toFixed(5);
+  if(!$('journeyDestination').value.trim()){
+   $('journeyDestination').value=journeyAddressChoice
+    ?[$('journeyStreet').value.trim(),$('journeyCity').value.trim()].filter(Boolean).join(', ').slice(0,70)
+    :'Destinazione sulla mappa';
+  }
+  toast('Punto sulla mappa confermato. Ora scegli un contatto e invia la richiesta.');
+ }
+ journeyMapCandidate=null;
+ stableMap?.schedule();
+ showView('modes');
+ $('zyroJourneyOptions').open=true;
+ requestAnimationFrame(()=>$('journeyPanel').scrollIntoView({block:'start',behavior:'auto'}));
 }
 async function v15JourneyStart(){
  requireFamilyPlan();
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
  const auto=$('journeyAuto').checked;
- if(auto&&!journeyTarget)throw Error('Imposta prima la meta GPS dalla mappa.');
- const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:auto?journeyTarget:null});
- await refresh();toast(result.ok?'Accompagnami attivo. I contatti scelti vedono il percorso se hai attivato la posizione.':'Percorso non avviato.');
+ if(!journeyTarget)throw Error('Prima cerca un indirizzo, poi premi Guarda sulla mappa e Imposta.');
+ const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:journeyTarget||null,autoArrival:auto});
+ await refresh();toast(result.ok?'Richiesta Accompagnami inviata. La posizione del percorso sarà visibile solo ai contatti che accettano.':'Richiesta non inviata.');
 }
-async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere il percorso?'))return;await post('/api/journey/end',{arrived});journeyTarget=null;$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato.');}
+async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato/a?':'Interrompere il percorso?'))return;await post('/api/journey/end',{arrived});journeyTarget=null;journeyAddressChoice=null;journeyAddressResults=[];$('journeyAddressResults').hidden=true;$('journeyAddressResults').replaceChildren();$('journeyViewMap').disabled=true;['journeyStreet','journeyCity','journeyPostal'].forEach(id=>$(id).value='');$('journeyAuto').checked=false;$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
 async function v15CheckinStart(){requireFamilyPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
@@ -2048,8 +2166,18 @@ async function changeAllContactAccess(target){
  const id=target.dataset.accessAll,contact=uniqueContacts().find(c=>c.id===id);
  if(!contact){await refresh();throw Error('Questo contatto non appartiene più alla tua cerchia.');}
  const enabled=target.checked,family=hasFamilyPlan();
- if(enabled&&family&&!confirm('Vuoi autorizzare per '+contact.name+' GPS, SOS, ascolto audio e comandi remoti Pick Pocket? Il microfono richiede comunque il tuo consenso generale; GPS e SOS non si avviano automaticamente.')){
-   $('savedInvitees')._zyroSig=null;await refresh();return;
+ const confirmed=await zyroOwnerDialog({
+  title:enabled?'Autorizza tutte le funzioni':'Revoca tutte le autorizzazioni',
+  description:enabled
+   ?'Stai per autorizzare '+contact.name+' a utilizzare tutte le funzioni consentite dal tuo piano (GPS, SOS'+(family?', audio SOS e controllo remoto Pick Pocket':'')+'). Potrai disabilitarle o modificarle una per una, quando vuoi. GPS LIVE, SOS e microfono non si attivano automaticamente.'
+   :'Vuoi revocare tutte le autorizzazioni di '+contact.name+'? Potrai riabilitarle tutte insieme o singolarmente in qualsiasi momento.',
+  submitLabel:enabled?'Conferma autorizzazioni':'Disabilita tutte'
+ });
+ if(!confirmed){
+  target.checked=!enabled;
+  $('savedInvitees')._zyroSig=null;
+  renderInvitedPeople();
+  return;
  }
  const response=await post('/api/settings/contact-access',{
    userId:id,shareGps:enabled,receiveSos:enabled,
@@ -2264,7 +2392,27 @@ async function init(){
   $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();if(isZyroNativeAvailable()){try{await nativeBackgroundSync();}catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}}toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
   $('journeyRecipients').addEventListener('change',e=>{if(e.target.matches('[data-journey-to]')){e.target.checked?journeySelected.add(e.target.dataset.journeyTo):journeySelected.delete(e.target.dataset.journeyTo);}});
   $('checkinRecipients').addEventListener('change',e=>{if(e.target.matches('[data-checkin-to]')){e.target.checked?checkinSelected.add(e.target.dataset.checkinTo):checkinSelected.delete(e.target.dataset.checkinTo);}});
-  $('journeySetTarget').addEventListener('click',()=>{if(!stableMap){toast('Apri prima la Home e carica la mappa.',true);return;}journeyTarget={lat:stableMap.center.lat,lon:stableMap.center.lon};$('journeyAuto').checked=true;$('journeyTargetInfo').textContent=`Meta impostata: ${journeyTarget.lat.toFixed(5)}, ${journeyTarget.lon.toFixed(5)}`;toast('Meta GPS salvata dal centro della mappa.');});
+  $('journeyFindAddress').addEventListener('click',()=>void action(searchJourneyAddress));
+  $('journeyAddressResults').addEventListener('click',e=>{
+   const item=e.target.closest('[data-journey-address-index]');if(!item)return;
+   const index=Number(item.dataset.journeyAddressIndex);
+   journeyAddressChoice=journeyAddressResults[index]||null;
+   $('journeyViewMap').disabled=!journeyAddressChoice;
+   $('journeyAddressResults').querySelectorAll('[data-journey-address-index]').forEach(button=>button.setAttribute('aria-pressed',String(button===item)));
+  });
+  $('journeyViewMap').addEventListener('click',()=>{if(journeyAddressChoice)openJourneyMapPreview(journeyAddressChoice);});
+  $('journeySetTarget').addEventListener('click',()=>openJourneyMapPreview(journeyTarget||lastCoords||DEFAULT_CENTER));
+  $('journeyPreviewCancel').addEventListener('click',()=>closeJourneyMapPreview(false));
+  $('journeyPreviewSet').addEventListener('click',()=>action(()=>closeJourneyMapPreview(true)));
+  $('journeyContactsStatus').addEventListener('click',e=>{
+   const reply=e.target.closest('[data-journey-answer]');
+   if(reply){reply.disabled=true;void action(async()=>{try{await answerJourney(reply);}finally{reply.disabled=false;}});return;}
+   const map=e.target.closest('[data-journey-map]');
+   if(map){
+    const j=(current?.journeys||[]).find(x=>x.userId===map.dataset.journeyMap&&x.response==='accepted');
+    if(j&&mapValidPoint(j.currentPoint)){showView('home');requestAnimationFrame(()=>focusStableMap(j.currentPoint.lat,j.currentPoint.lon,14));}
+   }
+  });
   $('journeyStart').addEventListener('click',()=>action(v15JourneyStart));
   $('journeyArrived').addEventListener('click',()=>action(()=>v15JourneyEnd(true)));
   $('journeyCancel').addEventListener('click',()=>action(()=>v15JourneyEnd(false)));

@@ -21,10 +21,13 @@ test('all primary ids and controls remain unique',()=>{
   'pickSensitivity','pickNotify','pickRecipients','pickRecipientsList',
   'journeyStart','journeyArrived','journeyCancel','journeySetTarget',
   'checkinStart','checkinConfirm','checkinCancel','premiumStatus',
-  'zyroRestorePurchases','premiumDetails','contactsList','totalMembers',
+  'premiumDetails','contactsList','totalMembers',
   'totalCircles','myLocationText','greetingName','myAvatar']){
    assert.equal((modes.match(new RegExp('id="'+id+'"','g'))||[]).length,1,id);
  }
+});
+test('purchase restoration control remains hidden from subscriptions',()=>{
+ assert.ok(!modes.includes('id="zyroRestorePurchases"'));
 });
 test('quick navigation has four working destinations and accessible disclosures',()=>{
  for(const target of ['sosRecipientsPanel','pickPanel','journeyPanel','checkinPanel'])

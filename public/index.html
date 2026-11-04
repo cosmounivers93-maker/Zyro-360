@@ -30,6 +30,7 @@
   <link rel="stylesheet" href="/zyro-sos-home-v33.css?v=33.0">
   <link rel="stylesheet" href="/zyro-sos-card-v34.css?v=34.0">
   <link rel="stylesheet" href="/zyro-chat-groups-invitees-v1.css?v=2">
+  <link rel="stylesheet" href="/zyro-journey-v71.css?v=1">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
 .zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult,[data-zyro-permission="testpush"]{display:none!important}
@@ -456,9 +457,22 @@ html,body{overscroll-behavior-x:none}
         <details id="zyroJourneyOptions" class="zyro-mode-details">
           <summary><span class="zyro-mode-summary-label">Prepara il percorso<small>Destinazione, orario previsto e contatti</small></span><span class="zyro-mode-chevron" aria-hidden="true">⌄</span></summary>
         <div id="journeyInactive">
-          <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, lavoro, stazione" autocomplete="off"></label>
+          <div class="zyro-journey-address">
+            <h3>Dove vuoi andare?</h3>
+            <p>Inserisci l'indirizzo e cerca il punto da verificare sulla mappa.</p>
+            <label class="zyro-v15-field">Via e numero civico<input id="journeyStreet" maxlength="110" placeholder="Es. Via Roma 5" autocomplete="street-address"></label>
+            <div class="zyro-journey-address-grid">
+              <label class="zyro-v15-field">Città<input id="journeyCity" maxlength="90" placeholder="Es. Torino" autocomplete="address-level2"></label>
+              <label class="zyro-v15-field">CAP<input id="journeyPostal" maxlength="10" inputmode="text" placeholder="Es. 10100" autocomplete="postal-code"></label>
+            </div>
+            <button id="journeyFindAddress" type="button" class="zyro-v15-secondary">Cerca</button>
+            <div id="journeyAddressResults" hidden aria-live="polite"></div>
+            <button id="journeyViewMap" type="button" class="zyro-v15-secondary" disabled>Guarda sulla mappa</button>
+            <p class="zyro-journey-provider-note">La ricerca invia l'indirizzo inserito al fornitore di geocodifica. Dati cartografici © OpenStreetMap contributors.</p>
+          </div>
+          <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, Lavoro, Palestra, Altro" autocomplete="off"></label>
           <label class="zyro-v15-field">Tempo previsto<select id="journeyMinutes"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e mezza</option><option value="120">2 ore</option><option value="240">4 ore</option></select></label>
-          <div class="zyro-v15-destination"><label><input id="journeyAuto" type="checkbox"> Arrivo automatico (se imposti il centro della mappa come destinazione)</label><small>Seleziona la destinazione spostando prima la mappa nella Home. Il rilevamento automatico richiede GPS e app aperta.</small><button id="journeySetTarget" type="button" class="zyro-v15-secondary">Usa il centro della mappa come meta</button><span id="journeyTargetInfo">Nessuna meta GPS impostata</span></div>
+          <div class="zyro-v15-destination"><label><input id="journeyAuto" type="checkbox"> Arrivo automatico (se imposti il centro della mappa come destinazione)</label><small>La meta GPS viene salvata solo dopo aver premuto Imposta. Il rilevamento automatico richiede GPS e app aperta.</small><button id="journeySetTarget" type="button" class="zyro-v15-secondary">Scegli manualmente sulla mappa</button><span id="journeyTargetInfo">Nessuna meta GPS impostata</span></div>
           <p class="zyro-v15-subhead">Chi può seguire il tuo percorso?</p><div id="journeyRecipients" class="zyro-v15-contacts"></div>
           <button id="journeyStart" type="button" class="zyro-v15-primary">Avvia Accompagnami</button>
         </div>
@@ -725,9 +739,19 @@ html,body{overscroll-behavior-x:none}
     <p class="theft-subnote">Possibili falsi allarmi. Non blocca Android. In caso di emergenza reale chiama il 112.</p>
   </div>
 </div>
+<div id="journeyMapOverlay" class="zyro-journey-map-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="journeyMapTitle" aria-hidden="true">
+  <div class="zyro-journey-map-overlay-card">
+    <h3 id="journeyMapTitle">Verifica la destinazione sulla mappa</h3>
+    <p>Sposta la mappa sul punto esatto, poi premi Imposta. Non partirà alcuna condivisione prima dell'invio e dell'accettazione della richiesta.</p>
+    <div class="zyro-journey-map-overlay-actions">
+      <button id="journeyPreviewCancel" type="button">Annulla</button>
+      <button id="journeyPreviewSet" type="button">Imposta</button>
+    </div>
+  </div>
+</div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=70.0" defer></script>
+<script src="/app.js?v=71.0" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
 </html>

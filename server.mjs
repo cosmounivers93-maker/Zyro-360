@@ -114,7 +114,32 @@ const banNotice = 'A causa di una violazione delle norme e delle politiche di ut
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
 function validCoords(point){const lat=Number(point?.lat),lon=Number(point?.lon),accuracy=Number(point?.accuracy||0);return Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180&&Number.isFinite(accuracy)&&accuracy>=0&&accuracy<=100000?{lat,lon,accuracy,updatedAt:now()}:null;}
 function metersBetween(a,b){const r=Math.PI/180,phi=(b.lat-a.lat)*r,l=(b.lon-a.lon)*r;const q=Math.sin(phi/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(l/2)**2;return 12742000*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));}
-const publicJourney = (j,viewer) => j && (j.userId===viewer || (j.recipients||[]).includes(viewer)) ? {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',destination:j.destination,dueAt:j.dueAt,startedAt:j.startedAt,status:j.status,arrivedAt:j.arrivedAt||null,autoArrival:!!j.destinationPoint} : null;
+// A selected contact receives an invitation, not automatic live-route access.
+function journeyDecision(j,viewer){return j?.responseBy?.[viewer] || 'pending';}
+function journeyAccessFor(ownerId,viewer){
+ const j=db.journeys[ownerId];
+ return !!j && ['active','late'].includes(j.status) && (j.recipients||[]).includes(viewer) &&
+   journeyDecision(j,viewer)==='accepted' && !!db.users[ownerId]?.sharing && sharedCircle(ownerId,viewer);
+}
+const publicJourney = (j,viewer) => {
+ if(!j)return null;
+ const owner=j.userId===viewer;
+ if(!owner && (!(j.recipients||[]).includes(viewer)||!sharedCircle(j.userId,viewer)))return null;
+ const response=owner?'owner':journeyDecision(j,viewer);
+ if(response==='declined')return null;
+ const active=['active','late'].includes(j.status);
+ const visible=owner||(response==='accepted'&&active);
+ const gps=locations.get(j.userId);
+ return {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',
+  destination:j.destination,dueAt:j.dueAt,startedAt:j.startedAt,status:j.status,
+  arrivedAt:j.arrivedAt||null,autoArrival:!!j.autoArrival,response,
+  destinationPoint:visible?(j.destinationPoint||null):null,
+  currentPoint:visible && active && db.users[j.userId]?.sharing && gps &&
+    now()-gps.updatedAt<120000 ? {lat:gps.lat,lon:gps.lon,updatedAt:gps.updatedAt}:null,
+  responseCounts:owner?{accepted:(j.recipients||[]).filter(id=>journeyDecision(j,id)==='accepted').length,
+   pending:(j.recipients||[]).filter(id=>journeyDecision(j,id)==='pending').length,
+   declined:(j.recipients||[]).filter(id=>journeyDecision(j,id)==='declined').length}:undefined};
+};
 const publicCheckin = (c,viewer) => c && (c.userId===viewer || (c.recipients||[]).includes(viewer)) ? {id:c.id,userId:c.userId,name:db.users[c.userId]?.name||'Contatto',dueAt:c.dueAt,status:c.status,completedAt:c.completedAt||null} : null;
 
 const cleanText = (s, max = 60) => String(s || '').trim().replace(/[\u0000-\u001F\u007F<>]/g, '').slice(0, max);
@@ -218,7 +243,7 @@ function stateFor(id) {
       const u = db.users[x]; const alert = currentAlert(x);
       const visibleAlert = alert && canSeeAlert(id,alert) ? alert : null;
       const emergencyShare = !!(visibleAlert?.recipients?.includes(id));
-      const shared = Boolean(mayViewSharedGps(u,id) || (visibleAlert?.kind === 'pickpocket' && emergencyShare));
+      const shared = Boolean(mayViewSharedGps(u,id) || journeyAccessFor(u.id,id) || (visibleAlert?.kind === 'pickpocket' && emergencyShare));
       const location = (shared || emergencyShare) && locations.has(x) ? locations.get(x) : null;
       const membership = db.memberships.find(m => m.circleId === c.id && m.userId === x);
       return { ...publicUser(u), invitedByMe: membership?.invitedBy === id, joinedAt:membership?.joinedAt||null, online: online(x), sharing: shared, location, sos: visibleAlert ? { id: alert.id, startedAt: alert.startedAt, hasAudio: !!alert.hasAudio && sosAudioAccessFor(u,id), kind: alert.kind || 'sos' } : null };
@@ -641,9 +666,9 @@ app.post('/api/position', requireAuth, (req,res) => {
   const t=now(); if (t-(lastPos.get(req.user.id)||0)<2400) return res.json({ok:true}); lastPos.set(req.user.id,t);
   locations.set(req.user.id,{lat,lon,accuracy,updatedAt:t});
   const j=db.journeys[req.user.id];
-  if(j?.status==='active' && j.destinationPoint && accuracy<=100){
+  if(j?.status==='active' && j.autoArrival===true && j.destinationPoint && accuracy<=100){
     j.nearCount = metersBetween({lat,lon},j.destinationPoint) <= 120 ? (j.nearCount||0)+1 : 0;
-    if(j.nearCount>=2){j.status='arrived';j.arrivedAt=t;save();void sendEventPush(j.recipients,'✅ Arrivo confermato',`${req.user.name} è arrivato/a a ${j.destination}.`);}
+    if(j.nearCount>=2){j.status='arrived';j.arrivedAt=t;save();void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),'✅ Arrivo confermato',`${req.user.name} è arrivato/a a ${j.destination}.`);}
   }
   refreshRelated(req.user.id); res.json({ok:true});
 });
@@ -827,7 +852,7 @@ function journeyAudience(userId, ids){const chosen=allowedRecipients(userId,ids)
 // Trip / check-in events are server-backed but cannot run during Render Free spin-down.
 function overdueCheck(){
  const t=now();let changed=false;
- for(const j of Object.values(db.journeys))if(j.status==='active'&&j.dueAt<=t){j.status='late';j.lateAt=t;changed=true;void sendEventPush(j.recipients,'⌛ Percorso in ritardo',`${db.users[j.userId]?.name||'Un contatto'} non ha ancora confermato l'arrivo a ${j.destination}. Verifica direttamente.`);for(const x of j.recipients)pushState(x);}
+ for(const j of Object.values(db.journeys))if(j.status==='active'&&j.dueAt<=t){j.status='late';j.lateAt=t;changed=true;void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),'⌛ Percorso in ritardo',`${db.users[j.userId]?.name||'Un contatto'} non ha ancora confermato l'arrivo a ${j.destination}. Verifica direttamente.`);for(const x of j.recipients)pushState(x);}
  for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){c.status='late';c.lateAt=t;changed=true;void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);for(const x of c.recipients)pushState(x);}
  if(changed)save();
 }
@@ -875,6 +900,42 @@ app.post('/api/billing/google-notifications',async(req,res)=>{
  }catch{res.sendStatus(503);}
 });
 
+// Explicit address lookup only. No autocomplete: preserve privacy and provider quotas.
+// Configure ZYRO_DESTINATION_GEOCODER_ENABLED=true and a production geocoding
+// provider URL before deploying at scale. Queries go to the selected provider.
+let lastDestinationSearchAt=0;
+app.post('/api/journey/geocode',requireAuth,limit,async(req,res)=>{
+ if(!familyActive(req.user))return res.status(402).json({error:'Accompagnami richiede Family.'});
+ if(process.env.ZYRO_DESTINATION_GEOCODER_ENABLED!=='true')
+  return res.status(503).json({error:'Ricerca indirizzi non ancora configurata. Puoi scegliere il centro della mappa.'});
+ const street=cleanText(req.body?.street,110),city=cleanText(req.body?.city,90),
+  postal=cleanText(req.body?.postal,10);
+ if(street.length<4||city.length<2||postal&&!/^[A-Za-z0-9 -]{3,10}$/.test(postal))
+  return res.status(400).json({error:'Inserisci via e città valide, e verifica il CAP.'});
+ if(Date.now()-lastDestinationSearchAt<1200)
+  return res.status(429).json({error:'Troppe ricerche: riprova dopo qualche secondo.'});
+ lastDestinationSearchAt=Date.now();
+ try{
+  const url=new URL(process.env.ZYRO_DESTINATION_GEOCODER_URL||'https://nominatim.openstreetmap.org/search');
+  if(url.protocol!=='https:')return res.status(503).json({error:'Il servizio indirizzi richiede HTTPS.'});
+  url.searchParams.set('format','jsonv2');
+  url.searchParams.set('street',street);url.searchParams.set('city',city);
+  if(postal)url.searchParams.set('postalcode',postal);
+  url.searchParams.set('limit','3');url.searchParams.set('addressdetails','0');
+  const response=await fetch(url,{headers:{
+   'User-Agent':'ZYRO360/1.0 (+https://zyro-360.onrender.com)',
+   'Referer':'https://zyro-360.onrender.com/',
+   'Accept-Language':'it'
+  },signal:AbortSignal.timeout(4500)});
+  if(!response.ok)return res.status(502).json({error:'Servizio indirizzi momentaneamente non disponibile.'});
+  const raw=await response.json();
+  const items=(Array.isArray(raw)?raw:[]).map(x=>{
+    const point=validCoords(x);
+    return point?{label:cleanText(x.display_name,160),lat:point.lat,lon:point.lon}:null;
+  }).filter(Boolean).slice(0,3);
+  return res.json({items,provider:'OpenStreetMap / servizio di geocodifica configurato'});
+ }catch{return res.status(502).json({error:'Impossibile cercare l’indirizzo. Verifica la connessione.'});}
+});
 app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients);
@@ -884,15 +945,31 @@ app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  if(['active','late'].includes(db.journeys[req.user.id]?.status))return res.status(409).json({error:'Termina prima il percorso esistente.'});
  const point=req.body.destinationPoint?validCoords(req.body.destinationPoint):null;
  if(req.body.destinationPoint && !point)return res.status(400).json({error:'Coordinate della destinazione non valide.'});
- const j={id:token(10),userId:req.user.id,destination,recipients,startedAt:now(),dueAt:now()+mins*60000,status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,nearCount:0};
+ const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),dueAt:now()+mins*60000,status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,autoArrival:req.body.autoArrival===true,nearCount:0};
  db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
- void sendEventPush(recipients,'🚶 Percorso iniziato',`${req.user.name} è in viaggio verso ${destination}. Orario di arrivo previsto: ${new Date(j.dueAt).toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Rome'})}.`);
+ void sendEventPush(recipients,'🚶 Richiesta Accompagnami',`${req.user.name} ti chiede di seguire il suo percorso verso ${destination}. Apri Zyro 360 per accettare o rifiutare.`);
  res.json({ok:true,journey:publicJourney(j,req.user.id)});
+});
+// Only the invited authenticated user may accept or refuse a particular trip.
+app.post('/api/journey/respond',requireAuth,limit,(req,res)=>{
+ const ownerId=String(req.body?.userId||''),j=db.journeys[ownerId];
+ if(!j||String(req.body?.journeyId||'')!==j.id||!['active','late'].includes(j.status))
+  return res.status(404).json({error:'La richiesta non è più disponibile.'});
+ if(!(j.recipients||[]).includes(req.user.id)||!sharedCircle(ownerId,req.user.id))
+  return res.status(403).json({error:'Non sei autorizzato a rispondere.'});
+ if(typeof req.body?.accept!=='boolean')
+  return res.status(400).json({error:'Indica se accetti o rifiuti.'});
+ j.responseBy||={};
+ j.responseBy[req.user.id]=req.body.accept?'accepted':'declined';
+ save();refreshRelated(ownerId);
+ void sendEventPush([ownerId],req.body.accept?'✅ Accompagnamento accettato':'Accompagnamento rifiutato',
+  `${req.user.name} ${req.body.accept?'ha accettato':'ha rifiutato'} la richiesta di accompagnamento.`);
+ res.json({ok:true,accepted:req.body.accept,journey:publicJourney(j,req.user.id)});
 });
 app.post('/api/journey/end',requireAuth,(req,res)=>{
  const j=db.journeys[req.user.id];if(!j||!['active','late'].includes(j.status))return res.status(404).json({error:'Nessun percorso attivo.'});
  const arrived=req.body.arrived===true;j.status=arrived?'arrived':'cancelled';j.endedAt=now();if(arrived)j.arrivedAt=j.endedAt;
- save();refreshRelated(req.user.id);void sendEventPush(j.recipients,arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`);res.json({ok:true});
+ save();refreshRelated(req.user.id);void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`);res.json({ok:true});
 });
 app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
  if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
