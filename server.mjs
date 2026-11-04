@@ -852,7 +852,7 @@ function journeyAudience(userId, ids){const chosen=allowedRecipients(userId,ids)
 // Trip / check-in events are server-backed but cannot run during Render Free spin-down.
 function overdueCheck(){
  const t=now();let changed=false;
- // Accompagnami now runs until the owner explicitly confirms arrival or cancels.\n // No arbitrary deadline, late state, or false overdue alert is generated.
+ // Accompagnami runs until explicitly ended by its owner; no automatic late alert.
  for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){c.status='late';c.lateAt=t;changed=true;void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);for(const x of c.recipients)pushState(x);}
  if(changed)save();
 }
