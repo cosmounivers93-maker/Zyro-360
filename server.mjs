@@ -131,7 +131,7 @@ const publicJourney = (j,viewer) => {
  const visible=owner||(response==='accepted'&&active);
  const gps=locations.get(j.userId);
  return {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',
-  destination:j.destination,dueAt:j.dueAt,startedAt:j.startedAt,status:j.status,
+  destination:j.destination,dueAt:null,startedAt:j.startedAt,status:j.status,
   arrivedAt:j.arrivedAt||null,autoArrival:!!j.autoArrival,response,
   destinationPoint:visible?(j.destinationPoint||null):null,
   currentPoint:visible && active && db.users[j.userId]?.sharing && gps &&
@@ -852,7 +852,7 @@ function journeyAudience(userId, ids){const chosen=allowedRecipients(userId,ids)
 // Trip / check-in events are server-backed but cannot run during Render Free spin-down.
 function overdueCheck(){
  const t=now();let changed=false;
- for(const j of Object.values(db.journeys))if(j.status==='active'&&j.dueAt<=t){j.status='late';j.lateAt=t;changed=true;void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),'⌛ Percorso in ritardo',`${db.users[j.userId]?.name||'Un contatto'} non ha ancora confermato l'arrivo a ${j.destination}. Verifica direttamente.`);for(const x of j.recipients)pushState(x);}
+ // Accompagnami runs until explicitly ended by its owner; no automatic late alert.
  for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){c.status='late';c.lateAt=t;changed=true;void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);for(const x of c.recipients)pushState(x);}
  if(changed)save();
 }
@@ -939,13 +939,13 @@ app.post('/api/journey/geocode',requireAuth,limit,async(req,res)=>{
 app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients);
- const destination=cleanText(req.body.destination,70);const mins=Number(req.body.minutes);
- if(!recipients||!destination||!Number.isInteger(mins)||mins<5||mins>720)return res.status(400).json({error:'Indica meta, minuti (5-720) e destinatari della cerchia.'});
+ const destination=cleanText(req.body.destination,70);
+ if(!recipients||!destination)return res.status(400).json({error:'Indica la destinazione e i destinatari della cerchia.'});
  if(!req.user.sharing)return res.status(409).json({error:'Attiva la condivisione della posizione prima di iniziare Accompagnami.'});
  if(['active','late'].includes(db.journeys[req.user.id]?.status))return res.status(409).json({error:'Termina prima il percorso esistente.'});
  const point=req.body.destinationPoint?validCoords(req.body.destinationPoint):null;
  if(req.body.destinationPoint && !point)return res.status(400).json({error:'Coordinate della destinazione non valide.'});
- const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),dueAt:now()+mins*60000,status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,autoArrival:req.body.autoArrival===true,nearCount:0};
+ const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,autoArrival:req.body.autoArrival===true,nearCount:0};
  db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
  void sendEventPush(recipients,'🚶 Richiesta Accompagnami',`${req.user.name} ti chiede di seguire il suo percorso verso ${destination}. Apri Zyro 360 per accettare o rifiutare.`);
  res.json({ok:true,journey:publicJourney(j,req.user.id)});

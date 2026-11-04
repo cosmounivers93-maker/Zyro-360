@@ -50,6 +50,7 @@ let sosPending=null;
 const journeySelected=new Set(),checkinSelected=new Set();
 let journeyTarget=null;
 let journeyAddressResults=[],journeyAddressChoice=null,journeyMapCandidate=null;
+let journeyPreviewPositionLocked=false;
 let inviteFromLink=null;
 // Map: GPS stays on this device unless the user explicitly enables sharing or an alert.
 let mapTracking=false, ownCentered=false;
@@ -1314,8 +1315,9 @@ class ZyroRasterMap{
   this.routeStart.setAttribute('r','8');this.routeEnd.setAttribute('r','9');
   this.routeLayer.append(this.routeLine,this.routeStart,this.routeEnd);
   this.el.replaceChildren(this.layer,this.routeLayer,this.pinLayer);
-  this.onDown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(this.pointers.size===2)this.pinchStart=0;try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
+  this.onDown=e=>{if(journeyPreviewPositionLocked){e.preventDefault();return;}if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(this.pointers.size===2)this.pinchStart=0;try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
   this.onMove=e=>{
+   if(journeyPreviewPositionLocked){e.preventDefault();return;}
    if(!this.pointers.has(e.pointerId))return;
    const prev=this.pointers.get(e.pointerId),next={x:e.clientX,y:e.clientY};this.pointers.set(e.pointerId,next);
    if(this.pointers.size===1){this.shift(next.x-prev.x,next.y-prev.y);}
@@ -1328,7 +1330,7 @@ class ZyroRasterMap{
    e.preventDefault();
   };
   this.onUp=e=>{this.pointers.delete(e.pointerId);if(this.pointers.size<2)this.pinchStart=0;};
-  this.onWheel=e=>{e.preventDefault();this.zoomTo(this.zoom+(e.deltaY<0?1:-1));};
+  this.onWheel=e=>{e.preventDefault();if(!journeyPreviewPositionLocked)this.zoomTo(this.zoom+(e.deltaY<0?1:-1));};
   this.el.addEventListener('pointerdown',this.onDown);
   this.el.addEventListener('pointermove',this.onMove);
   this.el.addEventListener('pointerup',this.onUp);this.el.addEventListener('pointercancel',this.onUp);
@@ -1677,7 +1679,7 @@ function renderV15(){if(!current)return;
  if(onJ)journeyOptions.open=false;
  $('journeyInactive').classList.toggle('hidden',onJ);
  $('journeyActive').classList.toggle('hidden',!onJ);
- if(onJ){$('journeyStatus').textContent=j.status==='late'?'Orario previsto superato: contatta i tuoi familiari':'Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination} · Previsto entro ${v15Time(j.dueAt)}${j.autoArrival?' · Rilevamento GPS attivo':''}`;}
+ if(onJ){$('journeyStatus').textContent='Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination}${j.autoArrival?' · Rilevamento GPS attivo':''}`;}
  const c=me.checkin,onC=c&&['pending','late'].includes(c.status);
  $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
  if(onC){$('checkinStatus').textContent=c.status==='late'?'Orario scaduto: conferma appena puoi':'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.`;}
@@ -1688,7 +1690,7 @@ function renderV15(){if(!current)return;
   const route=accepted&&mapValidPoint(x.currentPoint)&&mapValidPoint(x.destinationPoint);
   const distance=route?Math.round(zyroJourneyMeters(x.currentPoint,x.destinationPoint)):null;
   return `<article class="zyro-journey-request"><strong>🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)}</strong>
-   <p>${pending?'Ti chiede di seguire il suo percorso. Accetta o rifiuta prima di vedere la posizione.':x.status==='late'?'Orario previsto superato':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso terminato':'Arrivo previsto '+v15Time(x.dueAt)}</p>
+   <p>${pending?'Ti chiede di seguire il suo percorso. Accetta o rifiuta prima di vedere la posizione.':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso terminato':'In viaggio verso la destinazione'}</p>
    ${pending?`<div class="zyro-journey-request-actions"><button type="button" data-journey-answer="yes" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Accetta</button><button type="button" data-journey-answer="no" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Rifiuta</button></div>`:''}
    ${accepted?`<p>Accompagnamento accettato${distance!==null?' · Distanza in linea d’aria: '+(distance>=1000?(distance/1000).toFixed(1)+' km':distance+' m'):''}.</p><div class="zyro-journey-request-actions"><button type="button" data-journey-answer="no" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Smetti di seguire</button></div>`:''}
    ${route?`<div class="zyro-journey-request-actions"><button type="button" data-journey-map="${escapeHtml(x.userId)}">Guarda sulla mappa</button><a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(x.destinationPoint.lat+','+x.destinationPoint.lon)}" target="_blank" rel="noopener noreferrer">Apri navigazione stradale</a></div>`:''}
@@ -1737,13 +1739,15 @@ async function searchJourneyAddress(){
   ?'<strong>Indirizzo trovato · scegli il risultato corretto</strong>'+journeyAddressResults.map((item,index)=>`<button type="button" data-journey-address-index="${index}" aria-pressed="${index===0}">${escapeHtml(item.label)}</button>`).join('')
   :'<p>Non è stato trovato nessun indirizzo. Verifica via, città e CAP.</p>';
 }
-function openJourneyMapPreview(point){
+function openJourneyMapPreview(point,locked=true){
  if(!mapValidPoint(point)){toast('Scegli una destinazione valida prima di aprire la mappa.',true);return;}
  journeyMapCandidate={lat:Number(point.lat),lon:Number(point.lon)};
+ journeyPreviewPositionLocked=locked;
+ $('journeyMapHint').textContent=locked?'Il puntino viola resta fisso sull’indirizzo trovato: premi Imposta per confermare.':'Selezione manuale: sposta la mappa e premi Imposta per scegliere il centro.';
  showView('home');
  const overlay=$('journeyMapOverlay');overlay.classList.remove('hidden');overlay.setAttribute('aria-hidden','false');
- // Centered on the map, this purple pin is visible even before map tiles
- // have finished loading and stays at the map center while dragging.
+ // A searched destination remains fixed: no accidental map-drag can alter it.
+ // Manual map selection retains deliberate pan-and-confirm interaction.
  $('journeyPreviewPin').classList.remove('hidden');
  // The center of the visible Home map is the proposed destination; users may drag it.
  requestAnimationFrame(()=>{
@@ -1754,7 +1758,7 @@ function openJourneyMapPreview(point){
  stableMap?.schedule();
 }
 function closeJourneyMapPreview(savePoint){
- const point=stableMap?.center||journeyMapCandidate;
+ const point=journeyPreviewPositionLocked ? journeyMapCandidate : (stableMap?.center||journeyMapCandidate);
  const overlay=$('journeyMapOverlay');overlay.classList.add('hidden');overlay.setAttribute('aria-hidden','true');
  $('journeyPreviewPin').classList.add('hidden');
  if(savePoint){
@@ -1769,6 +1773,7 @@ function closeJourneyMapPreview(savePoint){
   toast('Punto sulla mappa confermato. Ora scegli un contatto e invia la richiesta.');
  }
  journeyMapCandidate=null;
+ journeyPreviewPositionLocked=false;
  stableMap?.schedule();
  showView('modes');
  $('zyroJourneyOptions').open=true;
@@ -1779,7 +1784,7 @@ async function v15JourneyStart(){
  const destination=$('journeyDestination').value.trim(),recipients=[...journeySelected];if(!recipients.length)throw Error('Scegli almeno un contatto.');
  const auto=$('journeyAuto').checked;
  if(!journeyTarget)throw Error('Prima cerca un indirizzo, poi premi Guarda sulla mappa e Imposta.');
- const result=await post('/api/journey/start',{destination,minutes:Number($('journeyMinutes').value),recipients,destinationPoint:journeyTarget||null,autoArrival:auto});
+ const result=await post('/api/journey/start',{destination,recipients,destinationPoint:journeyTarget||null,autoArrival:auto});
  await refresh();
  if(result.ok&&current?.me?.journey&&['active','late'].includes(current.me.journey.status)){
   $('journeyActive').scrollIntoView({block:'start',behavior:'smooth'});
@@ -2424,8 +2429,8 @@ async function init(){
    $('journeyViewMap').disabled=!journeyAddressChoice;
    $('journeyAddressResults').querySelectorAll('[data-journey-address-index]').forEach(button=>button.setAttribute('aria-pressed',String(button===item)));
   });
-  $('journeyViewMap').addEventListener('click',()=>{if(journeyAddressChoice)openJourneyMapPreview(journeyAddressChoice);});
-  $('journeySetTarget').addEventListener('click',()=>openJourneyMapPreview(journeyTarget||lastCoords||DEFAULT_CENTER));
+  $('journeyViewMap').addEventListener('click',()=>{if(journeyAddressChoice)openJourneyMapPreview(journeyAddressChoice,true);});
+  $('journeySetTarget').addEventListener('click',()=>openJourneyMapPreview(journeyTarget||lastCoords||DEFAULT_CENTER,false));
   $('journeyPreviewCancel').addEventListener('click',()=>closeJourneyMapPreview(false));
   $('journeyPreviewSet').addEventListener('click',()=>action(()=>closeJourneyMapPreview(true)));
   $('journeyContactsStatus').addEventListener('click',e=>{
