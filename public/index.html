@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="/zyro-sos-home-v33.css?v=33.0">
   <link rel="stylesheet" href="/zyro-sos-card-v34.css?v=34.0">
   <link rel="stylesheet" href="/zyro-chat-groups-invitees-v1.css?v=2">
-  <link rel="stylesheet" href="/zyro-journey-v71.css?v=2">
+  <link rel="stylesheet" href="/zyro-journey-v71.css?v=3">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
 .zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult,[data-zyro-permission="testpush"]{display:none!important}
@@ -488,6 +488,14 @@ html,body{overscroll-behavior-x:none}
           <div class="zyro-v15-destination"><label><input id="journeyAuto" type="checkbox"> Arrivo automatico (se imposti il centro della mappa come destinazione)</label><small>La meta GPS viene salvata solo dopo aver premuto Imposta. Il rilevamento automatico richiede GPS e app aperta.</small><button id="journeySetTarget" type="button" class="zyro-v15-secondary">Scegli manualmente sulla mappa</button><span id="journeyTargetInfo">Nessuna meta GPS impostata</span></div>
           <p class="zyro-v15-subhead">Chi può seguire il tuo percorso?</p><div id="journeyRecipients" class="zyro-v15-contacts"></div>
           <button id="journeyStart" type="button" class="zyro-v15-primary">Avvia Accompagnami</button>
+          <div id="journeyPendingActions" class="zyro-journey-pending-actions" aria-label="Comandi disponibili dopo l’avvio del percorso">
+            <p>Quando avvii il percorso, potrai concluderlo in qualsiasi momento:</p>
+            <div class="zyro-v15-actions">
+              <button type="button" class="zyro-v15-primary" disabled aria-label="Sono arrivato a destinazione, disponibile quando il percorso è attivo">✓ Sono arrivato a destinazione</button>
+              <button type="button" class="zyro-v15-secondary" disabled aria-label="Annulla percorso, disponibile quando il percorso è attivo">Annulla percorso</button>
+            </div>
+            <small>I due comandi si attivano solo dopo «Avvia Accompagnami».</small>
+          </div>
         </div>
         </details>
         <div id="journeyContactsStatus" class="zyro-v15-feed"></div>
@@ -763,7 +771,7 @@ html,body{overscroll-behavior-x:none}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=72.0" defer></script>
+<script src="/app.js?v=73.0" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
 </html>

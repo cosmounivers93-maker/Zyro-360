@@ -121,3 +121,29 @@
 @media(max-height:640px) and (orientation:landscape){
  .zyro-journey-map-overlay:not(.hidden){padding-top:65px}
 }
+
+/* V73: make it clear that arrival/cancel controls exist, but never let
+   an inactive journey invoke the safety-critical trip-ending endpoint. */
+#journeyPanel .zyro-journey-pending-actions{
+  margin:14px 0 4px;padding:14px 12px;
+  border-radius:17px;border:1px solid rgba(117,165,218,.42);
+  background:linear-gradient(120deg,rgba(240,250,255,.86),rgba(244,236,255,.86));
+}
+#journeyPanel .zyro-journey-pending-actions p{
+  font-size:13px;line-height:1.45;color:#345f7e;margin:0 0 10px;
+}
+#journeyPanel .zyro-journey-pending-actions .zyro-v15-actions{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;
+}
+#journeyPanel .zyro-journey-pending-actions button{
+  min-width:0;min-height:45px;padding:9px;
+  border-radius:13px;font-size:12px;line-height:1.35;font-weight:750;
+  white-space:normal;opacity:.62;filter:saturate(.55);cursor:not-allowed;
+  pointer-events:none;
+}
+#journeyPanel .zyro-journey-pending-actions small{
+  display:block;font-size:12px;color:#5b758c;line-height:1.4;margin-top:10px;
+}
+@media(max-width:380px){
+ #journeyPanel .zyro-journey-pending-actions .zyro-v15-actions{grid-template-columns:1fr}
+}

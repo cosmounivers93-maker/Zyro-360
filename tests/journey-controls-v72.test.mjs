@@ -93,3 +93,20 @@ test('Map preview displays purple centered destination, compact controls away fr
  assert.match(html,/id="journeyPreviewCancel"/);
  assert.match(html,/id="journeyPreviewSet"/);
 });
+
+test('Preparation shows both journey-ending commands but disables them until a trip is active',()=>{
+ const prepStart=html.indexOf('id="journeyInactive"');
+ const prepEnd=html.indexOf('id="journeyContactsStatus"',prepStart);
+ const part=html.slice(prepStart,prepEnd);
+ assert.ok(part.includes('id="journeyPendingActions"'));
+ const pending=part.slice(part.indexOf('id="journeyPendingActions"'));
+ assert.match(pending,/<button[^>]*disabled[^>]*>✓ Sono arrivato a destinazione<\/button>/);
+ assert.match(pending,/<button[^>]*disabled[^>]*>Annulla percorso<\/button>/);
+ assert.match(pending,/I due comandi si attivano solo dopo/);
+ // The enabled, wired buttons have unique IDs and remain outside the inactive form.
+ assert.equal((html.match(/id="journeyArrived"/g)||[]).length,1);
+ assert.equal((html.match(/id="journeyCancel"/g)||[]).length,1);
+ const active=html.slice(html.indexOf('id="journeyActive"'),html.indexOf('id="zyroJourneyOptions"'));
+ assert.match(active,/<button id="journeyArrived"[^>]*>✓ Sono arrivato a destinazione<\/button>/);
+ assert.match(active,/<button id="journeyCancel"[^>]*>Annulla percorso<\/button>/);
+});
