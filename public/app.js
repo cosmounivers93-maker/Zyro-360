@@ -175,6 +175,58 @@ async function api(route, options={}) {
   return body;
 }
 const post = (path,data={})=>api(path,{method:'POST',body:JSON.stringify(data)});
+
+/* Android WebView: an FCM token must be linked to the authenticated session
+ * before server-side requests can reach this phone. Permission is requested
+ * only by the explicit Android button, never automatically. */
+let zyroFcmRegisteredKey='';
+let zyroFcmRegistering=false;
+let zyroFcmLastAttemptKey='';
+let zyroFcmLastAttemptAt=0;
+function showAndroidFcmStatus(value){
+ window.ZyroFCMStatus={...value};
+ if(document.getElementById('zyroNotifState'))void refreshPermissionStates();
+}
+async function registerAndroidPush(force=false){
+ const userId=current?.me?.id, native=window.ZyroAndroidPush;
+ if(!userId||native?.platform!=='android')return;
+ if(window.ZyroAndroidNotificationEnabled!==true){
+  if(window.ZyroAndroidNotificationEnabled===false)
+    showAndroidFcmStatus({connected:false,registering:false,error:'Abilita le notifiche nelle impostazioni Android.'});
+  return;
+ }
+ const token=native.token;
+ if(typeof token!=='string'||token.length<60)return;
+ const key=userId+':'+token;
+ if(zyroFcmRegistering||(!force&&zyroFcmRegisteredKey===key))return;
+ if(!force&&zyroFcmLastAttemptKey===key&&Date.now()-zyroFcmLastAttemptAt<15000)return;
+ zyroFcmRegistering=true;
+ zyroFcmLastAttemptKey=key;
+ zyroFcmLastAttemptAt=Date.now();
+ showAndroidFcmStatus({connected:false,registering:true});
+ try{
+  const registered=await post('/api/push/android/register',{token});
+  if(!current?.me||current.me.id!==userId||window.ZyroAndroidPush?.token!==token)return;
+  if(registered?.linkedToCurrentSession!==true)throw Error('Registrazione del dispositivo non confermata.');
+  zyroFcmRegisteredKey=key;
+  showAndroidFcmStatus({connected:true,registering:false});
+ }catch(err){
+  if(current?.me?.id===userId)showAndroidFcmStatus({
+   connected:false,registering:false,error:err?.message||'Registrazione notifiche non riuscita.'
+  });
+ }finally{
+  zyroFcmRegistering=false;
+ }
+}
+window.addEventListener('zyro:android-push-token',()=>void registerAndroidPush());
+window.addEventListener('zyro:android-notification-permission',()=>void registerAndroidPush());
+window.addEventListener('zyro:android-ready',()=>void registerAndroidPush());
+window.addEventListener('zyro:android-resume',()=>void registerAndroidPush());
+window.addEventListener('zyro:force-fcm-register',()=>{
+ zyroFcmRegisteredKey='';
+ void registerAndroidPush(true);
+});
+
 async function action(fn){try{await fn();}catch(e){toast(e.message,true);}}
 function connectSocket(){
   if(!current || socket?.readyState===WebSocket.OPEN || socket?.readyState===WebSocket.CONNECTING) return;
@@ -209,6 +261,7 @@ function setState(data){
   const prev = current;
   syncConsumedInviteCodes(prev,data);
   current=data;
+  void registerAndroidPush();
   if(data.billingReady&&window.ZyroBillingSupported&&prev?.me?.id!==data.me.id)void zyroNativeRequest('billing-sync').catch(()=>{});
   void syncDeviceInfo();
   // Revoking explicit opt-in stops ongoing live audio locally as well.
