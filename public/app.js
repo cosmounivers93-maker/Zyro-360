@@ -1688,7 +1688,7 @@ function renderV15(){if(!current)return;
   return `<article class="zyro-journey-request"><strong>🚶 ${escapeHtml(x.name)}: ${escapeHtml(x.destination)}</strong>
    <p>${pending?'Ti chiede di seguire il suo percorso. Accetta o rifiuta prima di vedere la posizione.':x.status==='late'?'Orario previsto superato':x.status==='arrived'?'Arrivo confermato':x.status==='cancelled'?'Percorso terminato':'Arrivo previsto '+v15Time(x.dueAt)}</p>
    ${pending?`<div class="zyro-journey-request-actions"><button type="button" data-journey-answer="yes" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Accetta</button><button type="button" data-journey-answer="no" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Rifiuta</button></div>`:''}
-   ${accepted?`<p>Accompagnamento accettato${distance!==null?' · Distanza in linea d’aria: '+(distance>=1000?(distance/1000).toFixed(1)+' km':distance+' m'):''}.</p>`:''}
+   ${accepted?`<p>Accompagnamento accettato${distance!==null?' · Distanza in linea d’aria: '+(distance>=1000?(distance/1000).toFixed(1)+' km':distance+' m'):''}.</p><div class="zyro-journey-request-actions"><button type="button" data-journey-answer="no" data-journey-user="${escapeHtml(x.userId)}" data-journey-id="${escapeHtml(x.id)}">Smetti di seguire</button></div>`:''}
    ${route?`<div class="zyro-journey-request-actions"><button type="button" data-journey-map="${escapeHtml(x.userId)}">Guarda sulla mappa</button><a href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(x.destinationPoint.lat+','+x.destinationPoint.lon)}" target="_blank" rel="noopener noreferrer">Apri navigazione stradale</a></div>`:''}
   </article>`;
  }).join(''));
@@ -1705,13 +1705,24 @@ async function answerJourney(button){
  await post('/api/journey/respond',{userId:button.dataset.journeyUser,
   journeyId:button.dataset.journeyId,accept:yes});
  await refresh();
- toast(yes?'Richiesta accettata. Puoi seguire la posizione e vedere la mappa.':'Richiesta rifiutata. Nessun percorso condiviso.');
+ toast(yes?'Richiesta accettata. Puoi seguire la posizione e vedere la mappa.':'Accompagnamento non condiviso. Nessuna posizione del percorso visibile.');
 }
 async function searchJourneyAddress(){
  const street=$('journeyStreet').value.trim(),city=$('journeyCity').value.trim(),postal=$('journeyPostal').value.trim();
  if(street.length<4||city.length<2)throw Error('Inserisci via, numero civico e città prima della ricerca.');
- const result=await post('/api/journey/geocode',{street,city,postal});
- journeyAddressResults=Array.isArray(result.items)?result.items:[];
+ let result=null;
+ // Android's on-device geocoder is available from the trusted, origin-bound
+ // bridge. It avoids requiring a separate hosted geocoding subscription.
+ if(typeof hasZyroNativeBridge==='function' && hasZyroNativeBridge() &&
+    typeof zyroNativeRequest==='function'){
+  try {
+   const native=await zyroNativeRequest('journey-geocode',{street,city,postcode:postal});
+   if(native?.ok && Array.isArray(native.results) && native.results.length)
+    result={items:native.results};
+  } catch {}
+ }
+ if(!result)result=await post('/api/journey/geocode',{street,city,postal});
+ journeyAddressResults=(Array.isArray(result.items)?result.items:[]).filter(p=>mapValidPoint(p)).slice(0,5);
  journeyAddressChoice=null;journeyTarget=null;
  $('journeyTargetInfo').textContent='Nessuna meta GPS impostata';
  $('journeyViewMap').disabled=true;
@@ -2395,7 +2406,7 @@ async function init(){
   $('journeyPreviewSet').addEventListener('click',()=>action(()=>closeJourneyMapPreview(true)));
   $('journeyContactsStatus').addEventListener('click',e=>{
    const reply=e.target.closest('[data-journey-answer]');
-   if(reply){reply.disabled=true;void action(()=>answerJourney(reply));return;}
+   if(reply){reply.disabled=true;void action(async()=>{try{await answerJourney(reply);}finally{reply.disabled=false;}});return;}
    const map=e.target.closest('[data-journey-map]');
    if(map){
     const j=(current?.journeys||[]).find(x=>x.userId===map.dataset.journeyMap&&x.response==='accepted');
