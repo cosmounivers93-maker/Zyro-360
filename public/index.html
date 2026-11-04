@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="/zyro-sos-home-v33.css?v=33.0">
   <link rel="stylesheet" href="/zyro-sos-card-v34.css?v=34.0">
   <link rel="stylesheet" href="/zyro-chat-groups-invitees-v1.css?v=2">
-  <link rel="stylesheet" href="/zyro-journey-v71.css?v=1">
+  <link rel="stylesheet" href="/zyro-journey-v71.css?v=2">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
 .zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult,[data-zyro-permission="testpush"]{display:none!important}
@@ -345,6 +345,10 @@ html,body{overscroll-behavior-x:none}
       <section class="geo-panel geo-immersive" aria-label="Mappa reale della tua posizione">
         <div id="liveMap" class="live-map" aria-label="Mappa interattiva. Trascina per spostarti, usa due dita per ingrandire.">
           <div id="zyroVectorMap" class="zyro-vector-map" aria-label="Cartografia mondiale interattiva di ZYRO 360"></div>
+          <div id="journeyPreviewPin" class="zyro-journey-preview-pin hidden" role="img" aria-label="Puntino viola: destinazione che stai confermando">
+            <span class="zyro-journey-preview-pin-center" aria-hidden="true"></span>
+            <span class="zyro-journey-preview-pin-label" aria-hidden="true">Destinazione</span>
+          </div>
           <div id="mapZoomControls" class="map-zoom-controls" aria-label="Controlli mappa"><button type="button" id="mapZoomIn" title="Ingrandisci la mappa" aria-label="Ingrandisci">+</button><button type="button" id="mapZoomOut" title="Riduci la mappa" aria-label="Riduci">−</button></div>
           <div class="zyro-atlas-legend" aria-label="Legenda GPS, cerchia e SOS"><span><i class="atlas-key-you"></i> Tu</span><span><i class="atlas-key-circle"></i> Cerchia</span><span><i class="atlas-key-sos"></i> SOS</span></div>
           <div id="mapStatus" class="map-status" role="status" aria-live="polite">Mappa pronta. Attiva la posizione per vedere il tuo punto.</div>
@@ -454,6 +458,15 @@ html,body{overscroll-behavior-x:none}
       <header class="zyro-modes-group-title"><span aria-hidden="true">02</span><div><h2>Percorsi e conferme</h2><p>Scegli come farti accompagnare e restare in contatto.</p></div></header>
       <section class="zyro-v15-panel" id="journeyPanel">
         <div class="zyro-v15-heading zyro-heading-v55"><span class="zyro-v15-symbol">↗</span><div class="zyro-heading-copy"><p class="eyebrow muted">VIAGGIA CON PIÙ TRANQUILLITÀ</p><h2>Accompagnami</h2></div><p class="zyro-heading-description">Condividi il percorso con i contatti scelti e indica quando pensi di arrivare.</p></div>
+        <div id="journeyActive" class="hidden zyro-v15-active zyro-journey-active-card" aria-live="polite">
+          <strong id="journeyStatus">Percorso in corso</strong>
+          <p id="journeyDetail"></p>
+          <div class="zyro-v15-actions">
+            <button id="journeyArrived" type="button" class="zyro-v15-primary">✓ Sono arrivato a destinazione</button>
+            <button id="journeyCancel" type="button" class="zyro-v15-secondary">Annulla percorso</button>
+          </div>
+          <small>Per iniziare un nuovo accompagnamento, termina prima il percorso attuale.</small>
+        </div>
         <details id="zyroJourneyOptions" class="zyro-mode-details">
           <summary><span class="zyro-mode-summary-label">Prepara il percorso<small>Destinazione, orario previsto e contatti</small></span><span class="zyro-mode-chevron" aria-hidden="true">⌄</span></summary>
         <div id="journeyInactive">
@@ -477,7 +490,6 @@ html,body{overscroll-behavior-x:none}
           <button id="journeyStart" type="button" class="zyro-v15-primary">Avvia Accompagnami</button>
         </div>
         </details>
-        <div id="journeyActive" class="hidden zyro-v15-active"><strong id="journeyStatus">Percorso in corso</strong><p id="journeyDetail"></p><div class="zyro-v15-actions"><button id="journeyArrived" type="button" class="zyro-v15-primary">✓ Sono arrivato/a</button><button id="journeyCancel" type="button" class="zyro-v15-secondary">Interrompi percorso</button></div></div>
         <div id="journeyContactsStatus" class="zyro-v15-feed"></div>
       </section>
       <section class="zyro-v15-panel" id="checkinPanel">
@@ -742,7 +754,7 @@ html,body{overscroll-behavior-x:none}
 <div id="journeyMapOverlay" class="zyro-journey-map-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="journeyMapTitle" aria-hidden="true">
   <div class="zyro-journey-map-overlay-card">
     <h3 id="journeyMapTitle">Verifica la destinazione sulla mappa</h3>
-    <p>Sposta la mappa sul punto esatto, poi premi Imposta. Non partirà alcuna condivisione prima dell'invio e dell'accettazione della richiesta.</p>
+    <p>Il puntino viola indica la meta. Sposta la mappa sul punto corretto e premi Imposta.</p>
     <div class="zyro-journey-map-overlay-actions">
       <button id="journeyPreviewCancel" type="button">Annulla</button>
       <button id="journeyPreviewSet" type="button">Imposta</button>
@@ -751,7 +763,7 @@ html,body{overscroll-behavior-x:none}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=71.0" defer></script>
+<script src="/app.js?v=72.0" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
 </html>
