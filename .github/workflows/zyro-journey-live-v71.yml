@@ -28,8 +28,9 @@ jobs:
                grep -q 'id="journeyPreviewSet"' /tmp/zyro-live-index.html &&
                grep -q 'data-journey-answer' /tmp/zyro-live-app.js &&
                grep -q 'title:enabled.*Autorizza tutte le funzioni' /tmp/zyro-live-app.js &&
-               grep -q "filter(c=>c.kind==='chat')" /tmp/zyro-live-app.js; then
-              echo 'SUCCESS: Accompagnami v71, consenso contatti e chat private sono online.'
+               grep -q "filter(c=>c.kind==='chat')" /tmp/zyro-live-app.js &&
+               [ "$(curl --silent --show-error --location --max-time 28 --output /dev/null --write-out '%{http_code}' --request POST --header 'Content-Type: application/json' --data '{}' 'https://zyro-360.onrender.com/api/journey/respond')" = "401" ]; then
+              echo 'SUCCESS: Accompagnami v71 e endpoint autenticato /api/journey/respond online.'
               exit 0
             fi
             echo "La versione v71 non risulta ancora online; verifica $attempt/18"
