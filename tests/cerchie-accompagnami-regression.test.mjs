@@ -13,7 +13,7 @@ function route(path,next,context){
   const handlers={};
   vm.runInNewContext(server.slice(begin,end),{
     app:{post:(path,...args)=>handlers[path]=args.at(-1)},
-    requireAuth:()=>{},limit:()=>{},...context
+    requireAuth:()=>{},limit:()=>{},MAX_USER_CIRCLES:12,...context
   });
   assert.equal(typeof handlers[path],'function');
   return handlers[path];
