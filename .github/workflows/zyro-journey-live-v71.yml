@@ -1,0 +1,39 @@
+name: ZYRO 360 - Verifica live Accompagnami e chat private v71
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/app.js'
+      - 'public/index.html'
+      - 'server.mjs'
+      - '.github/workflows/zyro-journey-live-v71.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-live-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Controlla UI online realmente aggiornata
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 18); do
+            if curl --fail --silent --show-error --location --max-time 28 'https://zyro-360.onrender.com/' -o /tmp/zyro-live-index.html &&
+               curl --fail --silent --show-error --location --max-time 28 'https://zyro-360.onrender.com/app.js?v=71.0' -o /tmp/zyro-live-app.js &&
+               grep -q 'id="journeyViewMap"' /tmp/zyro-live-index.html &&
+               grep -q 'id="journeyPreviewSet"' /tmp/zyro-live-index.html &&
+               grep -q 'data-journey-answer' /tmp/zyro-live-app.js &&
+               grep -q 'title:enabled.*Autorizza tutte le funzioni' /tmp/zyro-live-app.js &&
+               grep -q "filter(c=>c.kind==='chat')" /tmp/zyro-live-app.js; then
+              echo 'SUCCESS: Accompagnami v71, consenso contatti e chat private sono online.'
+              exit 0
+            fi
+            echo "La versione v71 non risulta ancora online; verifica $attempt/18"
+            sleep 8
+          done
+          echo "::error::Le correzioni v71 non sono pubblicate sul sito Zyro 360."
+          exit 1
