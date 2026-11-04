@@ -45,6 +45,8 @@ let listeningTo = null;
 let geolocationError = '';
 let lastAlertKey = '';
 const inviteCodes = new Map();
+const dismissedJourneyPrompts = new Set();
+let journeyInvitePrompt = null;
 let chatRoom=null, chatPhotoData=null;
 let sosPending=null;
 const journeySelected=new Set(),checkinSelected=new Set();
@@ -205,6 +207,7 @@ function connection(up){$('connectionText').textContent=up?'Collegato':'Non coll
 function setState(data){
   if(!data?.me)return;
   const prev = current;
+  syncConsumedInviteCodes(prev,data);
   current=data;
   if(data.billingReady&&window.ZyroBillingSupported&&prev?.me?.id!==data.me.id)void zyroNativeRequest('billing-sync').catch(()=>{});
   void syncDeviceInfo();
@@ -231,6 +234,7 @@ function setState(data){
   const key = data.alerts.filter(a=>a.userId!==data.me.id).map(a=>a.id).sort().join(',');
   if(prev && key && key !== lastAlertKey) toast('🆘 Nuovo SOS nella tua cerchia.',true);
   lastAlertKey=key;
+  renderJourneyInvitePrompt();
 }
 // Admin UI is only an interface. Every admin endpoint separately verifies the owner's server-side user ID.
 function renderAdminAccess(){
@@ -467,13 +471,25 @@ function inviteCodeFromButton(button){
  if(!code||!/^[A-Fa-f0-9]{18}$/.test(code))throw Error('Genera un nuovo codice prima di condividerlo.');
  return code;
 }
+function syncConsumedInviteCodes(previous,next){
+  if(!previous?.me || previous.me.id!==next.me?.id)return;
+  for(const circle of next.circles||[]){
+    const before=(previous.circles||[]).find(x=>x.id===circle.id);
+    if(!before || circle.members.length<=before.members.length)continue;
+    inviteCodes.delete(circle.id);
+    if(chatRoom?.type==='circle' && chatRoom.id===circle.id && $('chatGroupInviteResult')){
+      $('chatGroupInviteResult').hidden=true;
+      $('chatGroupInviteCode').textContent='';
+    }
+  }
+}
 function renderCircles(){
   if(!current)return;
   const list=$('circlesList');
   const sig=JSON.stringify([current.me.id,current.me.name,(current.circles||[]).map(c=>[c.id,c.name,c.mine,(c.members||[]).map(m=>[m.id,m.name])]),[...inviteCodes.entries()]]);
   if(list._zyroSig===sig&&list.children.length)return;
   list._zyroSig=sig;
-  list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions">${c.kind==='chat'?'<button type="button" data-chatcircle="'+escapeHtml(c.id)+'">💬 Apri gruppo</button>':''}${c.kind==='chat'?'':'<button type="button" data-invite="'+escapeHtml(c.id)+'">✚ Genera codice invito</button>'}${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
+  list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions"><button type="button" data-chatcircle="${escapeHtml(c.id)}">💬 Chat della cerchia</button>${c.kind==='chat'?'':'<button type="button" data-invite="'+escapeHtml(c.id)+'">✚ Genera codice invito</button>'}${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
   list.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
     const r=await post('/api/invites',{circleId:b.dataset.invite});
     const target=b.closest('.circle-card').querySelector('.invite-target');
@@ -554,7 +570,7 @@ async function makeChatGroupInvite(){
  if(!group||group.kind!=='chat'||!group.mine)throw Error('Solo chi ha creato il gruppo può invitare.');
  const response=await post('/api/chat/groups/invite',{groupId:group.id});
  showChatGroupInviteCode(response.code);
- toast('Codice gruppo creato: può essere usato da più persone per 24 ore.');
+ toast('Codice gruppo monouso creato. Per invitare altre persone genera altri codici.');
 }
 let chatCategory='all';
 let chatSearch='';
@@ -563,8 +579,8 @@ const roomGroupIcon=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
 const roomChatIcon=`<svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg>`;
 function renderChatRooms(){
   if(!current)return;
-  // Only groups explicitly created from 'Crea gruppo' appear as group conversations.
-  const circles=(current.circles||[]).filter(c=>c.kind==='chat'), contacts=uniqueContacts();
+  // Every private circle has a shared conversation, including ordinary family circles.
+  const circles=current.circles||[], contacts=uniqueContacts();
   const list=$('chatRooms');
   const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.kind,c.mine,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
   if(list._zyroSig===sig&&list.children.length)return;
@@ -1777,7 +1793,7 @@ function renderV15(){if(!current)return;
  if(onJ)journeyOptions.open=false;
  $('journeyInactive').classList.toggle('hidden',onJ);
  $('journeyActive').classList.toggle('hidden',!onJ);
- if(onJ){$('journeyStatus').textContent=j.status==='late'?(j.autoSosTriggeredAt?'Orario scaduto · SOS creato':'Orario scaduto · SOS non attivato'):'Percorso attivo';$('journeyDetail').textContent=`Meta: ${j.destination}${j.dueAt?' · Arrivo previsto: '+new Date(j.dueAt).toLocaleString('it-IT',{dateStyle:'short',timeStyle:'short'}):''}${j.autoSosTriggeredAt?' · SOS creato per mancato arrivo'+(j.autoSosPushAccepted>0?' · Notifica accettata dal servizio, recapito non confermato':' · Notifica non confermata'):''}`;}
+ if(onJ){$('journeyStatus').textContent=j.status==='late'?(j.autoSosTriggeredAt?'Orario scaduto · SOS creato':'Orario scaduto · SOS non attivato'):'Percorso attivo';const rs=j.responseCounts||{};const receipt=j.requestPushStatus==='provider-accepted'?' · Push accettata dal servizio (ricezione non verificata)':j.requestPushStatus==='not-accepted'||j.requestPushStatus==='failed'?' · Attenzione: push non accettata, contatta la persona':j.requestPushStatus==='pending'?' · Invio notifica in corso':'';$('journeyDetail').textContent=`Meta: ${j.destination}${j.dueAt?' · Arrivo previsto: '+new Date(j.dueAt).toLocaleString('it-IT',{dateStyle:'short',timeStyle:'short'}):''} · ${rs.accepted||0} accettati, ${rs.pending||0} in attesa, ${rs.declined||0} rifiutati${receipt}${j.autoSosTriggeredAt?' · SOS creato per mancato arrivo'+(j.autoSosPushAccepted>0?' · Notifica accettata dal servizio, recapito non confermato':' · Notifica non confermata'):''}`;}
  const c=me.checkin,onC=c&&['pending','late'].includes(c.status);
  $('checkinInactive').classList.toggle('hidden',!!onC);$('checkinActive').classList.toggle('hidden',!onC);
  if(onC){$('checkinStatus').textContent=c.status==='late'?'Orario scaduto: conferma appena puoi':'Check-in programmato';$('checkinDetail').textContent=`Conferma prevista entro ${v15Time(c.dueAt)}.`;}
@@ -1802,6 +1818,54 @@ function zyroJourneyMeters(a,b){
  const r=Math.PI/180,dlat=(b.lat-a.lat)*r,dlon=(b.lon-a.lon)*r;
  const q=Math.sin(dlat/2)**2+Math.cos(a.lat*r)*Math.cos(b.lat*r)*Math.sin(dlon/2)**2;
  return 12742000*Math.atan2(Math.sqrt(q),Math.sqrt(1-q));
+}
+function renderJourneyInvitePrompt(){
+  if(!current?.me)return;
+  const incoming=(current.journeys||[])
+    .filter(j=>j.userId!==current.me.id && j.response==='pending' &&
+      ['active','late'].includes(j.status) && !dismissedJourneyPrompts.has(j.id))
+    .sort((a,b)=>b.startedAt-a.startedAt)[0];
+  if(!incoming){if(journeyInvitePrompt)journeyInvitePrompt.hidden=true;return;}
+  if(!journeyInvitePrompt){
+    journeyInvitePrompt=document.createElement('section');
+    journeyInvitePrompt.id='zyroJourneyInvitePrompt';
+    journeyInvitePrompt.className='zyro-journey-incoming';
+    journeyInvitePrompt.setAttribute('role','region');
+    journeyInvitePrompt.setAttribute('aria-label','Nuova richiesta Accompagnami');
+    journeyInvitePrompt.setAttribute('aria-live','polite');
+    journeyInvitePrompt.addEventListener('click',event=>{
+      const button=event.target.closest('[data-incoming-choice]');
+      if(!button)return;
+      const id=journeyInvitePrompt.dataset.journeyId;
+      const j=(current?.journeys||[]).find(x=>x.id===id && x.response==='pending');
+      if(!j)return;
+      if(button.dataset.incomingChoice==='later'){
+        dismissedJourneyPrompts.add(id);
+        journeyInvitePrompt.hidden=true;
+        toast('Richiesta disponibile in Modalità → Accompagnami.');
+        return;
+      }
+      void action(async()=>{
+        await answerJourney({dataset:{
+          journeyAnswer:button.dataset.incomingChoice==='accept'?'yes':'no',
+          journeyUser:j.userId,journeyId:j.id
+        }});
+        if(button.dataset.incomingChoice==='accept')showView('modes');
+      });
+    });
+    document.body.append(journeyInvitePrompt);
+  }
+  if(journeyInvitePrompt.dataset.journeyId===incoming.id && !journeyInvitePrompt.hidden)return;
+  journeyInvitePrompt.dataset.journeyId=incoming.id;
+  journeyInvitePrompt.innerHTML=`<div class="zyro-journey-incoming-header"><span aria-hidden="true">🚶</span><strong>Richiesta Accompagnami</strong></div>
+   <p><b>${escapeHtml(incoming.name)}</b> ti chiede di seguirlo verso <b>${escapeHtml(incoming.destination)}</b>.</p>
+   <small>La posizione del percorso sarà disponibile solo dopo che avrai accettato.</small>
+   <div class="zyro-journey-incoming-actions">
+    <button type="button" data-incoming-choice="accept">Accetta</button>
+    <button type="button" data-incoming-choice="decline">Rifiuta</button>
+    <button type="button" data-incoming-choice="later">Più tardi</button>
+   </div>`;
+  journeyInvitePrompt.hidden=false;
 }
 async function answerJourney(button){
  const yes=button.dataset.journeyAnswer==='yes';
@@ -1909,7 +1973,7 @@ async function v15JourneyStart(){
  if(result.ok&&current?.me?.journey&&['active','late'].includes(current.me.journey.status)){
   $('journeyActive').scrollIntoView({block:'start',behavior:'smooth'});
  }
- toast(result.ok?'Richiesta Accompagnami inviata. Puoi confermare l’arrivo o annullare il percorso in qualsiasi momento.':'Richiesta non inviata.');
+ toast(result.ok?'Richiesta Accompagnami creata. Attendi Accetta o Rifiuta del contatto e verifica che riceva la notifica.':'Richiesta non inviata.');
 }
 async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato a destinazione?':'Vuoi annullare il percorso? I contatti che lo seguono saranno avvisati.'))return;await post('/api/journey/end',{arrived});journeyTarget=null;journeyAddressChoice=null;journeyAddressResults=[];$('journeyAddressResults').hidden=true;$('journeyAddressResults').replaceChildren();$('journeyViewMap').disabled=true;['journeyStreet','journeyCity','journeyPostal'].forEach(id=>$(id).value='');$('journeyDueAt').value='';$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
 async function v15CheckinStart(){requireFamilyPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
@@ -2527,7 +2591,7 @@ async function init(){
   $('pickTest').addEventListener('click',()=>action(previewSiren));
   $('theftStop').addEventListener('click',()=>action(stopTheft));
   $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/circles',{name:$('circleName').value});$('circleName').value='';await refresh();toast('Cerchia creata! Ora puoi generare un invito.');});});
-  $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/invites/join',{code:$('inviteInput').value});$('inviteInput').value='';await refresh();inviteFromLink=null;toast('Ora fai parte della cerchia!');});});
+  $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const result=await post('/api/invites/join',{code:$('inviteInput').value});$('inviteInput').value='';await refresh();inviteFromLink=null;if(result.circleId)openChat('circle',result.circleId);toast('Sei entrato nella cerchia! La chat con i membri è disponibile.');});});
   $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();if(isZyroNativeAvailable()){try{await nativeBackgroundSync();}catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}}toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
   $('journeyRecipients').addEventListener('change',e=>{if(e.target.matches('[data-journey-to]')){e.target.checked?journeySelected.add(e.target.dataset.journeyTo):journeySelected.delete(e.target.dataset.journeyTo);}});
   $('checkinRecipients').addEventListener('change',e=>{if(e.target.matches('[data-checkin-to]')){e.target.checked?checkinSelected.add(e.target.dataset.checkinTo):checkinSelected.delete(e.target.dataset.checkinTo);}});
