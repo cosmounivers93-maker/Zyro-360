@@ -110,21 +110,25 @@ test('Preparation shows both journey-ending commands but disables them until a t
  assert.match(active,/<button id="journeyCancel"[^>]*>Annulla percorso<\/button>/);
 });
 
-test('Accompagnami never asks for Tempo previsto or sends a deadline',()=>{
+test('Accompagnami offers an expected arrival date and server-backed SOS deadline',()=>{
  const server=fs.readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
- assert.doesNotMatch(html,/id="journeyMinutes"/);
- assert.doesNotMatch(html,/>Tempo previsto</);
- assert.match(html,/Destinazione e contatti fidati/);
- const journeyStart=app.slice(app.indexOf('async function v15JourneyStart('),app.indexOf('async function v15JourneyEnd('));
- assert.doesNotMatch(journeyStart,/journeyMinutes/);
- const postStart=server.slice(server.indexOf("app.post('/api/journey/start'"),server.indexOf("app.post('/api/journey/respond'"));
- assert.doesNotMatch(postStart,/req\.body\.minutes|mins\*60000|dueAt:/);
- const scheduled=server.slice(server.indexOf('function overdueCheck(){'),server.indexOf("app.get('/api/premium/status'"));
- assert.doesNotMatch(scheduled,/Percorso in ritardo|j\.dueAt/);
- assert.match(scheduled,/c\.dueAt/); // Check-in reminders remain enabled.
+ assert.match(html,/id="journeyDueAt" type="datetime-local"/);
+ assert.doesNotMatch(html,/id="journeyAuto"/);
  assert.match(html,/id="journeyArrived"/);
  assert.match(html,/id="journeyCancel"/);
+ const journeyStart=app.slice(app.indexOf('async function v15JourneyStart('),app.indexOf('async function v15JourneyEnd('));
+ assert.match(journeyStart,/new Date\(etaInput.value\).getTime\(\)/);
+ assert.match(journeyStart,/post\('\/api\/journey\/start',\{destination,recipients,destinationPoint:journeyTarget,dueAt\}\)/);
+ const postStart=server.slice(server.indexOf("app.post('/api/journey/start'"),server.indexOf("app.post('/api/journey/respond'"));
+ assert.match(postStart,/req.body\?\.dueAt/);
+ assert.match(postStart,/dueAt,autoArrival:false/);
+ const scheduled=server.slice(server.indexOf('function overdueCheck(){'),server.indexOf("app.get('/api/premium/status'"));
+ assert.match(scheduled,/j\.dueAt<=t/);
+ assert.match(scheduled,/kind:'sos',source:'journey-deadline'/);
+ assert.match(scheduled,/j\.autoSosPushStatus='pending'/);
+ assert.match(scheduled,/c\.dueAt/);
 });
+
 test('Searched destination retains geographic coordinates while map can pan, manual selection remains adjustable',()=>{
  assert.match(app,/let journeyPreviewPositionLocked=false/);
  assert.doesNotMatch(app,/this\.onDown=e=>\{if\(journeyPreviewPositionLocked\)/);
