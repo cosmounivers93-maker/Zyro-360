@@ -28,7 +28,7 @@ test('Active journey hides preparation and restores it once the journey ends',()
  const nodes={};
  function node(id){
   if(!nodes[id]){
-   const selected=new Set(['journeyInactive','journeyActive'].filter(x=>x===id&&x==='journeyActive'?'hidden':false));
+   const selected=new Set(id==='journeyActive'?['hidden']:[]);
    nodes[id]={id,hidden:false,open:true,dataset:{},classList:{
     has:n=>selected.has(n),
     toggle:(n,on)=>on?selected.add(n):selected.delete(n),
