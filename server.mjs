@@ -131,7 +131,9 @@ const publicJourney = (j,viewer) => {
  const visible=owner||(response==='accepted'&&active);
  const gps=locations.get(j.userId);
  return {id:j.id,userId:j.userId,name:db.users[j.userId]?.name||'Contatto',
-  destination:j.destination,dueAt:null,startedAt:j.startedAt,status:j.status,
+  destination:j.destination,dueAt:Number.isFinite(j.dueAt)?j.dueAt:null,startedAt:j.startedAt,status:j.status,
+  autoSosTriggeredAt:j.autoSosTriggeredAt||null,
+  autoSosPushAccepted:owner?(j.autoSosPushAccepted??null):undefined,
   arrivedAt:j.arrivedAt||null,autoArrival:!!j.autoArrival,response,
   destinationPoint:visible?(j.destinationPoint||null):null,
   currentPoint:visible && active && db.users[j.userId]?.sharing && gps &&
@@ -850,11 +852,73 @@ async function sosAddressFor(pos){
 }
 function journeyAudience(userId, ids){const chosen=allowedRecipients(userId,ids);return chosen&&chosen.length===new Set(ids).size&&chosen.length?chosen:null;}
 // Trip / check-in events are server-backed but cannot run during Render Free spin-down.
+// The deadline is recorded in PostgreSQL and checked on the server.
+// A sleeping/free Render instance cannot guarantee punctual execution;
+// a truly dependable alert needs an always-on worker / managed job scheduler.
+const journeySosPushInFlight=new Set();
 function overdueCheck(){
  const t=now();let changed=false;
- // Accompagnami runs until explicitly ended by its owner; no automatic late alert.
- for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){c.status='late';c.lateAt=t;changed=true;void sendEventPush(c.recipients,'⌛ Check-in mancato',`${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);for(const x of c.recipients)pushState(x);}
+ for(const j of Object.values(db.journeys)){
+  if(j.status!=='active'||!Number.isFinite(j.dueAt)||j.dueAt>t)continue;
+  j.status='late';j.lateAt=t;changed=true;
+  const owner=db.users[j.userId];
+  const recipients=(j.recipients||[]).filter(id=>id!==j.userId && db.users[id] &&
+   !db.users[id].bannedAt && sharedCircle(j.userId,id) && journeyDecision(j,id)!=='declined');
+  // Never replace an existing manually armed SOS or Pick Pocket alarm.
+  const existing=currentAlert(j.userId);
+  if(owner&&!owner.bannedAt&&recipients.length&&!existing){
+   const alert={id:token(12),userId:j.userId,recipients,startedAt:t,active:true,
+    hasAudio:false,kind:'sos',source:'journey-deadline',journeyId:j.id,address:null};
+   db.alerts[alert.id]=alert;
+   j.autoSosAlertId=alert.id;
+   j.autoSosTriggeredAt=t;
+   j.autoSosPushStatus='pending';
+   j.autoSosPushAttempts=0;
+   j.autoSosNextRetryAt=t;
+  }else{
+   j.autoSosPushStatus=existing?'existing-alert':'no-authorized-recipient';
+  }
+  refreshRelated(j.userId);
+ }
+ for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){
+  c.status='late';c.lateAt=t;changed=true;
+  void sendEventPush(c.recipients,'⌛ Check-in mancato',
+   `${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);
+  for(const x of c.recipients)pushState(x);
+ }
+ const jobs=[];
+ for(const j of Object.values(db.journeys)){
+  if(j.status!=='late'||j.autoSosPushStatus!=='pending'||!j.autoSosAlertId ||
+     journeySosPushInFlight.has(j.id)|| (j.autoSosNextRetryAt||0)>t)continue;
+  const alert=db.alerts[j.autoSosAlertId];
+  if(!alert?.active || alert.source!=='journey-deadline' || alert.journeyId!==j.id){
+   j.autoSosPushStatus='stopped';changed=true;continue;
+  }
+  if((j.autoSosPushAttempts||0)>=3){j.autoSosPushStatus='not-accepted';changed=true;continue;}
+  const targets=alert.recipients.filter(id=>db.users[id]&&!db.users[id].bannedAt&&
+   sharedCircle(j.userId,id)&&journeyDecision(j,id)!=='declined');
+  if(!targets.length){j.autoSosPushStatus='no-authorized-recipient';changed=true;continue;}
+  j.autoSosPushAttempts=(j.autoSosPushAttempts||0)+1;
+  j.autoSosNextRetryAt=t+60000;
+  journeySosPushInFlight.add(j.id);changed=true;
+  jobs.push({j,targets,ownerName:db.users[j.userId]?.name||'Il tuo contatto'});
+ }
  if(changed)save();
+ for(const {j,targets,ownerName} of jobs){
+  void sendEventPush(targets,'🆘 SOS automatico • Accompagnami',
+   `${ownerName} non ha confermato l'arrivo a ${j.destination} entro l'orario previsto. Verifica subito che stia bene e apri Zyro 360.`,'sos')
+   .then(outcome=>{
+     j.autoSosPushAccepted=outcome.accepted;
+     j.autoSosPushAttempted=outcome.attempted;
+     if(outcome.accepted>0)j.autoSosPushStatus='provider-accepted';
+     else if(j.autoSosPushAttempts>=3)j.autoSosPushStatus='not-accepted';
+     save();refreshRelated(j.userId);
+   }).catch(err=>{
+     console.error('[ZYRO Accompagnami] Notifica SOS non accettata:',err?.message||'errore');
+     if(j.autoSosPushAttempts>=3)j.autoSosPushStatus='not-accepted';
+     save();refreshRelated(j.userId);
+   }).finally(()=>journeySosPushInFlight.delete(j.id));
+ }
 }
 app.get('/api/premium/status',requireAuth,(req,res)=>res.json({active:premiumActive(req.user),plan:premiumPlan(req.user),features:planFeatures(req.user),billingReady:billingReady(),expiresAt:premiumExpiry(req.user)}));
 app.get('/api/billing/bootstrap',requireAuth,(req,res)=>{
@@ -943,9 +1007,17 @@ app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  if(!recipients||!destination)return res.status(400).json({error:'Indica la destinazione e i destinatari della cerchia.'});
  if(!req.user.sharing)return res.status(409).json({error:'Attiva la condivisione della posizione prima di iniziare Accompagnami.'});
  if(['active','late'].includes(db.journeys[req.user.id]?.status))return res.status(409).json({error:'Termina prima il percorso esistente.'});
+ const dueAt=Number(req.body?.dueAt);
+ const minDeadline=now()+5*60000,maxDeadline=now()+24*3600000;
+ if(!Number.isSafeInteger(dueAt)||dueAt<minDeadline||dueAt>maxDeadline)
+  return res.status(400).json({error:'Scegli un orario previsto di arrivo tra 5 minuti e 24 ore da adesso.'});
+ if(storageKind!=='postgres'||(!fcmReady&&!configuredPush))
+  return res.status(503).json({error:'SOS automatico non disponibile: servono database persistente e notifiche server configurate.'});
+ if(currentAlert(req.user.id))
+  return res.status(409).json({error:'Termina prima un SOS o Pick Pocket attivo.'});
  const point=req.body.destinationPoint?validCoords(req.body.destinationPoint):null;
  if(req.body.destinationPoint && !point)return res.status(400).json({error:'Coordinate della destinazione non valide.'});
- const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,autoArrival:req.body.autoArrival===true,nearCount:0};
+ const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,dueAt,autoArrival:false,nearCount:0};
  db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
  void sendEventPush(recipients,'🚶 Richiesta Accompagnami',`${req.user.name} ti chiede di seguire il suo percorso verso ${destination}. Apri Zyro 360 per accettare o rifiutare.`);
  res.json({ok:true,journey:publicJourney(j,req.user.id)});
@@ -969,6 +1041,13 @@ app.post('/api/journey/respond',requireAuth,limit,(req,res)=>{
 app.post('/api/journey/end',requireAuth,(req,res)=>{
  const j=db.journeys[req.user.id];if(!j||!['active','late'].includes(j.status))return res.status(404).json({error:'Nessun percorso attivo.'});
  const arrived=req.body.arrived===true;j.status=arrived?'arrived':'cancelled';j.endedAt=now();if(arrived)j.arrivedAt=j.endedAt;
+ j.autoSosPushStatus=j.autoSosPushStatus==='pending'?'stopped':j.autoSosPushStatus;
+ // Stop only an SOS created by this particular journey; never stop a manual SOS.
+ const automatedAlert=j.autoSosAlertId&&db.alerts[j.autoSosAlertId];
+ if(automatedAlert?.active&&automatedAlert.source==='journey-deadline'&&automatedAlert.journeyId===j.id){
+  automatedAlert.active=false;automatedAlert.endedAt=now();
+  for(const id of alertAudience(automatedAlert))for(const ws of connections(id))sendSocket(ws,{type:'sos-ended',userId:req.user.id});
+ }
  save();refreshRelated(req.user.id);void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`);res.json({ok:true});
 });
 app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
@@ -1514,7 +1593,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
       console.error('[ZYRO billing] Acquisti non disponibili; servizio sicurezza attivo:',err.message);
     }
   }).then(()=>{
-    server.listen(PORT,'0.0.0.0',()=>console.log(`Zyro 360: http://localhost:${PORT} (${storageKind})`));
+    server.listen(PORT,'0.0.0.0',()=>{console.log(`Zyro 360: http://localhost:${PORT} (${storageKind})`);overdueCheck();});
   }).catch(err=>{
     console.error('[ZYRO storage] AVVIO BLOCCATO:',err.message);
     process.exitCode=1;
