@@ -1315,9 +1315,8 @@ class ZyroRasterMap{
   this.routeStart.setAttribute('r','8');this.routeEnd.setAttribute('r','9');
   this.routeLayer.append(this.routeLine,this.routeStart,this.routeEnd);
   this.el.replaceChildren(this.layer,this.routeLayer,this.pinLayer);
-  this.onDown=e=>{if(journeyPreviewPositionLocked){e.preventDefault();return;}if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(this.pointers.size===2)this.pinchStart=0;try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
+  this.onDown=e=>{if(e.pointerType==='mouse'&&e.button!==0)return;this.pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(this.pointers.size===2)this.pinchStart=0;try{this.el.setPointerCapture(e.pointerId);}catch{}e.preventDefault();};
   this.onMove=e=>{
-   if(journeyPreviewPositionLocked){e.preventDefault();return;}
    if(!this.pointers.has(e.pointerId))return;
    const prev=this.pointers.get(e.pointerId),next={x:e.clientX,y:e.clientY};this.pointers.set(e.pointerId,next);
    if(this.pointers.size===1){this.shift(next.x-prev.x,next.y-prev.y);}
@@ -1330,7 +1329,7 @@ class ZyroRasterMap{
    e.preventDefault();
   };
   this.onUp=e=>{this.pointers.delete(e.pointerId);if(this.pointers.size<2)this.pinchStart=0;};
-  this.onWheel=e=>{e.preventDefault();if(!journeyPreviewPositionLocked)this.zoomTo(this.zoom+(e.deltaY<0?1:-1));};
+  this.onWheel=e=>{e.preventDefault();this.zoomTo(this.zoom+(e.deltaY<0?1:-1));};
   this.el.addEventListener('pointerdown',this.onDown);
   this.el.addEventListener('pointermove',this.onMove);
   this.el.addEventListener('pointerup',this.onUp);this.el.addEventListener('pointercancel',this.onUp);
@@ -1418,6 +1417,7 @@ class ZyroRasterMap{
   }
   this.drawJourneyRoute(w,h,center);
   this.drawPins(w,h,center);
+  this.drawPreviewDestination(w,h,center);
  }
  drawJourneyRoute(w,h,center){
   const approved=(current?.journeys||[]).find(j=>j.userId!==current.me.id &&
@@ -1441,6 +1441,27 @@ class ZyroRasterMap{
   this.routeLine.setAttribute('x2',String(to.x));this.routeLine.setAttribute('y2',String(to.y));
   this.routeStart.setAttribute('cx',String(from.x));this.routeStart.setAttribute('cy',String(from.y));
   this.routeEnd.setAttribute('cx',String(to.x));this.routeEnd.setAttribute('cy',String(to.y));
+ }
+ drawPreviewDestination(w,h,center){
+  const pin=$('journeyPreviewPin');
+  if(!pin||pin.classList.contains('hidden')||!mapValidPoint(journeyMapCandidate))return;
+  let x=w/2,y=h/2;
+  // For an address returned by geocoding, the purple pin belongs to the
+  // destination's geographic coordinates, not the screen's center.
+  if(journeyPreviewPositionLocked){
+   const pos=toWorld(journeyMapCandidate.lat,journeyMapCandidate.lon,this.zoom);
+   const world=worldWidth(this.zoom);
+   let dx=pos.x-center.x;
+   if(dx>world/2)dx-=world;
+   if(dx< -world/2)dx+=world;
+   x+=dx;y+=pos.y-center.y;
+  }
+  // The viewport normally fills liveMap, but use measured offsets if a
+  // map layout ever adds padding or shifts the raster canvas.
+  const mapRect=this.el.getBoundingClientRect();
+  const parentRect=pin.parentElement.getBoundingClientRect();
+  pin.style.transform=`translate3d(${Math.round(x+mapRect.left-parentRect.left)}px,${Math.round(y+mapRect.top-parentRect.top)}px,0) translate(-50%,-50%)`;
+  pin.style.visibility=(x< -50||x>w+50||y< -50||y>h+50)?'hidden':'visible';
  }
  drawPins(w,h,center){
   if(!current)return;
@@ -1739,6 +1760,17 @@ async function searchJourneyAddress(){
   ?'<strong>Indirizzo trovato · scegli il risultato corretto</strong>'+journeyAddressResults.map((item,index)=>`<button type="button" data-journey-address-index="${index}" aria-pressed="${index===0}">${escapeHtml(item.label)}</button>`).join('')
   :'<p>Non è stato trovato nessun indirizzo. Verifica via, città e CAP.</p>';
 }
+function positionJourneyPreviewDialog(){
+ const panel=$('journeyMapOverlay');
+ if(!panel||panel.classList.contains('hidden'))return;
+ const sosActions=document.querySelector('#homeView .zyro-command-row');
+ if(!sosActions)return;
+ const top=sosActions.getBoundingClientRect().top;
+ if(!Number.isFinite(top)||top<=0)return;
+ // Keep this small confirmation directly ABOVE the GPS/SOS button row.
+ const bottom=Math.ceil(window.innerHeight-top+12);
+ panel.style.setProperty('--zyro-journey-panel-bottom',`${Math.max(110,bottom)}px`);
+}
 function openJourneyMapPreview(point,locked=true){
  if(!mapValidPoint(point)){toast('Scegli una destinazione valida prima di aprire la mappa.',true);return;}
  journeyMapCandidate={lat:Number(point.lat),lon:Number(point.lon)};
@@ -1746,13 +1778,15 @@ function openJourneyMapPreview(point,locked=true){
  $('journeyMapHint').textContent=locked?'Il puntino viola resta fisso sull’indirizzo trovato: premi Imposta per confermare.':'Selezione manuale: sposta la mappa e premi Imposta per scegliere il centro.';
  showView('home');
  const overlay=$('journeyMapOverlay');overlay.classList.remove('hidden');overlay.setAttribute('aria-hidden','false');
- // A searched destination remains fixed: no accidental map-drag can alter it.
- // Manual map selection retains deliberate pan-and-confirm interaction.
+ // A geocoded address is pinned to its real coordinates, even while the
+ // user drags the map. Manual destination selection follows the map center.
  $('journeyPreviewPin').classList.remove('hidden');
- // The center of the visible Home map is the proposed destination; users may drag it.
+ $('journeyPreviewPin').style.visibility='visible';
+ positionJourneyPreviewDialog();
  requestAnimationFrame(()=>{
   ensureStableMap();
   if(journeyMapCandidate&&stableMap)focusStableMap(journeyMapCandidate.lat,journeyMapCandidate.lon,16);
+  positionJourneyPreviewDialog();
  });
  $('journeyPreviewCancel').focus();
  stableMap?.schedule();
@@ -1774,6 +1808,8 @@ function closeJourneyMapPreview(savePoint){
  }
  journeyMapCandidate=null;
  journeyPreviewPositionLocked=false;
+ $('journeyPreviewPin').style.visibility='';
+ $('journeyPreviewPin').style.transform='';
  stableMap?.schedule();
  showView('modes');
  $('zyroJourneyOptions').open=true;
@@ -2431,6 +2467,7 @@ async function init(){
   });
   $('journeyViewMap').addEventListener('click',()=>{if(journeyAddressChoice)openJourneyMapPreview(journeyAddressChoice,true);});
   $('journeySetTarget').addEventListener('click',()=>openJourneyMapPreview(journeyTarget||lastCoords||DEFAULT_CENTER,false));
+  window.addEventListener('resize',positionJourneyPreviewDialog,{passive:true});
   $('journeyPreviewCancel').addEventListener('click',()=>closeJourneyMapPreview(false));
   $('journeyPreviewSet').addEventListener('click',()=>action(()=>closeJourneyMapPreview(true)));
   $('journeyContactsStatus').addEventListener('click',e=>{
