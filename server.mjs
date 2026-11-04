@@ -134,6 +134,8 @@ const publicJourney = (j,viewer) => {
   destination:j.destination,dueAt:Number.isFinite(j.dueAt)?j.dueAt:null,startedAt:j.startedAt,status:j.status,
   autoSosTriggeredAt:j.autoSosTriggeredAt||null,
   autoSosPushAccepted:owner?(j.autoSosPushAccepted??null):undefined,
+  requestPushStatus:owner?(j.requestPushStatus||null):undefined,
+  requestPushAccepted:owner?(j.requestPushAccepted??null):undefined,
   arrivedAt:j.arrivedAt||null,autoArrival:!!j.autoArrival,response,
   destinationPoint:visible?(j.destinationPoint||null):null,
   currentPoint:visible && active && db.users[j.userId]?.sharing && gps &&
@@ -561,7 +563,7 @@ app.post('/api/admin/report-resolve',requireAuth,requireAdmin,limit,(req,res)=>{
 
 // Dedicated multi-member chat groups are represented as private circles, so
 // existing group chat, notifications, and per-contact permissions keep working.
-// Group invite codes are distinct from one-time person/circle codes.
+// Every invitation code is one-time: ten contacts use ten different codes.
 app.post('/api/chat/groups', requireAuth, limit, (req,res) => {
   const name=cleanText(req.body?.name,48);
   if(name.length<2)return res.status(400).json({error:'Dai un nome al gruppo (almeno 2 caratteri).'});
@@ -581,7 +583,7 @@ app.post('/api/chat/groups/invite', requireAuth, limit, (req,res) => {
     if(inv.kind==='group'&&inv.circleId===id)delete db.invites[key];
   const code='G'+crypto.randomBytes(9).toString('hex').toUpperCase();
   db.invites[hash(code)]={circleId:id,kind:'group',createdBy:req.user.id,expiresAt:now()+24*3600*1000};
-  save();res.json({code,expiresInHours:24,multipleUses:true});
+  save();res.json({code,expiresInHours:24,multipleUses:false});
 });
 app.post('/api/chat/groups/join', requireAuth, limit, (req,res) => {
   const code=String(req.body?.code||'').replace(/[\s-]/g,'').toUpperCase();
@@ -597,7 +599,8 @@ app.post('/api/chat/groups/join', requireAuth, limit, (req,res) => {
   if(memberIds(group.id).length>=30)
     return res.status(400).json({error:'Questo gruppo è pieno.'});
   db.memberships.push({circleId:group.id,userId:req.user.id,invitedBy:inv.createdBy,joinedAt:now()});
-  // Unlike one-time personal invites, a group code remains valid for 24h.
+  // Consume only after a successful join.
+  delete db.invites[hash(code)];
   save();for(const member of memberIds(group.id))refreshRelated(member);
   res.json({ok:true,groupId:group.id});
 });
@@ -613,6 +616,9 @@ app.post('/api/invites', requireAuth, limit, (req,res) => {
   const id = String(req.body.circleId || '');
   if (db.circles[id]?.kind==='chat') return res.status(400).json({error:'Per i gruppi chat genera un codice dalla sezione Chat.'});
    if (!memberIds(id).includes(req.user.id)) return res.status(403).json({error:'Non fai parte della cerchia.'});
+  // Regenerating a circle invite revokes any previously unused code.
+  for(const [key,inv] of Object.entries(db.invites))
+    if(inv.circleId===id && inv.kind!=='group')delete db.invites[key];
   const code = crypto.randomBytes(9).toString('hex').toUpperCase();
   db.invites[hash(code)] = { circleId:id, createdBy:req.user.id, expiresAt:now()+24*3600*1000 }; save();
   res.json({code, expiresInHours:24});
@@ -626,7 +632,7 @@ app.post('/api/invites/join', requireAuth, limit, (req,res) => {
   if (memberIds(inv.circleId).length >= 30) return res.status(400).json({error:'Cerchia piena.'});
   db.memberships.push({circleId:inv.circleId,userId:req.user.id,invitedBy:inv.createdBy,joinedAt:now()}); delete db.invites[key]; save();
   for (const id of memberIds(inv.circleId)) refreshRelated(id);
-  res.json({ok:true});
+  res.json({ok:true,circleId:inv.circleId});
 });
 app.post('/api/circles/leave', requireAuth, (req,res) => {
   const circle = db.circles[String(req.body.circleId || '')];
@@ -701,8 +707,10 @@ async function sendFcm(recipients,title,body,kind='general') {
         android:{
           priority:'high',ttl:kind==='sos'?300000:120000,
           notification:{
+            // Use existing Android updates channel for journey until all installed APKs
+            // support zyro_journey_v1. An unknown channel can suppress background FCM.
             channelId:kind==='sos'||kind==='pickpocket'?'zyro_sos_v2':kind==='chat'?'zyro_chat_v2':'zyro_updates',
-            priority:kind==='sos'||kind==='pickpocket'?'high':'default',
+            priority:kind==='sos'||kind==='pickpocket'||kind==='journey'?'high':'default',
             defaultSound:true,defaultVibrateTimings:true,
             visibility:'private'
           }
@@ -1018,9 +1026,19 @@ app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
   return res.status(409).json({error:'Termina prima un SOS o Pick Pocket attivo.'});
  const point=req.body.destinationPoint?validCoords(req.body.destinationPoint):null;
  if(req.body.destinationPoint && !point)return res.status(400).json({error:'Coordinate della destinazione non valide.'});
- const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,dueAt,autoArrival:false,nearCount:0};
+ const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,dueAt,autoArrival:false,nearCount:0,requestPushStatus:'pending'};
  db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
- void sendEventPush(recipients,'🚶 Richiesta Accompagnami',`${req.user.name} ti chiede di seguire il suo percorso verso ${destination}. Apri Zyro 360 per accettare o rifiutare.`);
+ void sendEventPush(recipients,'🚶 Richiesta Accompagnami',`${req.user.name} ti chiede di seguire il suo percorso verso ${destination}. Apri Zyro 360 per accettare o rifiutare.`,'journey')
+  .then(outcome=>{
+    if(db.journeys[req.user.id]?.id!==j.id)return;
+    j.requestPushAccepted=outcome.accepted;
+    j.requestPushStatus=outcome.accepted>0?'provider-accepted':'not-accepted';
+    save();refreshRelated(req.user.id);
+  }).catch(err=>{
+    console.error('[ZYRO journey] push error:',err?.message||'unknown');
+    if(db.journeys[req.user.id]?.id!==j.id)return;
+    j.requestPushStatus='failed';save();refreshRelated(req.user.id);
+  });
  res.json({ok:true,journey:publicJourney(j,req.user.id)});
 });
 // Only the invited authenticated user may accept or refuse a particular trip.

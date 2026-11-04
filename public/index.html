@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b1831">
+  <meta name="theme-color" content="#f5f8ff">
   <meta name="zyro-ui-build" content="v56-fluidita-reattiva">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="light">
   <link rel="manifest" href="/manifest.webmanifest?v=37">
   <link rel="icon" type="image/png" href="/zyro-icon-192-v37.png">
   <link rel="apple-touch-icon" href="/zyro-icon-192-v37.png">
@@ -30,10 +30,10 @@
   <link rel="stylesheet" href="/zyro-sos-home-v33.css?v=33.0">
   <link rel="stylesheet" href="/zyro-sos-card-v34.css?v=34.0">
   <link rel="stylesheet" href="/zyro-chat-groups-invitees-v1.css?v=2">
-  <link rel="stylesheet" href="/zyro-journey-v71.css?v=6">
+  <link rel="stylesheet" href="/zyro-journey-v71.css?v=7">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
-.zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult,[data-zyro-permission="testpush"]{display:none!important}
+.zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult{display:none!important}
 </style>
 <style>
 /* Keep native vertical scroll; horizontal gestures belong to section navigation. */
@@ -565,7 +565,7 @@ html,body{overscroll-behavior-x:none}
       </div>
       <section class="chat-hub" id="chatHub">
         <div class="chat-heading-row"><div><span class="mini-overline">I TUOI MESSAGGI</span><h2>Conversazioni</h2></div><div class="chat-heading-emblem" aria-hidden="true"><svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg></div></div>
-        <div class="chat-filter-bar" aria-label="Filtra le conversazioni"><button type="button" class="chat-filter active" data-chat-filter="all" aria-pressed="true">Tutte</button><button type="button" class="chat-filter" data-chat-filter="circle" aria-pressed="false">Famiglia</button><button type="button" class="chat-filter" data-chat-filter="group" aria-pressed="false">Gruppi</button><button type="button" class="chat-filter" data-chat-filter="direct" aria-pressed="false">Amici</button></div>
+        <div class="chat-filter-bar" aria-label="Filtra le conversazioni"><button type="button" class="chat-filter active" data-chat-filter="all" aria-pressed="true">Tutte</button><button type="button" class="chat-filter" data-chat-filter="circle" aria-pressed="false">Cerchie</button><button type="button" class="chat-filter" data-chat-filter="group" aria-pressed="false">Gruppi chat</button><button type="button" class="chat-filter" data-chat-filter="direct" aria-pressed="false">Private</button></div>
         <div class="zyro-group-toolbar" aria-label="Gestione gruppi chat">
           <button type="button" id="chatGroupCreateOpen" class="zyro-group-tool-btn">＋ Crea gruppo</button>
           <button type="button" id="chatGroupJoinOpen" class="zyro-group-tool-btn">⌘ Entra con codice</button>
@@ -575,14 +575,14 @@ html,body{overscroll-behavior-x:none}
           <form id="chatGroupCreateForm" class="zyro-group-form"><input id="chatGroupName" maxlength="48" required minlength="2" placeholder="Es. Amici del cuore" aria-label="Nome del nuovo gruppo"><button type="submit" class="btn btn-primary">Crea gruppo</button></form>
         </div>
         <div id="chatGroupJoinPanel" class="zyro-group-editor" hidden>
-          <h3>Unisciti a un gruppo</h3><p>Inserisci il codice del gruppo ricevuto dall'amministratore, diverso dal codice d'invito personale.</p>
+          <h3>Unisciti a un gruppo</h3><p>Inserisci il codice monouso del gruppo ricevuto dall'amministratore.</p>
           <form id="chatGroupJoinForm" class="zyro-group-form"><input id="chatGroupCode" maxlength="28" required autocomplete="off" autocapitalize="characters" placeholder="Codice gruppo G…" aria-label="Codice di invito al gruppo"><button type="submit" class="btn btn-primary">Entra</button></form>
         </div>
         <label class="chat-search"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.6"/><path d="m16 16 5 5"/></svg><input id="chatSearch" autocomplete="off" placeholder="Cerca una persona o un gruppo" aria-label="Cerca conversazioni"></label>
         <div id="chatRooms" class="chat-rooms" aria-live="polite"></div>
         <div class="chat-private-footnote"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1"/></svg><span>Le conversazioni sono riservate ai membri autorizzati.</span></div>
       </section>
-      <div id="chatConversation" class="panel chat-conversation hidden" role="dialog" aria-modal="true" aria-label="Conversazione"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatGroupInviteButton" class="zyro-group-header-btn hidden" aria-label="Genera invito per il gruppo">＋ Invita</button><button type="button" id="chatClose" class="chat-close" aria-label="Torna alle conversazioni">←</button></div><div id="chatGroupInviteResult" class="zyro-group-code" hidden><small>CODICE GRUPPO · PIÙ PERSONE · 24 ORE</small><code id="chatGroupInviteCode" aria-label="Codice del gruppo"></code><div class="zyro-group-code-actions"><button type="button" id="chatGroupCopy">Copia</button><button type="button" id="chatGroupShare">Condividi</button></div><small>Rigenerando il codice, quello precedente non sarà più valido.</small></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" enterkeyhint="send" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
+      <div id="chatConversation" class="panel chat-conversation hidden" role="dialog" aria-modal="true" aria-label="Conversazione"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatGroupInviteButton" class="zyro-group-header-btn hidden" aria-label="Genera invito per il gruppo">＋ Invita</button><button type="button" id="chatClose" class="chat-close" aria-label="Torna alle conversazioni">←</button></div><div id="chatGroupInviteResult" class="zyro-group-code" hidden><small>CODICE GRUPPO MONOUSO · VALIDO 24 ORE</small><code id="chatGroupInviteCode" aria-label="Codice del gruppo"></code><div class="zyro-group-code-actions"><button type="button" id="chatGroupCopy">Copia</button><button type="button" id="chatGroupShare">Condividi</button></div><small>Dopo l'ingresso di una persona il codice si disattiva. Per altri partecipanti genera un nuovo codice.</small></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" enterkeyhint="send" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
       <p class="small-disclaimer chat-security-note">Chat riservata ai partecipanti.</p>
     </section>
 
@@ -774,7 +774,7 @@ html,body{overscroll-behavior-x:none}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=79.0" defer></script>
+<script src="/app.js?v=80.0" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
 </html>
