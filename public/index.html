@@ -457,7 +457,7 @@ html,body{overscroll-behavior-x:none}
 
       <header class="zyro-modes-group-title"><span aria-hidden="true">02</span><div><h2>Percorsi e conferme</h2><p>Scegli come farti accompagnare e restare in contatto.</p></div></header>
       <section class="zyro-v15-panel" id="journeyPanel">
-        <div class="zyro-v15-heading zyro-heading-v55"><span class="zyro-v15-symbol">↗</span><div class="zyro-heading-copy"><p class="eyebrow muted">VIAGGIA CON PIÙ TRANQUILLITÀ</p><h2>Accompagnami</h2></div><p class="zyro-heading-description">Condividi il percorso con i contatti scelti e indica quando pensi di arrivare.</p></div>
+        <div class="zyro-v15-heading zyro-heading-v55"><span class="zyro-v15-symbol">↗</span><div class="zyro-heading-copy"><p class="eyebrow muted">VIAGGIA CON PIÙ TRANQUILLITÀ</p><h2>Accompagnami</h2></div><p class="zyro-heading-description">Condividi la destinazione e il percorso con i contatti scelti. Sei tu a confermare quando arrivi.</p></div>
         <div id="journeyActive" class="hidden zyro-v15-active zyro-journey-active-card" aria-live="polite">
           <strong id="journeyStatus">Percorso in corso</strong>
           <p id="journeyDetail"></p>
@@ -468,7 +468,7 @@ html,body{overscroll-behavior-x:none}
           <small>Per iniziare un nuovo accompagnamento, termina prima il percorso attuale.</small>
         </div>
         <details id="zyroJourneyOptions" class="zyro-mode-details">
-          <summary><span class="zyro-mode-summary-label">Prepara il percorso<small>Destinazione, orario previsto e contatti</small></span><span class="zyro-mode-chevron" aria-hidden="true">⌄</span></summary>
+          <summary><span class="zyro-mode-summary-label">Prepara il percorso<small>Destinazione e contatti fidati</small></span><span class="zyro-mode-chevron" aria-hidden="true">⌄</span></summary>
         <div id="journeyInactive">
           <div class="zyro-journey-address">
             <h3>Dove vuoi andare?</h3>
@@ -484,7 +484,6 @@ html,body{overscroll-behavior-x:none}
             <p class="zyro-journey-provider-note">La ricerca invia l'indirizzo inserito al fornitore di geocodifica. Dati cartografici © OpenStreetMap contributors.</p>
           </div>
           <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, Lavoro, Palestra, Altro" autocomplete="off"></label>
-          <label class="zyro-v15-field">Tempo previsto<select id="journeyMinutes"><option value="15">15 minuti</option><option value="30" selected>30 minuti</option><option value="45">45 minuti</option><option value="60">1 ora</option><option value="90">1 ora e mezza</option><option value="120">2 ore</option><option value="240">4 ore</option></select></label>
           <div class="zyro-v15-destination"><label><input id="journeyAuto" type="checkbox"> Arrivo automatico (se imposti il centro della mappa come destinazione)</label><small>La meta GPS viene salvata solo dopo aver premuto Imposta. Il rilevamento automatico richiede GPS e app aperta.</small><button id="journeySetTarget" type="button" class="zyro-v15-secondary">Scegli manualmente sulla mappa</button><span id="journeyTargetInfo">Nessuna meta GPS impostata</span></div>
           <p class="zyro-v15-subhead">Chi può seguire il tuo percorso?</p><div id="journeyRecipients" class="zyro-v15-contacts"></div>
           <button id="journeyStart" type="button" class="zyro-v15-primary">Avvia Accompagnami</button>
@@ -689,7 +688,7 @@ html,body{overscroll-behavior-x:none}
           <p><strong>4. Il comando viene verificato:</strong> il server controlla allarme attivo, autorizzazione e identità del richiedente. Il telefono del proprietario deve essere raggiungibile e rispettare le impostazioni Android. L’invio della richiesta <strong>non conferma che lo squillo o il blocco sia stato eseguito</strong>.</p>
           <p><strong>Limiti:</strong> lo squillo segue le regole audio e Non disturbare di Android. Senza Internet, notifiche operative o autorizzazioni necessarie, i comandi possono arrivare in ritardo o non funzionare. Nessuno può usarli liberamente al di fuori di un allarme Pick Pocket valido.</p>
         </div></details>
-        <details><summary>Accompagnami: condividi un percorso <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Incluso in Family. Inserisci dove stai andando, scegli il tempo previsto e le persone che possono seguire il percorso. Premi «Avvia Accompagnami» e, quando arrivi, «Sono arrivato/a». Per l’arrivo automatico imposta anche una meta GPS usando il centro della mappa: il rilevamento richiede l’invio delle posizioni. Puoi interrompere il percorso quando vuoi.</p></div></details>
+        <details><summary>Accompagnami: condividi un percorso <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Incluso in Family. Inserisci dove stai andando e scegli le persone che possono seguire il percorso, senza indicare un orario previsto. Premi «Avvia Accompagnami» e, quando arrivi, «Sono arrivato/a». Per l’arrivo automatico imposta anche una meta GPS usando il centro della mappa: il rilevamento richiede l’invio delle posizioni. Puoi interrompere il percorso quando vuoi.</p></div></details>
         <details><summary>Check-in: conferma che va tutto bene <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Incluso in Family. Scegli entro quanto vuoi confermare e chi avvisare se non rispondi, poi premi «Imposta check-in». Alla scadenza conferma «Tutto bene» oppure annulla prima il check-in. Una mancata risposta invita i contatti a verificare come stai: non dimostra automaticamente un’emergenza.</p></div></details>
         <details><summary>Notifiche e funzionamento in background <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Autorizza le notifiche in «Abilita permessi» e controlla anche le impostazioni Android. Per il GPS e Pick Pocket in background lascia attivo il servizio Android e consenti l’attività in background nelle impostazioni batteria. Anche i destinatari devono autorizzare gli avvisi. Internet e disponibilità del telefono influiscono sulla consegna: se manca una risposta, contatta direttamente la persona.</p></div></details>
         <details><summary>Scegli il piano adatto <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Mappa, posizione condivisa, cerchie e chat restano gratuite. <strong>Premium, 3,99 € al mese:</strong> SOS con posizione e indirizzo disponibile, Pick Pocket e blocco automatico dello schermo su allarme con permesso Android. Non include audio SOS né squillo/blocco da remoto. <strong>Family, 6,99 € al mese:</strong> include tutte le funzioni Premium e, in esclusiva, squillo e blocco da remoto autorizzati durante un allarme Pick Pocket, audio SOS con consenso, Accompagnami e Check-in. Family sblocca le funzioni dell’account abbonato; non assegna automaticamente abbonamenti agli altri membri della cerchia. Gli acquisti disponibili nell’app Android sono gestiti da Google Play: controlla prezzo e rinnovo nella schermata di conferma. Puoi ripristinare un acquisto con lo stesso account ZYRO 360 e gestire il rinnovo in Google Play.</p></div></details>
@@ -762,7 +761,7 @@ html,body{overscroll-behavior-x:none}
 <div id="journeyMapOverlay" class="zyro-journey-map-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="journeyMapTitle" aria-hidden="true">
   <div class="zyro-journey-map-overlay-card">
     <h3 id="journeyMapTitle">Verifica la destinazione sulla mappa</h3>
-    <p>Il puntino viola indica la meta. Sposta la mappa sul punto corretto e premi Imposta.</p>
+    <p id="journeyMapHint">Il puntino viola resta fisso sull’indirizzo trovato: premi Imposta per confermare.</p>
     <div class="zyro-journey-map-overlay-actions">
       <button id="journeyPreviewCancel" type="button">Annulla</button>
       <button id="journeyPreviewSet" type="button">Imposta</button>
@@ -771,7 +770,7 @@ html,body{overscroll-behavior-x:none}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=73.0" defer></script>
+<script src="/app.js?v=74.0" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
 </html>
