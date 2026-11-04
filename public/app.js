@@ -1484,7 +1484,11 @@ class ZyroRasterMap{
   }
   for(const [id,pin]of this.pinNodes)if(!present.has(id)){pin.remove();this.pinNodes.delete(id);}
  }
- remove(){this.removed=true;this.sizeObserver?.disconnect();if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
+ remove(){
+  // Keep the public preview marker alive when the raster layer is recreated.
+  const previewPin=this.pinLayer.querySelector('#journeyPreviewPin');
+  if(previewPin)$('liveMap')?.appendChild(previewPin);
+  this.removed=true;this.sizeObserver?.disconnect();if(this.pending!==null)cancelAnimationFrame(this.pending);this.el.removeEventListener('pointerdown',this.onDown);this.el.removeEventListener('pointermove',this.onMove);this.el.removeEventListener('pointerup',this.onUp);this.el.removeEventListener('pointercancel',this.onUp);this.el.removeEventListener('wheel',this.onWheel);this.el.replaceChildren();this.tiles.clear();this.pinNodes.clear();this.pointers.clear();}
 }
 function syncStableMarkers(){stableMap?.schedule();}
 function focusStableMap(lat,lon,zoom=16){if(!stableMap||!mapValidPoint({lat,lon}))return;stableMap.easeTo({center:[Number(lon),Number(lat)],zoom});}
@@ -1813,7 +1817,10 @@ function openJourneyMapPreview(point,locked=true){
 function closeJourneyMapPreview(savePoint){
  const point=journeyPreviewPositionLocked ? journeyMapCandidate : (stableMap?.center||journeyMapCandidate);
  const overlay=$('journeyMapOverlay');overlay.classList.add('hidden');overlay.setAttribute('aria-hidden','true');
- $('journeyPreviewPin').classList.add('hidden');
+ const previewPin=$('journeyPreviewPin');
+ previewPin.classList.add('hidden');
+ // Restore the marker to the permanent map container between previews.
+ if(previewPin.parentElement!==$('liveMap'))$('liveMap').appendChild(previewPin);
  if(savePoint){
   if(!mapValidPoint(point))throw Error('La mappa non ha un punto valido. Riprova.');
   journeyTarget={lat:Number(point.lat),lon:Number(point.lon)};
