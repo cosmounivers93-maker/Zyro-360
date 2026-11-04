@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="/zyro-sos-home-v33.css?v=33.0">
   <link rel="stylesheet" href="/zyro-sos-card-v34.css?v=34.0">
   <link rel="stylesheet" href="/zyro-chat-groups-invitees-v1.css?v=2">
-  <link rel="stylesheet" href="/zyro-journey-v71.css?v=5">
+  <link rel="stylesheet" href="/zyro-journey-v71.css?v=6">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
 .zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult,[data-zyro-permission="testpush"]{display:none!important}
@@ -480,7 +480,15 @@ html,body{overscroll-behavior-x:none}
             <p class="zyro-journey-provider-note">La ricerca invia l'indirizzo inserito al fornitore di geocodifica. Dati cartografici © OpenStreetMap contributors.</p>
           </div>
           <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, Lavoro, Palestra, Altro" autocomplete="off"></label>
-          <div class="zyro-v15-destination"><label><input id="journeyAuto" type="checkbox"> Arrivo automatico (se imposti il centro della mappa come destinazione)</label><small>La meta GPS viene salvata solo dopo aver premuto Imposta. Il rilevamento automatico richiede GPS e app aperta.</small><button id="journeySetTarget" type="button" class="zyro-v15-secondary">Scegli manualmente sulla mappa</button><span id="journeyTargetInfo">Nessuna meta GPS impostata</span></div>
+          <div class="zyro-v15-destination">
+            <label class="zyro-journey-deadline-label" for="journeyDueAt">
+              <strong>Orario previsto di arrivo</strong>
+              <input id="journeyDueAt" type="datetime-local" step="60" required aria-describedby="journeyDeadlineHelp">
+            </label>
+            <small id="journeyDeadlineHelp">Scegli data e ora (da 5 minuti a 24 ore). Se non premi «Sono arrivato a destinazione» entro l’orario, il server tenterà di attivare un SOS per i contatti fidati selezionati. La ricezione delle notifiche non è garantita: servono Internet, notifiche abilitate e un server sempre attivo.</small>
+            <button id="journeySetTarget" type="button" class="zyro-v15-secondary">Scegli manualmente sulla mappa</button>
+            <span id="journeyTargetInfo">Nessuna meta GPS impostata</span>
+          </div>
           <p class="zyro-v15-subhead">Chi può seguire il tuo percorso?</p><div id="journeyRecipients" class="zyro-v15-contacts"></div>
           <button id="journeyStart" type="button" class="zyro-v15-primary">Avvia Accompagnami</button>
           <div id="journeyPendingActions" class="zyro-journey-pending-actions" aria-label="Comandi disponibili dopo l’avvio del percorso">
@@ -684,7 +692,7 @@ html,body{overscroll-behavior-x:none}
           <p><strong>4. Il comando viene verificato:</strong> il server controlla allarme attivo, autorizzazione e identità del richiedente. Il telefono del proprietario deve essere raggiungibile e rispettare le impostazioni Android. L’invio della richiesta <strong>non conferma che lo squillo o il blocco sia stato eseguito</strong>.</p>
           <p><strong>Limiti:</strong> lo squillo segue le regole audio e Non disturbare di Android. Senza Internet, notifiche operative o autorizzazioni necessarie, i comandi possono arrivare in ritardo o non funzionare. Nessuno può usarli liberamente al di fuori di un allarme Pick Pocket valido.</p>
         </div></details>
-        <details><summary>Accompagnami: condividi un percorso <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Incluso in Family. Inserisci dove stai andando e scegli le persone che possono seguire il percorso, senza indicare un orario previsto. Premi «Avvia Accompagnami» e, quando arrivi, «Sono arrivato/a». Per l’arrivo automatico imposta anche una meta GPS usando il centro della mappa: il rilevamento richiede l’invio delle posizioni. Puoi interrompere il percorso quando vuoi.</p></div></details>
+        <details><summary>Accompagnami: condividi un percorso <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Incluso in Family. Cerca l’indirizzo e conferma la destinazione sulla mappa, poi scegli l’orario previsto di arrivo e i contatti fidati. Premi «Avvia Accompagnami». Se non confermi l’arrivo entro l’orario, il server tenterà di generare automaticamente un SOS visibile ai contatti selezionati (esclusi quelli che hanno rifiutato). Puoi confermare l’arrivo oppure annullare il percorso in qualsiasi momento. Il sistema richiede un server sempre attivo, database persistente e notifiche operative; nessun invio o recapito è garantito. In emergenza chiama il 112.</p></div></details>
         <details><summary>Check-in: conferma che va tutto bene <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Incluso in Family. Scegli entro quanto vuoi confermare e chi avvisare se non rispondi, poi premi «Imposta check-in». Alla scadenza conferma «Tutto bene» oppure annulla prima il check-in. Una mancata risposta invita i contatti a verificare come stai: non dimostra automaticamente un’emergenza.</p></div></details>
         <details><summary>Notifiche e funzionamento in background <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Autorizza le notifiche in «Abilita permessi» e controlla anche le impostazioni Android. Per il GPS e Pick Pocket in background lascia attivo il servizio Android e consenti l’attività in background nelle impostazioni batteria. Anche i destinatari devono autorizzare gli avvisi. Internet e disponibilità del telefono influiscono sulla consegna: se manca una risposta, contatta direttamente la persona.</p></div></details>
         <details><summary>Scegli il piano adatto <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Mappa, posizione condivisa, cerchie e chat restano gratuite. <strong>Premium, 3,99 € al mese:</strong> SOS con posizione e indirizzo disponibile, Pick Pocket e blocco automatico dello schermo su allarme con permesso Android. Non include audio SOS né squillo/blocco da remoto. <strong>Family, 6,99 € al mese:</strong> include tutte le funzioni Premium e, in esclusiva, squillo e blocco da remoto autorizzati durante un allarme Pick Pocket, audio SOS con consenso, Accompagnami e Check-in. Family sblocca le funzioni dell’account abbonato; non assegna automaticamente abbonamenti agli altri membri della cerchia. Gli acquisti disponibili nell’app Android sono gestiti da Google Play: controlla prezzo e rinnovo nella schermata di conferma. Puoi ripristinare un acquisto con lo stesso account ZYRO 360 e gestire il rinnovo in Google Play.</p></div></details>
@@ -766,7 +774,7 @@ html,body{overscroll-behavior-x:none}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=78.0" defer></script>
+<script src="/app.js?v=79.0" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
 </html>
