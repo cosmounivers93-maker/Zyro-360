@@ -20,5 +20,5 @@ test('billing UI does not reinsert the restore button, while retaining automatic
 });
 
 test('service worker cache version changes so refreshed UI can be installed',()=>{
-  assert.match(sw,/zyro-360-v18-journey-webview-pin/);
+  assert.match(sw,/zyro-360-v19-journey-invites/);
 });
