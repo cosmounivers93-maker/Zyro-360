@@ -79,3 +79,13 @@ test('incoming Accompagnami request supports explicit acceptance and refusal',()
   assert.match(server,/sendEventPush\(recipients,'🚶 Richiesta Accompagnami'/);
   assert.match(server,/requestPushStatus=outcome\.accepted>0\?'provider-accepted':'not-accepted'/);
 });
+
+test('Android native FCM token is registered only after user login and permission',()=>{
+  assert.match(client,/async function registerAndroidPush\(force=false\)/);
+  assert.match(client,/const userId=current\?\.me\?\.id/);
+  assert.match(client,/window\.ZyroAndroidNotificationEnabled!==true/);
+  assert.match(client,/post\('\/api\/push\/android\/register',\{token\}\)/);
+  assert.match(client,/zyro:android-push-token/);
+  assert.match(client,/zyro:force-fcm-register/);
+  assert.ok(!html.includes('[data-zyro-permission="testpush"]{display:none!important}'));
+});
