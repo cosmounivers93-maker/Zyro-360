@@ -482,10 +482,10 @@ html,body{overscroll-behavior-x:none}
           <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, Lavoro, Palestra, Altro" autocomplete="off"></label>
           <div class="zyro-v15-destination">
             <label class="zyro-journey-deadline-label" for="journeyDueAt">
-              <strong>Orario previsto di arrivo</strong>
-              <input id="journeyDueAt" type="datetime-local" step="60" required aria-describedby="journeyDeadlineHelp">
+              <strong>Orario previsto di arrivo (facoltativo)</strong>
+              <input id="journeyDueAt" type="datetime-local" step="60" aria-describedby="journeyDeadlineHelp">
             </label>
-            <small id="journeyDeadlineHelp">Scegli data e ora (da 5 minuti a 24 ore). Se non premi «Sono arrivato a destinazione» entro l’orario, il server tenterà di attivare un SOS per i contatti fidati selezionati. La ricezione delle notifiche non è garantita: servono Internet, notifiche abilitate e un server sempre attivo.</small>
+            <small id="journeyDeadlineHelp">Se vuoi il controllo automatico, scegli data e ora (da 5 minuti a 24 ore). Se non premi «Sono arrivato a destinazione» entro l’orario, il server tenterà di attivare un SOS per i contatti fidati selezionati. La ricezione delle notifiche non è garantita: servono Internet, notifiche abilitate e un server sempre attivo.</small>
             <button id="journeySetTarget" type="button" class="zyro-v15-secondary">Scegli manualmente sulla mappa</button>
             <span id="journeyTargetInfo">Nessuna meta GPS impostata</span>
           </div>
