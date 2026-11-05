@@ -2612,7 +2612,7 @@ async function init(){
   $('theftStop').addEventListener('click',()=>action(stopTheft));
   $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/circles',{name:$('circleName').value});$('circleName').value='';await refresh();toast('Cerchia creata! Ora puoi generare un invito.');});});
   $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{
-    const code=$('inviteInput').value.trim().replace(/[\\s-]/g,'').toUpperCase();
+    const code=$('inviteInput').value.trim().replace(/[\s-]/g,'').toUpperCase();
     const preview=await api('/api/invites/preview?code='+encodeURIComponent(code));
     const accepted=await confirmCircleInvitation(preview);
     if(!accepted){toast('Invito rifiutato. Non sei entrato nella cerchia.');return;}
