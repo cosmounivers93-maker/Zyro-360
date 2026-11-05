@@ -67,7 +67,7 @@ test('request acceptance is authenticated, scoped and does not start a new SOS',
 });
 
 test('UI has separate explicit groups, direct chats and fresh destination steps',()=>{
- assert.ok(client.includes("const circles=(current.circles||[]).filter(c=>c.kind==='chat')"));
+ assert.ok(client.includes("const circles=current.circles||[], contacts=uniqueContacts()"),"All circle members must be able to chat, not just dedicated chat groups");
  assert.ok(client.includes("title:enabled?'Autorizza tutte le funzioni':'Revoca tutte le autorizzazioni'"));
  for(const id of ['journeyFindAddress','journeyAddressResults','journeyViewMap','journeyPreviewCancel','journeyPreviewSet'])
   assert.ok(html.includes('id="'+id+'"'),id);
