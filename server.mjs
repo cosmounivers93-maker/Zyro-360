@@ -108,7 +108,7 @@ const premiumPlan = user => {
 };
 const premiumActive = user => premiumPlan(user)!=='free';
 const familyActive = user => premiumPlan(user)==='family';
-const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
+const planFeatures = user => ({sos:true,pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
 const allowedRecipients = (userId, ids) => Array.isArray(ids) && ids.length <= 60 && ids.every(x => typeof x==='string' && x.length < 100) ? [...new Set(ids)].filter(x=>x!==userId && sharedCircle(userId,x)) : null;
@@ -617,6 +617,17 @@ app.post('/api/invites', requireAuth, limit, (req,res) => {
   db.invites[hash(code)] = { circleId:id, createdBy:req.user.id, expiresAt:now()+24*3600*1000 }; save();
   res.json({code, expiresInHours:24});
 });
+// Preview does not join or consume a code. The recipient must expressly
+// accept; invitation metadata never includes private account information.
+app.get('/api/invites/preview', requireAuth, limit, (req,res) => {
+  const code=String(req.query.code||'').replace(/[\\s-]/g,'').toUpperCase();
+  if(!/^[A-F0-9]{18}$/.test(code))return res.status(400).json({error:'Codice non valido.'});
+  const inv=db.invites[hash(code)],circle=inv&&db.circles[inv.circleId];
+  if(!inv||inv.kind==='group'||inv.expiresAt<now()||!circle)
+    return res.status(400).json({error:'Codice non valido o scaduto.'});
+  if(memberIds(circle.id).includes(req.user.id))return res.status(409).json({error:'Sei già in questa cerchia.'});
+  res.json({circleName:circle.name,inviterName:db.users[inv.createdBy]?.name||'Una persona fidata',expiresAt:inv.expiresAt});
+});
 app.post('/api/invites/join', requireAuth, limit, (req,res) => {
   const code = String(req.body.code || '').replace(/[\s-]/g,'').toUpperCase();
   const key = hash(code), inv = db.invites[key];
@@ -624,9 +635,13 @@ app.post('/api/invites/join', requireAuth, limit, (req,res) => {
   if (userCircles(req.user.id).length >= MAX_USER_CIRCLES) return res.status(400).json({error:'Limite cerchie raggiunto.'});
   if (memberIds(inv.circleId).includes(req.user.id)) return res.status(400).json({error:'Sei già nella cerchia.'});
   if (memberIds(inv.circleId).length >= 30) return res.status(400).json({error:'Cerchia piena.'});
-  db.memberships.push({circleId:inv.circleId,userId:req.user.id,invitedBy:inv.createdBy,joinedAt:now()}); delete db.invites[key]; save();
-  for (const id of memberIds(inv.circleId)) refreshRelated(id);
-  res.json({ok:true});
+  db.memberships.push({circleId:inv.circleId,userId:req.user.id,invitedBy:inv.createdBy,joinedAt:now()});
+  delete db.invites[key];save();
+  for(const id of memberIds(inv.circleId)){
+    for(const sock of connections(id))sendSocket(sock,{type:'invite-consumed',circleId:inv.circleId});
+    refreshRelated(id);
+  }
+  res.json({ok:true,circleId:inv.circleId});
 });
 app.post('/api/circles/leave', requireAuth, (req,res) => {
   const circle = db.circles[String(req.body.circleId || '')];
@@ -1124,6 +1139,11 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
           .filter(id=>sharedCircle(req.user.id,id))),
         lock=new Set((req.user.pickRemoteLockContacts??req.user.pickRemoteContacts??[])
           .filter(id=>sharedCircle(req.user.id,id)));
+  if('consentSosAudio' in req.body && typeof req.body.consentSosAudio!=='boolean')
+    return res.status(400).json({error:'Consenso audio non valido.'});
+  if(req.body.consentSosAudio===true &&
+     !(req.body.listenSosAudio===true&&req.body.receiveSos===true&&familyActive(req.user)))
+    return res.status(400).json({error:'Il consenso audio richiede un ascoltatore SOS autorizzato e un piano compatibile.'});
   if((req.body.remoteRing===true||req.body.remoteLock===true)&&!familyActive(req.user))
     return res.status(402).json({error:'Squillo e blocco da remoto sono inclusi soltanto in ZYRO Family.'});
   if(req.body.listenSosAudio===true&&!familyActive(req.user))
@@ -1138,6 +1158,11 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
   req.user.gpsRecipients=[...gps].slice(0,120);
   req.user.sosRecipients=[...sos].slice(0,60);
   req.user.sosAudioRecipients=[...audio].filter(id=>sos.has(id)).slice(0,60);
+  // One explicit listener toggle also covers the owner's microphone consent.
+  // Bulk permission grants must send consentSosAudio explicitly; never
+  // activate the microphone merely by joining a circle.
+  if(req.body.consentSosAudio===true)req.user.sosAudioConsent=true;
+  if(!req.user.sosAudioRecipients.length)req.user.sosAudioConsent=false;
   req.user.pickRemoteRingContacts=[...ring].slice(0,60);
   req.user.pickRemoteLockContacts=[...lock].slice(0,60);
   req.user.pickRemoteContacts=[...new Set([...ring,...lock])].slice(0,60);
@@ -1283,8 +1308,7 @@ app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
   res.json({ok:true,message});
 });
 app.post('/api/sos/start', requireAuth, async (req,res) => {
- // Premium is enforced server-side. A UI claim or client flag never grants access.
- if (!premiumActive(req.user)) return res.status(402).json({error:'SOS Premium non attivo. Nessun avviso è stato inviato. Per un pericolo reale chiama il 112.'});
+ // SOS manuale resta gratuito per ogni account autenticato; i destinatari sono scelti dal proprietario.
  let alert=currentAlert(req.user.id);
  const recipients=[...new Set((req.user.sosRecipients||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)))];
  if(!recipients.length&&!alert)return res.status(400).json({error:'Seleziona prima almeno un destinatario SOS nella sezione Modalità.'});
