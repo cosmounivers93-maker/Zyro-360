@@ -533,6 +533,7 @@ async function confirmCircleInvitation({inviterName,circleName}){
  return new Promise(resolve=>{
    const onClose=()=>{dialog.removeEventListener('close',onClose);resolve(dialog.returnValue==='accept');};
    dialog.addEventListener('close',onClose);
+   dialog.returnValue='';
    dialog.showModal();
  });
 }
@@ -623,6 +624,19 @@ function showChatGroupEditor(type){
 function showChatGroupInviteCode(code){
  if(!/^G[A-F0-9]{18}$/.test(code))throw Error('Codice gruppo non valido.');
  $('chatGroupInviteCode').textContent=code;
+ const select=$('chatGroupRecipient');
+ if(select){
+   const group=chatRoom?.type==='circle'?current.circles.find(c=>c.id===chatRoom.id):null;
+   const members=new Set(group?.members.map(m=>m.id)||[]);
+   const eligible=uniqueContacts().filter(u=>!members.has(u.id));
+   select.replaceChildren();
+   const empty=document.createElement('option');empty.value='';empty.textContent=eligible.length?'Scegli un contatto':'Nessun contatto da invitare';select.append(empty);
+   for(const contact of eligible){
+     const option=document.createElement('option');option.value=contact.id;option.textContent=contact.name;select.append(option);
+   }
+   select.disabled=!eligible.length;
+   $('chatGroupSendContact').disabled=!eligible.length;
+ }
  $('chatGroupInviteResult').hidden=false;
 }
 async function makeChatGroupInvite(){
@@ -2676,6 +2690,21 @@ async function init(){
   $('chatGroupInviteButton').addEventListener('click',()=>void action(makeChatGroupInvite));
   $('chatGroupCopy').addEventListener('click',()=>void action(async()=>{
     await copyInvite($('chatGroupInviteCode').textContent,'Codice del gruppo copiato.');
+  }));
+  $('chatGroupSendContact')?.addEventListener('click',()=>void action(async()=>{
+    const target=$('chatGroupRecipient').value,code=$('chatGroupInviteCode').textContent;
+    const user=uniqueContacts().find(u=>u.id===target);
+    const group=chatRoom?.type==='circle'?current.circles.find(c=>c.id===chatRoom.id):null;
+    if(!group||group.kind!=='chat'||!group.mine||!user||!/^G[A-F0-9]{18}$/.test(code))
+      throw Error('Scegli un contatto e genera il codice del gruppo.');
+    const yes=await zyroOwnerDialog({title:'Invita '+user.name,
+      description:'Inviare nella sua chat privata il codice per entrare in «'+group.name+'»? Il contatto deciderà autonomamente se partecipare.',
+      submitLabel:'Invia invito'});
+    if(!yes)return;
+    await post('/api/chat/direct/'+encodeURIComponent(target),{
+      text:'Ti invito nel gruppo «'+group.name+'» di Zyro 360. Se vuoi partecipare, apri Chat → Entra con codice e inserisci: '+code
+    });
+    toast('Invito al gruppo inviato a '+user.name+'. La persona potrà scegliere se unirsi.');
   }));
   $('chatGroupShare').addEventListener('click',()=>void action(async()=>{
     const code=$('chatGroupInviteCode').textContent;
