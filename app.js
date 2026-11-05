@@ -629,7 +629,33 @@ function nativeDiagnosticText(state){
  parts.push('Non garantito dopo arresto forzato, revoca permessi o spegnimento.');
  return parts.join('\n');
 }
+function renderRapidSosPanel(){
+ const panel=$('rapidSosPanel');if(!panel)return;
+ const status=window.ZyroNativeSafety;
+ const supported=hasZyroNativeBridge() && typeof status?.powerSosOptIn==='boolean';
+ panel.classList.toggle('hidden',!supported || !current);
+ if(!supported || !current)return;
+ const armed=status.powerSosArmed===true;
+ const enabled=status.powerSosOptIn===true;
+ const canUse=!!current.me?.premiumActive;
+ const label=$('rapidSosStatus');
+ if(label){
+   if(!canUse)label.textContent='SOS Premium non attivo. Serve Premium o Family e almeno un contatto SOS autorizzato.';
+   else if(armed)label.textContent='● Servizio Android attivo: rilevamento sperimentale inserito. Prova sul tuo telefono, perché le tre pressioni possono non essere rilevate.';
+   else if(enabled)label.textContent='⚠ SOS rapido configurato, ma servizio Android NON attivo: la scorciatoia non funzionerà.';
+   else label.textContent='○ SOS rapido disattivato. Attivalo solo dopo aver autorizzato i destinatari SOS.';
+   if(status.lastPowerSosAt){
+     const code=Number(status.lastPowerSosHttpCode||0);
+     label.textContent+=' Ultimo tentativo: '+zyroNativeAge(status.lastPowerSosAt)+
+       (code>=200&&code<300?' · confermato dal server.':' · non confermato (HTTP '+code+').');
+   }
+ }
+ $('rapidSosEnable').hidden=enabled;
+ $('rapidSosEnable').disabled=!canUse;
+ $('rapidSosDisable').hidden=!enabled;
+}
 function renderNativeDiagnostic(){
+ renderRapidSosPanel();
  const panel=$('zyroNativeMonitor');if(!panel)return;
  panel.hidden=!current;
  if(!current)return;
@@ -2014,6 +2040,21 @@ async function init(){
     toast('Stato del servizio Android aggiornato.');
   }));
   $('zyroNativeBattery')?.addEventListener('click',()=>action(async()=>await openNativeBatterySettings()));
+  $('rapidSosEnable')?.addEventListener('click',()=>action(async()=>{
+    if(!current?.me?.premiumActive)throw Error('SOS rapido richiede Premium o Family attivo.');
+    const message='SOS rapido sperimentale: tre rapide pressioni del tasto accensione possono generare tre cambi di stato dello schermo, ma Android non garantisce il rilevamento. Altri eventi di schermo possono dare falsi allarmi. Richiede servizio Android sempre attivo, rete e contatti SOS selezionati. Non sostituisce il 112 né l’SOS Android. Vuoi attivarlo?';
+    if(!confirm(message))return;
+    await zyroNativeRequest('power-sos',{enabled:true});
+    await new Promise(resolve=>setTimeout(resolve,900));
+    const status=await readNativeSafetyStatus();
+    if(!status.powerSosArmed)throw Error('Servizio Android non attivo: SOS rapido non affidabile. Controlla GPS e autorizzazioni.');
+    toast('Monitoraggio sperimentale attivo. Verifica le tre pressioni sul tuo dispositivo.');
+  }));
+  $('rapidSosDisable')?.addEventListener('click',()=>action(async()=>{
+    await zyroNativeRequest('power-sos',{enabled:false});
+    await readNativeSafetyStatus();
+    toast('Monitoraggio SOS rapido disattivato.');
+  }));
   document.addEventListener('visibilitychange',()=>{
     if(document.visibilityState==='visible' && isZyroNativeAvailable())
       void readNativeSafetyStatus().catch(e=>console.warn('Android monitor:',e.message));
@@ -2055,6 +2096,8 @@ async function init(){
   $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
+    if(hasZyroNativeBridge() && typeof window.ZyroNativeSafety?.powerSosOptIn==='boolean')
+      await zyroNativeRequest('power-sos',{enabled:false});
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=16-profilo').catch(()=>{});
