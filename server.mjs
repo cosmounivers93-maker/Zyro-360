@@ -622,7 +622,7 @@ app.post('/api/invites', requireAuth, limit, (req,res) => {
 // Preview does not join or consume a code. The recipient must expressly
 // accept; invitation metadata never includes private account information.
 app.get('/api/invites/preview', requireAuth, limit, (req,res) => {
-  const code=String(req.query.code||'').replace(/[\\s-]/g,'').toUpperCase();
+  const code=String(req.query.code||'').replace(/[\s-]/g,'').toUpperCase();
   if(!/^[A-F0-9]{18}$/.test(code))return res.status(400).json({error:'Codice non valido.'});
   const inv=db.invites[hash(code)],circle=inv&&db.circles[inv.circleId];
   if(!inv||inv.kind==='group'||inv.expiresAt<now()||!circle)
