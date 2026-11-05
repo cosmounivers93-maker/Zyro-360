@@ -288,7 +288,7 @@ function setState(data){
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
+  renderHome();renderCircles();renderProfileInvites();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
 
@@ -300,7 +300,7 @@ function setState(data){
 function renderAdminAccess(){
  const admin=Boolean(current?.me?.isAdmin);
  $('zyroAdminPanel').classList.toggle('hidden',!admin);
- $('myAccountId').textContent=current?.me?.id||'';
+ $('myAccountId').textContent=current?.me?.profileId||'';
  const adminMenu=$('reportMenuItem');
  if(adminMenu){adminMenu.classList.remove('hidden');adminMenu.dataset.settingsTarget=admin?'admin':'reports';adminMenu.querySelector('span:nth-child(2)').innerHTML=admin?'Centro amministratore<small>Segnalazioni e utenti registrati</small>':'Segnala un utente<small>Invia una segnalazione privata</small>';}
 
@@ -347,6 +347,23 @@ function showAdminTab(tab){
 }
 let adminRefreshTimer=null;
 function scheduleAdminUsersRefresh(){if(adminRefreshTimer)return;adminRefreshTimer=setTimeout(()=>{adminRefreshTimer=null;if(current?.me?.isAdmin)void action(adminLoad);},350);}
+function renderAdminOverview(data){
+ const root=$('zyroAdminOverview');if(!root||!current?.me?.isAdmin)return;
+ const metrics=[
+  ['Account',data.registered],['Collegati',data.connected],['SOS attivi',data.activeSos],
+  ['Cerchie',data.circles],['Gruppi chat',data.chatGroups],['Inviti pendenti',data.pendingInvites],
+  ['Segnalazioni aperte',data.reportsToReview],['Account sospesi',data.suspended],
+  ['Premium a vita',data.lifetimeGifts]
+ ];
+ root.innerHTML='<h3>Centro di controllo</h3><div class="zyro-admin-overview-grid">'+
+  metrics.map(([label,value])=>'<div class="zyro-admin-stat"><strong>'+escapeHtml(value)+'</strong><small>'+escapeHtml(label)+'</small></div>').join('')+
+  '</div><div class="zyro-admin-system"><strong>Stato servizi</strong>'+
+  '<p>Database persistente: '+(data.services?.persistentDatabase?'Configurato':'Da verificare')+'</p>'+
+  '<p>Notifiche Firebase: '+(data.services?.notifications?'Configurate':'Da verificare')+'</p>'+
+  '<p>Verifica acquisti: '+(data.services?.billingVerifier?'Configurata':'Da verificare')+'</p>'+
+  '<p>Backend: '+escapeHtml(data.webVersion||'Versione non disponibile')+'</p>'+
+  '<small>La diagnostica non garantisce la consegna di SOS o notifiche e non legge chat, posizioni o microfoni privati.</small></div>';
+}
 async function adminLoad(){
  if(!current?.me?.isAdmin)return;
  $('adminStatus').textContent='Caricamento account e segnalazioni…';
@@ -354,6 +371,10 @@ async function adminLoad(){
  const data=await api('/api/admin/users');
  if(!current?.me?.isAdmin || current.me.id!==expectedAdminId)return;
  adminUsersCache=data.users||[];adminLoaded=true;renderAdminUsers();
+ try {
+   const summary=await api('/api/admin/overview');
+   if(current?.me?.isAdmin&&current.me.id===expectedAdminId)renderAdminOverview(summary);
+ }catch(error){if($('zyroAdminOverview'))$('zyroAdminOverview').textContent='Diagnostica non disponibile: '+error.message;}
  const allReports=data.reports||[];
  const reports=allReports.filter(r=>Boolean(r.adminArchivedAt)===adminArchivedView);
  $('adminReportCount').textContent=String(allReports.filter(r=>!r.adminArchivedAt&&r.status==='open').length);
@@ -523,43 +544,83 @@ function renderHome(){
   });
   renderMap();
 }
-function inviteBox(code){
- return `<div class="invite-code-box"><small>CODICE MONOUSO · VALIDO 24 ORE</small><code>${escapeHtml(code)}</code><div class="invite-share-actions"><button type="button" class="copy-code">Copia codice</button><button type="button" class="share-invite-code">↗ Condividi codice</button></div></div>`;
-}
-function inviteCodeFromButton(button){
- const code=button.closest('.invite-code-box')?.querySelector('code')?.textContent?.trim();
- if(!code||!/^[A-Fa-f0-9]{18}$/.test(code))throw Error('Genera un nuovo codice prima di condividerlo.');
- return code;
-}
+// ID-based invitations keep the approved Zyro 360 card styling; circle
+// membership is granted by the server ONLY after the recipient accepts.
 function renderCircles(){
-  if(!current)return;
-  const list=$('circlesList');
-  const sig=JSON.stringify([current.me.id,current.me.name,(current.circles||[]).map(c=>[c.id,c.name,c.mine,(c.members||[]).map(m=>[m.id,m.name])]),[...inviteCodes.entries()]]);
-  if(list._zyroSig===sig&&list.children.length)return;
-  list._zyroSig=sig;
-  list.innerHTML=current.circles.length?current.circles.map(c=>`<div class="circle-card" data-circle="${escapeHtml(c.id)}"><div class="circle-top"><div><strong>◎ ${escapeHtml(c.name)}</strong><small>${c.members.length} ${c.members.length===1?'membro':'membri'} · ${c.mine?'Creata da te':'Cerchia condivisa'}</small></div><span class="status-chip">Privata</span></div><div class="circle-members">${c.members.map(m=>`<span class="member-pill">${escapeHtml(m.name)}${m.id===current.me.id?' (tu)':''}</span>`).join('')}</div><div class="circle-actions">${c.kind==='chat'?'<button type="button" data-chatcircle="'+escapeHtml(c.id)+'">💬 Apri gruppo</button>':''}${c.kind==='chat'?'':'<button type="button" data-invite="'+escapeHtml(c.id)+'">✚ Genera codice invito</button>'}${c.mine?`<button type="button" class="danger" data-delete="${escapeHtml(c.id)}">Elimina cerchia</button>`:`<button type="button" class="danger" data-leave="${escapeHtml(c.id)}">Esci dalla cerchia</button>`}</div><div class="invite-target">${inviteCodes.has(c.id)?inviteBox(inviteCodes.get(c.id)):''}</div></div>`).join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea un gruppo o inserisci il codice di un familiare.</div>';
-  list.querySelectorAll('[data-invite]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
-    const r=await post('/api/invites',{circleId:b.dataset.invite});
-    const target=b.closest('.circle-card').querySelector('.invite-target');
-    inviteCodes.set(b.dataset.invite,r.code);target.innerHTML=inviteBox(r.code);
-    bindCopyCodes(target);
-  })));
-  bindCopyCodes(list);
-  list.querySelectorAll('[data-chatcircle]').forEach(b=>b.addEventListener('click',()=>openChat('circle',b.dataset.chatcircle)));
-  list.querySelectorAll('[data-leave]').forEach(b=>b.addEventListener('click',()=>action(async()=>{if(!confirm('Vuoi davvero uscire da questa cerchia?'))return;await post('/api/circles/leave',{circleId:b.dataset.leave});await refresh();toast('Hai lasciato la cerchia.');})));
-  list.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',()=>action(async()=>{if(!confirm('Eliminare definitivamente questa cerchia per tutti i membri?'))return;await post('/api/circles/delete',{circleId:b.dataset.delete});await refresh();toast('Cerchia eliminata.');})));
-}
-function bindCopyCodes(root){
- root.querySelectorAll('.copy-code').forEach(button=>button.addEventListener('click',()=>action(async()=>{
-  await copyInvite(inviteCodeFromButton(button),'Codice copiato.');
+ if(!current)return;
+ const list=$('circlesList');
+ const sig=JSON.stringify([current.me.id,(current.circles||[]).map(c=>[c.id,c.name,c.kind,c.mine,(c.members||[]).map(m=>[m.id,m.name])])]);
+ if(list._zyroSig===sig&&list.children.length)return;
+ list._zyroSig=sig;
+ const eligible=current.circles.filter(c=>c.kind!=='chat');
+ const picker=$('profileInviteCircle');
+ if(picker){
+   const previous=picker.value;
+   picker.innerHTML=eligible.map(c=>'<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>').join('');
+   if(eligible.some(c=>c.id===previous))picker.value=previous;
+ }
+ list.innerHTML=current.circles.length?current.circles.map(c=>
+  '<div class="circle-card" data-circle="'+escapeHtml(c.id)+'"><div class="circle-top"><div><strong>◎ '+escapeHtml(c.name)+'</strong><small>'+
+  c.members.length+' '+(c.members.length===1?'membro':'membri')+' · '+(c.mine?'Creata da te':'Cerchia condivisa')+
+  '</small></div><span class="status-chip">Privata</span></div><div class="circle-members">'+
+  c.members.map(m=>'<span class="member-pill">'+escapeHtml(m.name)+(m.id===current.me.id?' (tu)':'')+'</span>').join('')+
+  '</div><div class="circle-actions">'+
+  (c.kind==='chat'?'<button type="button" data-chatcircle="'+escapeHtml(c.id)+'">💬 Apri gruppo</button>':
+    '<button type="button" data-profile-invite="'+escapeHtml(c.id)+'">✚ Invita tramite ID</button>')+
+  (c.mine?'<button type="button" class="danger" data-delete="'+escapeHtml(c.id)+'">Elimina cerchia</button>':
+    '<button type="button" class="danger" data-leave="'+escapeHtml(c.id)+'">Esci dalla cerchia</button>')+
+  '</div></div>').join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea una cerchia e invita persone tramite il loro ID profilo.</div>';
+ list.querySelectorAll('[data-profile-invite]').forEach(b=>b.addEventListener('click',()=>{
+  if(picker)picker.value=b.dataset.profileInvite;
+  $('sendProfileInviteForm')?.scrollIntoView({behavior:'smooth',block:'center'});
+  $('profileInviteId')?.focus();
+ }));
+ list.querySelectorAll('[data-chatcircle]').forEach(b=>b.addEventListener('click',()=>openChat('circle',b.dataset.chatcircle)));
+ list.querySelectorAll('[data-leave]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
+  if(!confirm('Vuoi davvero uscire da questa cerchia?'))return;
+  await post('/api/circles/leave',{circleId:b.dataset.leave});await refresh();toast('Hai lasciato la cerchia.');
  })));
- root.querySelectorAll('.share-invite-code').forEach(button=>button.addEventListener('click',()=>action(async()=>{
-  const code=inviteCodeFromButton(button);
-  if(navigator.share){
-   try{await navigator.share({text:code});return;}
-   catch(error){if(error?.name==='AbortError')return;}
-  }
-  await copyInvite(code,'Codice copiato. Incollalo nell’app con cui vuoi condividerlo.');
+ list.querySelectorAll('[data-delete]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
+  if(!confirm('Eliminare definitivamente questa cerchia per tutti i membri?'))return;
+  await post('/api/circles/delete',{circleId:b.dataset.delete});await refresh();toast('Cerchia eliminata.');
+ })));
+}
+function renderProfileInvites(){
+ if(!current)return;
+ const incoming=$('profileIncomingInvites'),outgoing=$('profileOutgoingInvites');
+ if(!incoming||!outgoing)return;
+ const invites=current.profileInvites||[];
+ const pending=invites.filter(x=>x.direction==='received'&&x.status==='pending');
+ const sent=invites.filter(x=>x.direction==='sent');
+ const sig=JSON.stringify(invites);
+ if(incoming._sig===sig && outgoing._sig===sig)return;
+ incoming._sig=sig;outgoing._sig=sig;
+ incoming.innerHTML='<h3>Richieste ricevute</h3>'+(pending.length?pending.map(x=>
+   '<article class="zyro-id-invite-card"><strong>'+escapeHtml(x.peerName)+'</strong>'+
+   '<p>Vuole invitarti in «'+escapeHtml(x.circleName)+'». Vuoi accettare?</p>'+
+   '<div class="zyro-id-invite-actions">'+
+   '<button type="button" data-profile-accept="'+escapeHtml(x.id)+'">Accetta</button>'+
+   '<button type="button" data-profile-decline="'+escapeHtml(x.id)+'">Rifiuta</button>'+
+   '<button type="button" data-profile-block="'+escapeHtml(x.id)+'">Rifiuta e blocca inviti</button>'+
+   '</div></article>').join(''):'<p class="setting-description">Nessuna richiesta in attesa.</p>');
+ outgoing.innerHTML='<h3>Richieste inviate</h3>'+(sent.length?sent.map(x=>
+   '<article class="zyro-id-invite-card"><strong>'+escapeHtml(x.peerName)+'</strong>'+
+   '<p>'+escapeHtml(x.circleName)+' · '+(x.status==='pending'?'In attesa di risposta':x.status==='declined'?'Invito rifiutato':x.status==='accepted'?'Invito accettato':'Richiesta annullata')+'</p>'+
+   (x.status==='pending'?'<button type="button" data-profile-cancel="'+escapeHtml(x.id)+'">Annulla invito</button>':'')+
+   '</article>').join(''):'<p class="setting-description">Non hai richieste inviate.</p>');
+ for(const type of ['accept','decline','block']){
+  incoming.querySelectorAll('[data-profile-'+type+']').forEach(btn=>btn.addEventListener('click',()=>action(async()=>{
+   const inviteId=btn.dataset['profile'+type[0].toUpperCase()+type.slice(1)];
+   const choice=type==='accept'?'accept':'decline';
+   if(type==='block'&&!confirm('Bloccare altre richieste di invito da questo utente?'))return;
+   if(type==='accept'&&!confirm('Entrare nella cerchia? GPS, microfono e controllo remoto non vengono autorizzati automaticamente.'))return;
+   await post('/api/profile-invites/respond',{inviteId,decision:choice,blockSender:type==='block'});
+   await refresh();toast(type==='accept'?'Invito accettato. Chat e cerchia aggiornate.':'Invito rifiutato.');
+  })));
+ }
+ outgoing.querySelectorAll('[data-profile-cancel]').forEach(btn=>btn.addEventListener('click',()=>action(async()=>{
+  await post('/api/profile-invites/cancel',{inviteId:btn.dataset.profileCancel});
+  await refresh();toast('Richiesta annullata.');
  })));
 }
 async function copyInvite(value,message){
@@ -2439,11 +2500,11 @@ async function init(){
   $('mapRetry')?.addEventListener('click',()=>{stableAttempts=0;removeStableMap();mapHideFailure();ensureStableMap();});
   window.addEventListener('online',()=>{if(current){stableAttempts=0;removeStableMap();renderMap();}});
   const params=new URLSearchParams(location.search);inviteFromLink=params.get('invite');
-  if(inviteFromLink && /^[A-Fa-f0-9]{18}$/.test(inviteFromLink)){history.replaceState(null,'',location.pathname);$('inviteInput').value=inviteFromLink.toUpperCase();}else inviteFromLink=null;
+  inviteFromLink=null;
   document.querySelectorAll('.auth-tab').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
   $('authForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{
     const payload={email:$('email').value.trim(),password:$('password').value,device:currentDeviceInfo()};if(authMode==='register')payload.name=$('name').value.trim();
-    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();closeProfileSettings();if(inviteFromLink){showView('circles');toast('Codice di invito compilato: premi Entra per unirti alla cerchia.');}else{showView('home');toast('Benvenuto in Zyro 360!');}}finally{$('authSubmit').disabled=false;}
+    $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();closeProfileSettings();showView('home');toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
   setupProfileSettings();
@@ -2595,7 +2656,14 @@ async function init(){
   $('pickTest').addEventListener('click',()=>action(previewSiren));
   $('theftStop').addEventListener('click',()=>action(stopTheft));
   $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/circles',{name:$('circleName').value});$('circleName').value='';await refresh();toast('Cerchia creata! Ora puoi generare un invito.');});});
-  $('joinCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/invites/join',{code:$('inviteInput').value});$('inviteInput').value='';await refresh();inviteFromLink=null;toast('Ora fai parte della cerchia!');});});
+  $('sendProfileInviteForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
+  const profileId=$('profileInviteId').value.trim().toUpperCase();
+  const circleId=$('profileInviteCircle').value;
+  if(!/^ZYRO-[A-F0-9]{16}$/.test(profileId))throw Error('Inserisci l’ID completo: ZYRO- seguito da 16 caratteri.');
+  const sent=await post('/api/profile-invites',{profileId,circleId});
+  $('profileInviteId').value='';await refresh();
+  toast('Richiesta inviata a '+sent.recipientName+'. Potrà accettare o rifiutare.');
+ });});
   $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();if(isZyroNativeAvailable()){try{await nativeBackgroundSync();}catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}}toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
   $('journeyRecipients').addEventListener('change',e=>{if(e.target.matches('[data-journey-to]')){e.target.checked?journeySelected.add(e.target.dataset.journeyTo):journeySelected.delete(e.target.dataset.journeyTo);}});
   $('checkinRecipients').addEventListener('change',e=>{if(e.target.matches('[data-checkin-to]')){e.target.checked?checkinSelected.add(e.target.dataset.checkinTo):checkinSelected.delete(e.target.dataset.checkinTo);}});
@@ -2681,7 +2749,7 @@ async function init(){
   $('adminArchiveToggle').addEventListener('click',()=>{adminArchivedView=!adminArchivedView;$('adminArchiveToggle').setAttribute('aria-pressed',String(adminArchivedView));$('adminArchiveToggle').textContent=adminArchivedView?'Torna all’elenco principale':'Mostra archiviate';void action(adminLoad);});
   document.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>showAdminTab(b.dataset.adminTab)));
   $('adminFilter').addEventListener('input',renderAdminUsers);
-  $('copyMyId').addEventListener('click',async()=>{if(!current)return;try{await copyAccountId(current.me.id);toast('ID account copiato.');}catch{toast('Copia non disponibile. Seleziona il codice e copialo manualmente.',true);}});
+  $('copyMyId').addEventListener('click',async()=>{if(!current)return;try{await copyAccountId(current.me.profileId);toast('ID profilo copiato.');}catch{toast('Copia non disponibile. Seleziona il codice e copialo manualmente.',true);}});
   $('pushButton').addEventListener('click',()=>action(enablePush));
   $('pushTestButton').addEventListener('click',()=>action(sendPushTest));
   $('closeListen').addEventListener('click',stopListening);
@@ -2708,7 +2776,7 @@ async function init(){
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=18-journey-pin').catch(()=>{});
-  try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();if(inviteFromLink){showView('circles');toast('Invito ricevuto: premi Entra per confermare.');}}
+  try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);
     // 401 indicates a missing/expired session; a returning user signs in
