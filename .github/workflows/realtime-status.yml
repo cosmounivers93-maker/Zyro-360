@@ -1,0 +1,35 @@
+name: ZYRO 360 - Stato online e riconnessione
+on:
+  push:
+    branches: [main, 'fix/zyro-connection-status-20261105']
+    paths:
+      - 'server.mjs'
+      - 'public/app.js'
+      - 'public/index.html'
+      - 'tests/realtime-presence.test.mjs'
+      - '.github/workflows/realtime-status.yml'
+  pull_request:
+    paths:
+      - 'server.mjs'
+      - 'public/app.js'
+      - 'public/index.html'
+      - 'tests/realtime-presence.test.mjs'
+      - '.github/workflows/realtime-status.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  status-presence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate production JS and server syntax
+        run: |
+          node --check public/app.js
+          node --check server.mjs
+      - name: Verify indicator and reconnection safeguards
+        run: node --test tests/realtime-presence.test.mjs

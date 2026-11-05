@@ -1478,6 +1478,13 @@ wss.on('connection', ws => {
     const self=ws.userId;
     if(!db.users[self]||deletingAccounts.has(self)){ws.close(1008,'Account non disponibile');return;}
     if(db.users[self]?.bannedAt){ws.close(1008,'Account sospeso');return;}
+    // Application-level liveness acknowledgement for Android WebView. A native
+    // WebSocket PONG is not exposed to browser JavaScript, so this allows the
+    // foreground UI to recover reliably after suspension.
+    if(m.type==='presence-ping'){
+      sendSocket(ws,{type:'presence-pong'});
+      return;
+    }
     if (m.type==='audio-ready') {
       const a=currentAlert(self); if (!a) return;
       ws.microphoneReady = familyActive(db.users[self]) && m.ready === true && db.users[self]?.sosAudioConsent===true;

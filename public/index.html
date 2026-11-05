@@ -128,7 +128,10 @@ html[data-theme="dark"] #premiumPanel.zyro-plans{color:#e8faf6}
 </style>
 <style>
 #appScreen>.topbar{display:flex!important;justify-content:center!important;align-items:center!important;position:relative;min-height:70px;padding:18px 24px!important}
-#appScreen>.topbar .connection-pill{display:none!important}
+#appScreen>.topbar .connection-pill{display:flex!important;position:absolute;right:12px;top:50%;transform:translateY(-50%);z-index:3;padding:7px 9px;border-radius:999px;font-size:10px;font-weight:650;background:rgba(19,41,63,.65);border:1px solid rgba(255,255,255,.24);color:#f1fcff;white-space:nowrap;max-width:calc(50% - 42px)}
+#appScreen>.topbar .connection-dot{flex:0 0 8px;height:8px;width:8px;background:#f5ad6b!important;box-shadow:0 0 0 3px rgba(245,173,107,.13)!important}
+#appScreen>.topbar .connection-dot.connected{background:#36e5ac!important;box-shadow:0 0 0 3px rgba(54,229,172,.20),0 0 11px rgba(54,229,172,.33)!important}
+@media(max-width:390px){#appScreen>.topbar .connection-pill{right:8px;padding:6px 7px;font-size:9px}}
 #appScreen>.topbar .brand{display:flex!important;align-items:center;justify-content:center;gap:12px!important;opacity:1!important;color:#ecfffc!important;letter-spacing:3px!important;font-size:19px!important;font-weight:750!important}
 #appScreen>.topbar .brand>span{color:#ecfffc!important;text-shadow:none!important;line-height:1.3}
 #appScreen>.topbar .brand b{color:#68e6d2!important;font-weight:750!important}
@@ -338,7 +341,7 @@ html,body{overscroll-behavior-x:none}
 <div id="appScreen" class="app-shell hidden">
   <header class="topbar">
     <div class="brand zyro-neon-wordmark" aria-label="ZYRO 360"><span>ZYRO <b>360</b></span></div>
-    <div class="connection-pill" hidden aria-hidden="true"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">Connessione...</span></div>
+    <div class="connection-pill" role="status" aria-live="polite" aria-label="Stato connessione Zyro 360"><span id="connectionDot" class="connection-dot" aria-hidden="true"></span><span id="connectionText">Connessione...</span></div>
   </header>
   <main class="container">
     <section id="homeView" class="view home-map-view">

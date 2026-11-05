@@ -29,6 +29,11 @@ let adminArchivedView=false;
 let adminLoaded = false;
 let socket = null;
 let wsRetry = null;
+let wsConnectedAt = 0;
+let wsLastMessageAt = 0;
+let wsLastProbeAt = 0;
+let wsConnectStartedAt = 0;
+let wsReconnectAttempts = 0;
 let watchId = null;
 let lastCoords = null;
 let sentAt = 0;
@@ -178,11 +183,29 @@ function connectSocket(){
   if(!current || socket?.readyState===WebSocket.OPEN || socket?.readyState===WebSocket.CONNECTING) return;
   if(wsRetry){clearTimeout(wsRetry);wsRetry=null;}
   const proto=location.protocol==='https:'?'wss':'ws';
-  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+  wsConnectStartedAt=Date.now();
+  let ws;
+  try{ws=new WebSocket(`${proto}://${location.host}/ws`);}
+  catch(error){connection(false);wsRetry=setTimeout(connectSocket,5000);return;}
   socket=ws;
-  ws.onopen=()=>{ connection(true);if(current?.me?.isAdmin)scheduleAdminUsersRefresh(); if(localStream)ws.send(JSON.stringify({type:'audio-ready',ready:true})); if(listeningTo)retryListenAfterReconnect(); };
+  connection(false);
+  ws.onopen=()=>{
+    if(socket!==ws)return;
+    wsConnectedAt=Date.now();
+    wsLastMessageAt=wsConnectedAt;
+    wsLastProbeAt=0;
+    wsReconnectAttempts=0;
+    connection(true);
+    probeSocketPresence();
+    if(current?.me?.isAdmin)scheduleAdminUsersRefresh();
+    if(localStream)ws.send(JSON.stringify({type:'audio-ready',ready:true}));
+    if(listeningTo)retryListenAfterReconnect();
+  };
   ws.onmessage=async(event)=>{
+    if(socket!==ws)return;
+    wsLastMessageAt=Date.now();
     let m;try{m=JSON.parse(event.data);}catch{return;}
+    if(m.type==='presence-pong')return;
     if(m.type==='state'){setState(m.data);if(current?.me?.isAdmin && !adminLoaded)scheduleAdminUsersRefresh();}
     if(m.type==='listen-request') await action(()=>sendOffer(m.from));
     if(m.type==='rtc') await action(()=>handleRTC(m.from,m.signal));
@@ -197,8 +220,49 @@ function connectSocket(){
     if(m.type==='chat-new')window.dispatchEvent(new CustomEvent('zyro:chat-new',{detail:m}));
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
   };
-  ws.onclose=()=>{if(socket!==ws)return;socket=null;connection(false);stopAudioRelaySender();if(current)wsRetry=setTimeout(connectSocket,3000);};
-  ws.onerror=()=>{connection(false);};
+  ws.onclose=()=>{
+    if(socket!==ws)return;
+    socket=null;
+    connection(false);
+    stopAudioRelaySender();
+    if(current){
+      const delay=Math.min(30000,3000*Math.pow(2,Math.min(wsReconnectAttempts++,3)));
+      wsRetry=setTimeout(connectSocket,delay);
+    }
+  };
+  ws.onerror=()=>{if(socket===ws)connection(false);};
+}
+// WebView may suspend JavaScript while Android is locked or in another app.
+// Recheck a stalled connection when the app resumes, without marking it green
+// until the WebSocket has genuinely opened and answered.
+function probeSocketPresence(){
+  if(socket?.readyState!==WebSocket.OPEN)return;
+  try{
+    socket.send(JSON.stringify({type:'presence-ping'}));
+    wsLastProbeAt=Date.now();
+  }catch(error){
+    try{socket.close();}catch{}
+  }
+}
+function verifySocketPresence(){
+  if(!current || document.hidden)return;
+  const now=Date.now();
+  if(socket?.readyState===WebSocket.CONNECTING){
+    if(now-wsConnectStartedAt>18000){
+      try{socket.close();}catch{}
+    }
+    return;
+  }
+  if(socket?.readyState===WebSocket.OPEN){
+    if(now-wsLastMessageAt>65000){
+      connection(false);
+      try{socket.close();}catch{}
+      return;
+    }
+    if(now-wsLastProbeAt>20000)probeSocketPresence();
+    return;
+  }
+  if(!wsRetry)connectSocket();
 }
 function wsSend(message){if(socket?.readyState!==WebSocket.OPEN)return false;socket.send(JSON.stringify(message));return true;}
 function connection(up){$('connectionText').textContent=up?'Collegato':'Non collegato';$('connectionDot').classList.toggle('connected',up);}
@@ -2501,9 +2565,13 @@ async function init(){
   }));
   $('zyroNativeBattery')?.addEventListener('click',()=>action(async()=>await openNativeBatterySettings()));
   document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible' && isZyroNativeAvailable())
-      void readNativeSafetyStatus().catch(e=>console.warn('Android monitor:',e.message));
+    if(document.visibilityState==='visible'){
+      verifySocketPresence();
+      if(isZyroNativeAvailable())
+        void readNativeSafetyStatus().catch(e=>console.warn('Android monitor:',e.message));
+    }
   });
+  window.addEventListener('focus',verifySocketPresence);
   // Quick actions jump to the correct settings without resetting or toggling protections.
   $('modesView').addEventListener('click',event=>{
     const button=event.target.closest('button[data-mode-target]');
@@ -2646,8 +2714,9 @@ async function init(){
     // 401 indicates a missing/expired session; a returning user signs in
     // with the same credentials. Never store passwords in localStorage.
   }
-  refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnect handles live state */}}},45000);
-  window.addEventListener('online',()=>{if(current){connectSocket();refresh().catch(()=>{});}});
+  refreshTimer=setInterval(async()=>{if(current){try{await refresh();}catch{/* WebSocket reconnection is handled separately. */}}},45000);
+  setInterval(verifySocketPresence,15000);
+  window.addEventListener('online',()=>{if(current){verifySocketPresence();refresh().catch(()=>{});}});
   window.addEventListener('pagehide',()=>{ /* Browsers may suspend GPS, sensors and audio: never promise background safety. */ });
 }
 // Startup is invoked after onboarding declarations below.
