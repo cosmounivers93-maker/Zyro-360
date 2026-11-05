@@ -2345,7 +2345,7 @@ function renderInvitedPeople(){
    const all=document.createElement('input');all.type='checkbox';
    all.dataset.accessAll=member.id;all.checked=enabledCount===available.length;
    all.indeterminate=enabledCount>0&&enabledCount<available.length;
-   all.disabled=!!current.me.sos;
+   all.disabled=!!current.me.sos&&enabledCount===0;
    all.setAttribute('aria-label','Abilita o disabilita tutte le autorizzazioni per '+member.name);
    allLabel.append(allText,all);options.append(allLabel);
    const addToggle=(type,labelText,help,checked)=>{
@@ -2357,7 +2357,9 @@ function renderInvitedPeople(){
      const input=document.createElement('input');input.type='checkbox';
      input.dataset.accessUser=member.id;input.dataset.accessType=type;
      input.checked=checked;
-     input.disabled=!!current.me.sos||(type==='audio'&&!family)||
+     // During an active SOS, existing consent can still be revoked immediately.
+     // Granting new access waits until the SOS has ended.
+     input.disabled=(!!current.me.sos&&!checked)||(type==='audio'&&!family)||
        ((type==='ring'||type==='lock')&&!family);
      input.setAttribute('aria-label',labelText+' per '+member.name);
      row.append(info,input);options.append(row);
