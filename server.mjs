@@ -501,7 +501,7 @@ app.post('/api/legal/accept',requireAuth,(req,res)=>{
 });
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
-const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
+const adminUser = u => ({id:u.id,profileId:publicProfileId(u.id),name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
 app.post('/api/settings/device',requireAuth,limit,(req,res)=>{
  const device=deviceForRequest(req);
  req.user.lastDevice=device;save();notifyAdminUsers();res.json({ok:true});
@@ -1671,6 +1671,7 @@ setInterval(()=>{
   const t=now(); let changed=false;
   for (const [k,s] of Object.entries(db.sessions)) if (s.expiresAt<t) {delete db.sessions[k];changed=true;}
   for (const [k,v] of Object.entries(db.invites)) if (v.expiresAt<t) {delete db.invites[k];changed=true;}
+  for (const [k,inv] of Object.entries(db.profileInvites||{}))if(inv.expiresAt<t-3*86400*1000){delete db.profileInvites[k];changed=true;}
   for (const [k,a] of Object.entries(db.alerts)) if (!a.active && a.endedAt<t-7*86400*1000) {delete db.alerts[k];changed=true;}
   for(const u of Object.values(db.users))if(u.lastLoginAt && u.lastLoginAt<t-30*86400e3 && u.lastLoginIp){delete u.lastLoginIp;changed=true;}
   for(const u of Object.values(db.users))if(u.registrationIp && u.createdAt<t-30*86400e3){delete u.registrationIp;changed=true;}
