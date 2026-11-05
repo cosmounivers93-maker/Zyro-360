@@ -23,5 +23,7 @@ jobs:
         run: |
           node --check server.mjs
           node --check public/app.js
+      - name: Install server dependencies for integration tests
+        run: npm install --no-package-lock --ignore-scripts --no-audit --no-fund
       - name: Run test suite
         run: node --test
