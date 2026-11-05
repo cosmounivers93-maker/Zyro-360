@@ -31,6 +31,20 @@ jobs:
                 if(h.firebaseConfigured!==true)console.log("::warning::Notifiche SOS non confermate sul servizio pubblico.");
                 if(h.billingReady!==true)console.log("::warning::Google Play Billing non confermato sul servizio pubblico.");
               '
+              # Confirm the narrow connection-status fix has actually reached
+              # the public Render site (a GitHub merge alone is insufficient).
+              status_online='false'
+              if curl --silent --show-error --location --fail --max-time 23 'https://zyro-360.onrender.com/' -o /tmp/zyro-public-index.html \
+                 && curl --silent --show-error --location --fail --max-time 23 'https://zyro-360.onrender.com/app.js?v=79.0' -o /tmp/zyro-public-app.js \
+                 && grep -Fq 'class="connection-pill" role="status"' /tmp/zyro-public-index.html \
+                 && grep -Fq "function probeSocketPresence()" /tmp/zyro-public-app.js; then
+                status_online='true'
+              fi
+              if [ "$status_online" = 'true' ]; then
+                echo 'Connessione verde: correzione live presente nel frontend pubblico.'
+              else
+                echo "::warning::Correzione dello stato online non ancora confermata su Render."
+              fi
               exit 0
             fi
             echo "Ambiente Render non ancora risponde ($attempt/15)"
