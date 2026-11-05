@@ -338,7 +338,7 @@ html,body{overscroll-behavior-x:none}
 <div id="appScreen" class="app-shell hidden">
   <header class="topbar">
     <div class="brand zyro-neon-wordmark" aria-label="ZYRO 360"><span>ZYRO <b>360</b></span></div>
-    <div class="connection-pill" hidden aria-hidden="true"><span id="connectionDot" class="connection-dot"></span><span id="connectionText">Connessione...</span></div>
+    <div class="connection-pill" role="status" aria-live="polite" aria-label="Stato connessione Zyro 360"><span id="connectionDot" class="connection-dot" aria-hidden="true"></span><span id="connectionText">Connessione...</span></div>
   </header>
   <main class="container">
     <section id="homeView" class="view home-map-view">
