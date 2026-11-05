@@ -22,7 +22,16 @@ test('Gallery, invitation acceptance, one-time codes, direct/group chat and free
     return {status:res.status,data:await res.json(),cookie:res.headers.get('set-cookie')?.split(';')[0]};
   };
   try {
+    const release=await request('GET','/api/release-info');
+    assert.equal(release.status,200,'Native wrapper must be able to verify server release');
+    assert.equal(release.data.webRelease,'73');
+    assert.equal(release.data.apiRelease,'73');
+    assert.equal(release.data.capabilities.freeManualSos,true);
+    assert.equal(release.data.capabilities.oneTimeInviteStatus,true);
+    assert.equal(release.data.capabilities.singlePlusPlanPrepared,true);
     const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+    assert.match(html,/name="zyro-web-release" content="73"/);
+    assert.match(html,/app\.js\?v=73\.2/);
     assert.ok(html.includes('id="avatarGallery"'));
     assert.ok(!html.includes('id="avatarCamera"'));
     assert.ok(html.includes('id="circleInviteDialog"'));
