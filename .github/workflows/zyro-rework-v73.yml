@@ -1,0 +1,31 @@
+name: ZYRO 360 - Cerchie, chat, SOS gratuito e nuovo piano
+on:
+  push:
+    branches: ['feature/zyro-20261105-cerchie-chat-ui-sos-gratis']
+    paths:
+      - 'server.mjs'
+      - 'public/**'
+      - 'play-billing.mjs'
+      - 'test/**'
+      - 'tests/**'
+      - '.github/workflows/zyro-rework-v73.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  user-flows:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Dipendenze pulite
+        run: npm ci
+      - name: Sintassi delle risorse realmente servite da Express
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+          node --check play-billing.mjs
+      - name: Inviti con scelta, chat reale, SOS gratuito e acquisti verificati
+        run: node --test tests/zyro-user-flows-v73.test.mjs test/play-billing-products.test.mjs test/restore-hidden-ui.test.mjs
