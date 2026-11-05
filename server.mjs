@@ -492,6 +492,25 @@ app.post('/api/legal/accept',requireAuth,(req,res)=>{
  if(req.user.termsAcceptance?.version!==LEGAL_VERSION){req.user.termsAcceptance={version:LEGAL_VERSION,acceptedAt:now()};save();}
  res.json({ok:true,version:LEGAL_VERSION});
 });
+// Public, non-sensitive release fingerprint. Android is a WebView shell;
+// an APK build alone does NOT guarantee this server is running the matching UI.
+app.get('/api/release-info', (req,res) => {
+  res.set('Cache-Control','no-store, max-age=0');
+  res.json({
+    app:'ZYRO 360',
+    webRelease:'73',
+    apiRelease:'73',
+    capabilities:{
+      freeManualSos:true,
+      inviteReview:true,
+      oneTimeInviteStatus:true,
+      personalAndGroupChat:true,
+      sosAudioConsentPerContact:true,
+      singlePlusPlanPrepared:true
+    },
+    billingReady:billingReady()
+  });
+});
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
 const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
