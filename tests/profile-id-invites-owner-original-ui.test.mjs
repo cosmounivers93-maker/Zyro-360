@@ -6,6 +6,10 @@ import {join} from 'node:path';
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:net';
 import crypto from 'node:crypto';
+import {createRequire} from 'node:module';
+const require=createRequire(import.meta.url);
+let integrationDependencies=false;
+try{require.resolve('express');require.resolve('ws');integrationDependencies=true;}catch{}
 import {fileURLToPath} from 'node:url';
 import vm from 'node:vm';
 
@@ -52,7 +56,7 @@ function fixtureAdmin(password){
    sosAudioConsent:false,avatar:null};
 }
 
-test('End-to-end: ID requests, sender privacy, decline/block, consent, chat, owner moderation and lifetime gifts', {timeout:25000},async()=>{
+test('End-to-end: ID requests, sender privacy, decline/block, consent, chat, owner moderation and lifetime gifts', {timeout:25000,skip:integrationDependencies?false:'Run the authenticated integration suite in the dedicated CI job with npm install.'},async()=>{
  const dir=mkdtempSync(join(tmpdir(),'zyro-id-test-'));
  const pw='owner-password-strong-2026';
  writeFileSync(join(dir,'zyro360.json'),JSON.stringify({
