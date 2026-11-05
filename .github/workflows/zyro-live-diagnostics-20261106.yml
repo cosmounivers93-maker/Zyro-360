@@ -1,0 +1,30 @@
+name: ZYRO 360 - Diagnosi pubblicazione Render solo lettura
+on:
+  push:
+    branches: ['feature/zyro-id-inviti-admin-original-ui-20261106']
+    paths: ['.github/workflows/zyro-live-diagnostics-20261106.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Legge file pubblici e verifica marcatori online
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://zyro-360.onrender.com'
+          for item in '|' 'app.js?v=80.1|js' 'api/health|json' 'api/admin/overview|admin'; do
+            url="${item%%|*}" ; label="${item##*|}"
+            status=$(curl -sS --location --max-time 28 --retry 2 -w '%{http_code}' "$base/$url" -o "/tmp/zyro-${label:-index}.txt") || status='curl_failed'
+            echo "HTTP ${label:-index}: $status"
+          done
+          for text in 'id="sendProfileInviteForm"' 'id="zyroAdminOverview"' 'id="avatarCamera"' ; do
+            if grep -Fq "$text" /tmp/zyro-index.txt; then echo "HTML PRESENT: $text"; else echo "HTML MISSING: $text"; fi
+          done
+          for text in 'function renderProfileInvites()' "consentSosAudio:kind==='audio'&&target.checked"; do
+            if grep -Fq "$text" /tmp/zyro-js.txt; then echo "JS PRESENT: $text"; else echo "JS MISSING: $text"; fi
+          done
+          node -e 'const fs=require("fs");try{const s=JSON.parse(fs.readFileSync("/tmp/zyro-json.txt"));console.log("PersistentDB:",s.persistentStorage,"BillingReady:",s.billingReady,"FCMReady:",s.firebaseConfigured);}catch(e){console.log("Health diagnostic unavailable");}'
