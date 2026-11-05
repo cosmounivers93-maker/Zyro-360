@@ -678,7 +678,7 @@ function showView(view){
     if(panel?.animate)sectionAnimation=panel.animate(
       [{opacity:.88,transform:`translate3d(${order.indexOf(view)>order.indexOf(previousView)?12:-12}px,0,0)`},
        {opacity:1,transform:'translate3d(0,0,0)'}],
-      {duration:105,easing:'cubic-bezier(.22,.75,.25,1)'}
+      {duration:195,easing:'cubic-bezier(.22,.75,.25,1)'}
     );
   }
   if(view==='settings'&&current?.me?.isAdmin&&!adminLoaded)void action(adminLoad);

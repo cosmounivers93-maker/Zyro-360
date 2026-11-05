@@ -1,0 +1,99 @@
+/* ZYRO 360 v58 — visual unification for the light theme.
+   Non-functional styles only: no map canvas transforms, no GPS/SOS state changes.
+   The user's chosen dark theme retains its existing appearance. */
+html:not([data-theme="dark"]) {
+  --zyro-v58-ink:#243d70;
+  --zyro-v58-muted:#5b7097;
+  --zyro-v58-purple:#7757c8;
+  --zyro-v58-blue:#378cca;
+  --zyro-v58-border:#cbdcf5;
+  --bg:#f5f8ff;
+  --text:var(--zyro-v58-ink);
+  --muted:var(--zyro-v58-muted);
+  --border:var(--zyro-v58-border);
+}
+html:not([data-theme="dark"]) body {
+  background:#f5f8ff!important;
+  background-image:radial-gradient(ellipse at 0% 0%,#eae0ff 0%,transparent 47%),
+                   radial-gradient(ellipse at 100% 25%,#dff3ff 0%,transparent 56%)!important;
+  color:var(--zyro-v58-ink);
+}
+html:not([data-theme="dark"]) #appScreen {
+  color:var(--zyro-v58-ink);
+}
+/* Top bar is kept static; no costly animated backdrop over the live map. */
+html:not([data-theme="dark"]) #appScreen>.topbar {
+  background:linear-gradient(108deg,#fcfdff 0%,#f4edff 46%,#e5f5ff 100%)!important;
+  border-bottom:1px solid #cfdcf7!important;
+  box-shadow:0 4px 16px #5164a018!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+html:not([data-theme="dark"]) #appScreen>.topbar .brand.zyro-neon-wordmark {
+  background:linear-gradient(110deg,#fffefa,#f1eaff 65%,#eaf8ff) padding-box,
+             linear-gradient(110deg,#ac8bfa,#63bce9) border-box!important;
+  border:1px solid transparent!important;
+  box-shadow:0 3px 13px #8f94c32b,inset 0 1px 0 #ffffffd9!important;
+}
+html:not([data-theme="dark"]) #appScreen>.topbar .brand.zyro-neon-wordmark>span {
+  color:#29477b!important;text-shadow:none!important;
+}
+html:not([data-theme="dark"]) #appScreen>.topbar .brand.zyro-neon-wordmark b {
+  color:#7154c8!important;text-shadow:none!important;
+}
+/* Opaque, readable five-tab navigation: preserve existing hit targets & heights. */
+html:not([data-theme="dark"]) #appScreen>.bottom-nav {
+  background:#f9fbff!important;
+  border-top:1px solid #c8d9f4!important;
+  box-shadow:0 -4px 15px #384f8020!important;
+  -webkit-backdrop-filter:none!important;
+  backdrop-filter:none!important;
+}
+html:not([data-theme="dark"]) #appScreen>.bottom-nav .nav-item {
+  color:#5f7194!important;
+}
+html:not([data-theme="dark"]) #appScreen>.bottom-nav .nav-item.active {
+  color:#664ac0!important;text-shadow:none!important;
+}
+html:not([data-theme="dark"]) #appScreen>.bottom-nav .nav-item.active .nav-icon {
+  color:#7655c9!important;filter:none!important;
+}
+html:not([data-theme="dark"]) #appScreen>.bottom-nav .nav-item.active:before {
+  background:linear-gradient(90deg,#8c69e4,#58b7ed)!important;
+  box-shadow:none!important;
+}
+/* Light cards in Cerchie, Chats, Settings. Do not flatten the SOS, map or premium family card. */
+html:not([data-theme="dark"]) #circlesView :is(.panel,.circle-card,.stat-card),
+html:not([data-theme="dark"]) #chatsView :is(.panel,.chat-room,.chat-hub),
+html:not([data-theme="dark"]) #settingsView :is(.panel,.stat-card),
+html:not([data-theme="dark"]) #profileSettingsDrawer :is(.zyro-invitee-row,.zyro-drawer-menu>button) {
+  border-color:#cfdcf2!important;
+  box-shadow:0 6px 18px #6376a315!important;
+}
+html:not([data-theme="dark"]) #circlesView :is(.panel,.circle-card,.stat-card),
+html:not([data-theme="dark"]) #settingsView :is(.panel,.stat-card) {
+  background:linear-gradient(140deg,#ffffff,#f7faff)!important;
+}
+html:not([data-theme="dark"]) :is(#circlesView,#chatsView,#settingsView) :is(.page-heading h1,.section-head h2,.panel-title h2) {
+  color:#263f72!important;
+}
+/* Keep the already-polished Mode cards and Accompagnami inputs intact. */
+html:not([data-theme="dark"]) #modesView .zyro-modes-quicknav button {
+  border-color:#c8d9f5!important;
+  background:linear-gradient(120deg,#fdfdff,#ecf5ff 55%,#f1eaff)!important;
+}
+html:not([data-theme="dark"]) #modesView .zyro-mode-quick-icon {
+  background:linear-gradient(145deg,#e1f4ff,#ece5ff)!important;
+}
+html:not([data-theme="dark"]) :is(.btn-primary,.btn-outline):focus-visible,
+html:not([data-theme="dark"]) #appScreen .nav-item:focus-visible {
+  outline:3px solid #7655c9!important;outline-offset:3px;
+}
+@media (max-width:360px) {
+  html:not([data-theme="dark"]) #appScreen>.topbar .brand.zyro-neon-wordmark {
+    padding:8px 15px!important;letter-spacing:2px!important;
+  }
+}
+@media (prefers-reduced-motion:reduce) {
+  #appScreen .view {animation:none!important;transition:none!important;}
+}
