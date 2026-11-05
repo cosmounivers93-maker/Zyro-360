@@ -317,6 +317,21 @@ html,body{overscroll-behavior-x:none}
   }
 }
 </style>
+<style id="zyro-real-invites-v1">
+.zyro-invite-review{border:1px solid #afc8e3;border-radius:26px;padding:0;max-width:min(91vw,440px);width:100%;box-shadow:0 22px 70px rgba(35,54,105,.19);color:#25456c;background:linear-gradient(145deg,#f9fdff,#f0eaff)}
+.zyro-invite-review::backdrop{background:rgba(17,36,66,.58);backdrop-filter:blur(5px)}
+.zyro-invite-review form{padding:27px 23px;text-align:center}
+.zyro-invite-review h2{font-size:23px;color:#173c69;margin:14px 0}
+.zyro-invite-review p{line-height:1.55}
+.zyro-invite-review-symbol{display:inline-grid;place-items:center;background:linear-gradient(130deg,#d9f4fb,#eae1ff);border-radius:20px;width:58px;height:58px;font-size:28px}
+.zyro-invite-review-note{font-size:12px;color:#536b87}
+.zyro-invite-review-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:18px}
+.zyro-invite-review-buttons button{min-height:48px}
+.zyro-group-contact-send{display:grid;gap:8px;margin:14px 0}
+.zyro-group-contact-send label{text-align:left;font-weight:650;font-size:12px}
+.zyro-group-contact-send select{border-radius:12px;border:1px solid #b7cde2;background:#f7fbff;color:#284f78;min-height:43px;padding:7px 11px}
+.zyro-rapid-sos-option{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:14px;background:#eff4fa;padding:14px;margin:8px 0;color:#526984}
+</style>
 </head>
 <body class="zyro-await-intro">
 <div id="authScreen" class="auth-shell">
@@ -390,6 +405,18 @@ html,body{overscroll-behavior-x:none}
       <div class="section-head space-top"><div><h2>I miei gruppi</h2><p>Un invito dura 24 ore e si usa una volta</p></div></div>
       <div id="circlesList" class="circle-list"></div>
     </section>
+    <dialog id="circleInviteDialog" class="zyro-invite-review" aria-labelledby="circleInviteHeading" aria-describedby="circleInviteExplanation">
+      <form method="dialog">
+        <span class="zyro-invite-review-symbol" aria-hidden="true">✉</span>
+        <h2 id="circleInviteHeading">Invito nella tua cerchia</h2>
+        <p id="circleInviteExplanation"><strong id="circleInviteSender">Un utente</strong> vuole invitarti nella cerchia <strong id="circleInviteName">Privata</strong>.</p>
+        <p class="zyro-invite-review-note">Puoi accettare o rifiutare. Solo se accetti entrerai nella cerchia; il codice verrà utilizzato una sola volta e non sarà più valido.</p>
+        <div class="zyro-invite-review-buttons">
+          <button type="submit" value="reject" class="btn btn-outline">Rifiuta</button>
+          <button type="submit" value="accept" class="btn btn-primary">Accetta</button>
+        </div>
+      </form>
+    </dialog>
 
     <section id="modesView" class="view hidden modes-page">
       <div class="mode-heading"><span class="mode-heading-emblem" aria-hidden="true">✧</span><p class="eyebrow">PROTEZIONE PERSONALIZZATA</p><h1>Modalità <span>360°</span></h1><p>Tutte le protezioni e i contatti d'emergenza in un unico posto.</p></div>
@@ -585,7 +612,7 @@ html,body{overscroll-behavior-x:none}
         <div id="chatRooms" class="chat-rooms" aria-live="polite"></div>
         <div class="chat-private-footnote"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="11" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><circle cx="12" cy="15.5" r="1"/></svg><span>Le conversazioni sono riservate ai membri autorizzati.</span></div>
       </section>
-      <div id="chatConversation" class="panel chat-conversation hidden" role="dialog" aria-modal="true" aria-label="Conversazione"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatGroupInviteButton" class="zyro-group-header-btn hidden" aria-label="Genera invito per il gruppo">＋ Invita</button><button type="button" id="chatClose" class="chat-close" aria-label="Torna alle conversazioni">←</button></div><div id="chatGroupInviteResult" class="zyro-group-code" hidden><small>CODICE GRUPPO · PIÙ PERSONE · 24 ORE</small><code id="chatGroupInviteCode" aria-label="Codice del gruppo"></code><div class="zyro-group-code-actions"><button type="button" id="chatGroupCopy">Copia</button><button type="button" id="chatGroupShare">Condividi</button></div><small>Rigenerando il codice, quello precedente non sarà più valido.</small></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" enterkeyhint="send" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
+      <div id="chatConversation" class="panel chat-conversation hidden" role="dialog" aria-modal="true" aria-label="Conversazione"><div class="chat-header"><div><strong id="chatTitle">Conversazione</strong><small id="chatSubtitle">Solo membri autorizzati</small></div><button type="button" id="chatGroupInviteButton" class="zyro-group-header-btn hidden" aria-label="Genera invito per il gruppo">＋ Invita</button><button type="button" id="chatClose" class="chat-close" aria-label="Torna alle conversazioni">←</button></div><div id="chatGroupInviteResult" class="zyro-group-code" hidden><small>CODICE GRUPPO · PIÙ PERSONE · 24 ORE</small><code id="chatGroupInviteCode" aria-label="Codice del gruppo"></code><div class="zyro-group-code-actions"><button type="button" id="chatGroupCopy">Copia</button><button type="button" id="chatGroupShare">Condividi</button></div><div class="zyro-group-contact-send"><label for="chatGroupRecipient">Invita una persona della tua cerchia</label><select id="chatGroupRecipient"><option value="">Scegli un contatto...</option></select><button type="button" class="btn btn-primary" id="chatGroupSendContact">Invia invito nella chat privata</button></div><small>Ogni persona invitata potrà decidere se entrare. Rigenerando il codice, quello precedente non sarà più valido.</small></div><div id="chatMessages" class="chat-messages" role="log" aria-live="polite"></div><div class="quick-messages"><button type="button" data-quick="Sono arrivato/a ✅">✅ Sono arrivato</button><button type="button" data-quick="Sto tornando a casa 🏠">🏠 Sto tornando</button><button type="button" data-quick="Tutto bene ❤️">❤️ Tutto bene</button><button type="button" data-quick="Puoi chiamarmi appena puoi? 📞">📞 Chiamami</button></div><form id="chatForm" class="chat-compose"><input id="chatText" type="text" enterkeyhint="send" maxlength="1200" autocomplete="off" placeholder="Scrivi un messaggio…" aria-label="Messaggio"><label class="chat-photo-label" title="Invia una foto"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m3 17 5-5 4 4 3.2-3.2L21 18"/></svg><input id="chatPhoto" type="file" accept="image/*"></label><button class="btn btn-primary" id="chatSend" type="submit">Invia</button></form><div id="chatPendingPhoto" class="setting-description"></div></div>
       <p class="small-disclaimer chat-security-note">Chat riservata ai partecipanti.</p>
     </section>
 
