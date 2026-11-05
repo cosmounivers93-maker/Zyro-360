@@ -18,11 +18,12 @@ test('people invited show a single clear introduction without the old microphone
   assert.match(invitees,/addToggle\('lock'/);
 });
 
-test('explicit Family microphone consent is inside contact options, not the all switch',()=>{
-  assert.match(invitees,/if\(family\)\{[\s\S]*?consentToggle\.dataset\.sosAudioConsent='true'/);
-  assert.match(invitees,/consentToggle\.checked=current\.me\.sosAudioConsent===true/);
-  assert.match(app,/e\.target\.matches\('input\[data-sos-audio-consent\]'\)/);
-  assert.match(app,/post\('\/api\/settings\/sos-audio',\{enabled\}\)/);
+test('Family microphone has one per-contact consent, original plans remain unchanged',()=>{
+  assert.match(invitees,/addToggle\('audio'/);
+  assert.doesNotMatch(invitees,/consentToggle\.dataset\.sosAudioConsent='true'/);
+  assert.match(invitees,/consentSosAudio:kind==='audio'&&target\.checked/);
+  assert.match(invitees,/consentSosAudio:enabled&&family/);
+  assert.match(app,/title:'Consenso ascolto microfono SOS'/);
   assert.match(inviteesCss,/zyro-contact-audio-consent/);
 });
 
