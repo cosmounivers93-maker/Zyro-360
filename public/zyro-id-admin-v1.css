@@ -1,0 +1,36 @@
+/* Additive controls only: preserve Zyro 360's existing light/glass design. */
+#circlesView .zyro-id-invites{overflow:hidden}
+.zyro-profile-invite-form{display:grid;gap:10px;margin:14px 0}
+.zyro-profile-invite-form label{font-size:12px;font-weight:700;color:inherit}
+.zyro-profile-invite-form input,.zyro-profile-invite-form select{
+ display:block;width:100%;max-width:100%;box-sizing:border-box;min-width:0;
+ padding:13px;border-radius:14px;background:rgba(255,255,255,.56);
+ color:#243859;border:1px solid rgba(113,124,210,.4);
+ font:inherit;box-shadow:inset 0 1px 1px rgba(255,255,255,.5)}
+.zyro-profile-invite-form input:focus,.zyro-profile-invite-form select:focus{outline:2px solid #8272ed;outline-offset:2px}
+.zyro-profile-invites{margin-top:18px}
+.zyro-profile-invites>h3{font-size:15px;margin:0 0 9px;font-weight:750;color:inherit}
+.zyro-id-invite-card{padding:14px;margin-bottom:10px;border:1px solid rgba(138,143,216,.32);
+ background:linear-gradient(135deg,rgba(255,255,255,.66),rgba(196,228,249,.22));
+ border-radius:16px;overflow-wrap:anywhere;backdrop-filter:blur(12px)}
+.zyro-id-invite-card strong{font-size:14px}
+.zyro-id-invite-card p{font-size:12px;line-height:1.55;margin:6px 0 12px}
+.zyro-id-invite-actions{display:flex;gap:8px;flex-wrap:wrap}
+.zyro-id-invite-card button{padding:9px 12px;border-radius:12px;font-size:12px;font-weight:700;
+ color:#5448ae;background:rgba(240,239,255,.82);border:1px solid rgba(111,98,215,.32);cursor:pointer}
+.zyro-id-invite-card button[data-profile-accept]{color:#fff;background:linear-gradient(125deg,#756ce3,#42a4cc);border-color:transparent}
+.zyro-id-invite-card button:focus-visible{outline:2px solid #706ce6;outline-offset:2px}
+#zyroAdminOverview{display:grid;gap:12px;margin:14px 0 18px}
+#zyroAdminOverview>h3{font-size:17px;margin:0;color:inherit}
+#zyroAdminOverview .zyro-admin-overview-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+#zyroAdminOverview .zyro-admin-stat{border:1px solid rgba(125,143,220,.31);border-radius:15px;
+ background:linear-gradient(135deg,rgba(255,255,255,.60),rgba(209,238,247,.27));
+ padding:13px 8px;display:grid;gap:5px;min-width:0;backdrop-filter:blur(12px)}
+#zyroAdminOverview .zyro-admin-stat strong{font-size:23px;color:#645ac3;font-weight:800;line-height:1.1}
+#zyroAdminOverview .zyro-admin-stat small{font-size:10px;line-height:1.35;color:#395a7d}
+#zyroAdminOverview .zyro-admin-system{border:1px solid rgba(125,143,220,.31);border-radius:16px;
+ background:rgba(239,247,255,.56);padding:14px;color:#395a7d}
+#zyroAdminOverview .zyro-admin-system strong{color:#51489e}
+#zyroAdminOverview .zyro-admin-system p{margin:5px 0;font-size:12px}
+#zyroAdminOverview .zyro-admin-system small{font-size:10px;line-height:1.4}
+@media(max-width:355px){#zyroAdminOverview .zyro-admin-overview-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

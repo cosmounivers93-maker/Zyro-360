@@ -39,10 +39,10 @@ test('invited people are compact with independent five permissions and master',(
   assert.match(app,/changeAllContactAccess\(target\)/);
   assert.match(app,/Abilita tutte le opzioni/);
   for(const key of ["'gps'","'sos'","'audio'","'ring'","'lock'"])assert.ok(app.includes(key),key);
-  assert.match(app,/consentToggle\.dataset\.sosAudioConsent='true'/);
-  assert.match(app,/consentToggle\.checked=current\.me\.sosAudioConsent===true/);
+  assert.doesNotMatch(app,/consentToggle\.dataset\.sosAudioConsent='true'/);
+  assert.match(app,/consentSosAudio:kind==='audio'&&target\.checked/);
   assert.doesNotMatch(app,/Consenso microfono SOS <small>/);
-  assert.match(app,/listenSosAudio:enabled&&family/);
+  assert.match(app,/listenSosAudio:enabled&&family,consentSosAudio:enabled&&family/);
   assert.match(app,/remoteRing:enabled&&family/);
   assert.match(app,/remoteLock:enabled&&family/);
   assert.match(style,/zyro-access-card-compact/);

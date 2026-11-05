@@ -1,0 +1,35 @@
+name: ZYRO 360 - Inviti ID e admin senza cambio grafica o abbonamenti
+on:
+  push:
+    branches: ['feature/zyro-id-inviti-admin-original-ui-20261106']
+    paths:
+      - 'server.mjs'
+      - 'public/index.html'
+      - 'public/app.js'
+      - 'public/zyro-id-admin-v1.css'
+      - 'tests/**'
+      - 'test/**'
+      - '.github/workflows/profile-id-admin-original.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  safe-original-update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Dipendenze backend
+        run: npm install --no-audit --no-fund
+      - name: Sintassi server e client originali
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+          node --check play-billing.mjs
+      - name: Test reale con quattro account isolati e amministratore
+        run: node --test tests/profile-id-invites-owner-original-ui.test.mjs
+      - name: Suite completa del progetto originale
+        run: npm test

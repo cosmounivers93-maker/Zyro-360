@@ -79,7 +79,7 @@ async function initializeStorage() {
     catch (err) { if (err.code !== 'ENOENT') throw err; db = structuredClone(initial); }
     console.warn('[ZYRO storage] MODALITÀ TEMPORANEA: account e chat possono sparire a ogni deploy/riavvio.');
   }
-  db.journeys ||= {}; db.checkins ||= {}; db.adminAudit ||= []; db.userReports ||= [];
+  db.journeys ||= {}; db.checkins ||= {}; db.adminAudit ||= []; db.userReports ||= []; db.profileInvites ||= {};
   db.pickRemoteCommands ||= {}; db.pickRemoteAudit ||= [];
 }
 // Admin identity is pinned by a server-side user ID, never by a browser flag or email address.
@@ -94,6 +94,9 @@ const prod = process.env.NODE_ENV === 'production';
 const SESSION_MAX_AGE = 30 * 24 * 3600 * 1000;
 const MAX_USER_CIRCLES = 12;
 const hash = v => crypto.createHash('sha256').update(v).digest('hex');
+// Stable, non-email, non-internal profile identifier for invitations. Legacy accounts
+// receive the same address without a database migration or leaking their secret ID.
+const publicProfileId = id => 'ZYRO-' + hash('zyro-profile-public-v1:'+id).slice(0,16).toUpperCase();
 const token = (n = 24) => crypto.randomBytes(n).toString('base64url');
 const now = () => Date.now();
 // Only a verified, server-side purchase may set premiumUntil. Never trust premium=true from a browser.
@@ -145,7 +148,7 @@ const publicJourney = (j,viewer) => {
 const publicCheckin = (c,viewer) => c && (c.userId===viewer || (c.recipients||[]).includes(viewer)) ? {id:c.id,userId:c.userId,name:db.users[c.userId]?.name||'Contatto',dueAt:c.dueAt,status:c.status,completedAt:c.completedAt||null} : null;
 
 const cleanText = (s, max = 60) => String(s || '').trim().replace(/[\u0000-\u001F\u007F<>]/g, '').slice(0, max);
-const publicUser = u => ({ id: u.id, name: u.name, avatar: u.avatar || null });
+const publicUser = u => ({ id: u.id, profileId:publicProfileId(u.id), name: u.name, avatar: u.avatar || null });
 function save() {
   if (persistenceFailure) throw new Error('Database temporaneamente indisponibile: modifica non confermata.');
   const snapshot = JSON.stringify(db);
@@ -261,12 +264,18 @@ function stateFor(id) {
       (a.recipients||[]).includes(id),
     address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
+  const myInvites = Object.values(db.profileInvites||{}).filter(inv => inv && inv.expiresAt>now() && (inv.to===id || inv.from===id)).map(inv=>({
+    id:inv.id, circleId:inv.circleId, circleName:db.circles[inv.circleId]?.name||'Cerchia',
+    status:inv.status, expiresAt:inv.expiresAt, createdAt:inv.createdAt,
+    direction:inv.to===id?'received':'sent',
+    peerName:db.users[inv.to===id?inv.from:inv.to]?.name||'Utente'
+  })).filter(inv=>inv.status==='pending'||inv.direction==='sent').sort((a,b)=>b.createdAt-a.createdAt).slice(0,60);
   return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)),
   sosAudioRecipients:(me.sosAudioRecipients||[]).filter(x=>sharedCircle(id,x)),
   pickRemoteContacts:familyActive(me)?(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteRingContacts:familyActive(me)?(me.pickRemoteRingContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteLockContacts:familyActive(me)?(me.pickRemoteLockContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
-  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, profileInvites:myInvites, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -492,7 +501,7 @@ app.post('/api/legal/accept',requireAuth,(req,res)=>{
 });
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
-const adminUser = u => ({id:u.id,name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
+const adminUser = u => ({id:u.id,profileId:publicProfileId(u.id),name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
 app.post('/api/settings/device',requireAuth,limit,(req,res)=>{
  const device=deviceForRequest(req);
  req.user.lastDevice=device;save();notifyAdminUsers();res.json({ok:true});
@@ -501,6 +510,23 @@ app.get('/api/admin/connection-ip',requireAuth,requireAdmin,(req,res)=>{res.set(
 app.get('/api/admin/users',requireAuth,requireAdmin,(req,res)=>{
  res.set('Cache-Control','no-store');
  res.json({users:Object.values(db.users).map(adminUser).map(u=>{const ips=[u.registrationIp,u.lastLoginIp].filter(Boolean);const matches=Object.values(db.users).filter(v=>v.id!==u.id && v.bannedAt && [v.createdAt>now()-30*86400e3?v.registrationIp:null,v.lastLoginAt>now()-30*86400e3?v.lastLoginIp:null].some(ip=>ip&&ips.includes(ip)));return {...u,sameIpBannedAccounts:matches.map(v=>v.id)};}).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)),reports:db.userReports.slice(-100).reverse().map(r=>({...r,user:db.users[r.userId]?adminUser(db.users[r.userId]):null,reporter:db.users[r.reporterId]?adminUser(db.users[r.reporterId]):null})),audit:db.adminAudit.slice(-50).reverse()});
+});
+// No chat bodies, microphone, private positions or recipient lists in owner diagnostics.
+app.get('/api/admin/overview',requireAuth,requireAdmin,(req,res)=>{
+ const users=Object.values(db.users),messages=Object.values(db.messages||{});
+ const activeSos=Object.values(db.alerts).filter(a=>a.active && a.kind!=='pickpocket').length;
+ res.set('Cache-Control','no-store').json({
+   updatedAt:now(),registered:users.length,connected:users.filter(u=>online(u.id)).length,
+   suspended:users.filter(u=>Boolean(u.bannedAt)).length,
+   lifetimeGifts:users.filter(u=>u.premiumGiftLifetime===true).length,
+   activeSos, circles:Object.values(db.circles).filter(c=>c.kind!=='chat').length,
+   chatGroups:Object.values(db.circles).filter(c=>c.kind==='chat').length,
+   pendingInvites:Object.values(db.profileInvites||{}).filter(i=>i.status==='pending'&&i.expiresAt>now()).length,
+   reportsToReview:db.userReports.filter(r=>r.status==='open'&&!r.adminArchivedAt).length,
+   services:{persistentDatabase:storageKind==='postgres',notifications:fcmReady,billingVerifier:billingReady(),realtime:true},
+   // Version is a code label, not proof the Android APK or FCM delivery works.
+   webVersion:'original-ui-id-invites-admin-v1'
+ });
 });
 // Reports are accepted only for another user actually sharing a circle with the reporter.
 app.post('/api/report',requireAuth,limit,(req,res)=>{
@@ -609,6 +635,66 @@ app.post('/api/circles', requireAuth, limit, (req,res) => {
   const id = token(12); db.circles[id] = {id, name, ownerId:req.user.id, createdAt:now()};
   db.memberships.push({circleId:id, userId:req.user.id, joinedAt:now()}); save(); refreshRelated(req.user.id); res.json({ok:true, circleId:id});
 });
+// Recipient-controlled requests by permanent PUBLIC PROFILE ID. Nothing joins
+// a circle or grants location/SOS/audio/remote access before explicit consent.
+app.post('/api/profile-invites', requireAuth, limit, (req,res)=>{
+ const profileId=String(req.body?.profileId||'').trim().toUpperCase();
+ const circleId=String(req.body?.circleId||'');
+ if(!/^ZYRO-[A-F0-9]{16}$/.test(profileId))return res.status(400).json({error:'ID profilo non valido.'});
+ const circle=db.circles[circleId];
+ if(!circle||circle.kind==='chat'||!memberIds(circleId).includes(req.user.id))
+   return res.status(403).json({error:'Seleziona una tua cerchia valida.'});
+ const target=Object.values(db.users).find(u=>publicProfileId(u.id)===profileId);
+ if(!target||target.bannedAt||target.id===req.user.id)return res.status(404).json({error:'Profilo non disponibile.'});
+ if((target.inviteBlockedIds||[]).includes(req.user.id))
+   return res.status(403).json({error:'Non puoi inviare richieste a questo profilo.'});
+ if(memberIds(circleId).includes(target.id))return res.status(409).json({error:'Questa persona è già nella cerchia.'});
+ if(memberIds(circleId).length>=30)return res.status(409).json({error:'Cerchia completa.'});
+ const requests=Object.values(db.profileInvites||{});
+ const recent=requests.find(i=>i.from===req.user.id&&i.to===target.id&&i.circleId===circleId &&
+   (i.status==='pending'&&i.expiresAt>now()||i.status==='declined'&&i.createdAt>now()-24*3600*1000));
+ if(recent)return res.status(409).json({error:'Richiesta già inviata oppure rifiutata di recente.'});
+ if(requests.filter(i=>i.from===req.user.id&&i.status==='pending'&&i.expiresAt>now()).length>=15 ||
+    requests.filter(i=>i.to===target.id&&i.status==='pending'&&i.expiresAt>now()).length>=30)
+   return res.status(429).json({error:'Limite di richieste in sospeso raggiunto.'});
+ const id=token(12);
+ db.profileInvites[id]={id,circleId,from:req.user.id,to:target.id,status:'pending',
+   createdAt:now(),expiresAt:now()+24*3600*1000};
+ save();pushState(target.id);pushState(req.user.id);
+ void sendEventPush([target.id],'Invito alla cerchia • ZYRO 360',
+   req.user.name+' ti ha invitato in una cerchia. Apri l’app per accettare o rifiutare.');
+ res.json({ok:true,inviteId:id,recipientName:target.name,expiresInHours:24});
+});
+app.post('/api/profile-invites/respond',requireAuth,limit,(req,res)=>{
+ const invite=db.profileInvites?.[String(req.body?.inviteId||'')];
+ const decision=req.body?.decision;
+ if(!invite || invite.to!==req.user.id || invite.status!=='pending' ||
+     invite.expiresAt<=now() || !['accept','decline'].includes(decision))
+   return res.status(404).json({error:'Richiesta non disponibile o scaduta.'});
+ const circle=db.circles[invite.circleId],sender=db.users[invite.from];
+ if(decision==='accept'){
+   if(!circle||!sender||sender.bannedAt||!memberIds(circle.id).includes(sender.id))
+     return res.status(410).json({error:'La cerchia non è più disponibile.'});
+   if(userCircles(req.user.id).length>=MAX_USER_CIRCLES||memberIds(circle.id).length>=30)
+     return res.status(409).json({error:'Limite cerchie o membri raggiunto.'});
+   if(!memberIds(circle.id).includes(req.user.id))
+     db.memberships.push({circleId:circle.id,userId:req.user.id,invitedBy:invite.from,joinedAt:now()});
+ }
+ invite.status=decision==='accept'?'accepted':'declined';
+ invite.respondedAt=now();
+ if(decision==='decline'&&req.body.blockSender===true){
+   req.user.inviteBlockedIds=[...new Set([...(req.user.inviteBlockedIds||[]),invite.from])].slice(-200);
+ }
+ save();refreshRelated(req.user.id);refreshRelated(invite.from);
+ res.json({ok:true,status:invite.status});
+});
+app.post('/api/profile-invites/cancel',requireAuth,limit,(req,res)=>{
+ const invite=db.profileInvites?.[String(req.body?.inviteId||'')];
+ if(!invite||invite.from!==req.user.id||invite.status!=='pending')
+   return res.status(404).json({error:'Richiesta non disponibile.'});
+ invite.status='cancelled';invite.respondedAt=now();save();
+ pushState(invite.to);pushState(invite.from);res.json({ok:true});
+});
 app.post('/api/invites', requireAuth, limit, (req,res) => {
   const id = String(req.body.circleId || '');
   if (db.circles[id]?.kind==='chat') return res.status(400).json({error:'Per i gruppi chat genera un codice dalla sezione Chat.'});
@@ -650,6 +736,7 @@ app.post('/api/circles/delete', requireAuth, (req,res) => {
   const others = memberIds(circle.id);
   db.memberships = db.memberships.filter(m => m.circleId !== circle.id);
   for (const [k,v] of Object.entries(db.invites)) if (v.circleId === circle.id) delete db.invites[k];
+  for (const invite of Object.values(db.profileInvites||{}))if(invite.circleId===circle.id&&invite.status==='pending'){invite.status='cancelled';invite.respondedAt=now();pushState(invite.to);}
   delete db.circles[circle.id]; pruneDisconnectedPermissions(); save();
   for (const id of others) refreshRelated(id); res.json({ok:true});
 });
@@ -1124,6 +1211,13 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
           .filter(id=>sharedCircle(req.user.id,id))),
         lock=new Set((req.user.pickRemoteLockContacts??req.user.pickRemoteContacts??[])
           .filter(id=>sharedCircle(req.user.id,id)));
+  // Single explicit audio permission per contact: microphone remains OFF unless
+  // the owner opts in, has Family and also authorizes this SOS recipient.
+  if('consentSosAudio' in req.body && typeof req.body.consentSosAudio!=='boolean')
+    return res.status(400).json({error:'Consenso audio non valido.'});
+  if(req.body.consentSosAudio===true &&
+      !(req.body.listenSosAudio===true && req.body.receiveSos===true && familyActive(req.user)))
+    return res.status(400).json({error:'Autorizza prima l’ascoltatore SOS e verifica il piano Family.'});
   if((req.body.remoteRing===true||req.body.remoteLock===true)&&!familyActive(req.user))
     return res.status(402).json({error:'Squillo e blocco da remoto sono inclusi soltanto in ZYRO Family.'});
   if(req.body.listenSosAudio===true&&!familyActive(req.user))
@@ -1138,6 +1232,15 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
   req.user.gpsRecipients=[...gps].slice(0,120);
   req.user.sosRecipients=[...sos].slice(0,60);
   req.user.sosAudioRecipients=[...audio].filter(id=>sos.has(id)).slice(0,60);
+  // Consented checkbox grants account opt-in only with verified per-contact
+  // consent. Revoking the last listener stops owner audio immediately.
+  if(req.body.consentSosAudio===true)req.user.sosAudioConsent=true;
+  if(!req.user.sosAudioRecipients.length){
+    req.user.sosAudioConsent=false;
+    const alert=currentAlert(req.user.id);
+    if(alert?.kind==='sos')alert.hasAudio=false;
+    for(const connection of connections(req.user.id))connection.microphoneReady=false;
+  }
   req.user.pickRemoteRingContacts=[...ring].slice(0,60);
   req.user.pickRemoteLockContacts=[...lock].slice(0,60);
   req.user.pickRemoteContacts=[...new Set([...ring,...lock])].slice(0,60);
@@ -1568,6 +1671,7 @@ setInterval(()=>{
   const t=now(); let changed=false;
   for (const [k,s] of Object.entries(db.sessions)) if (s.expiresAt<t) {delete db.sessions[k];changed=true;}
   for (const [k,v] of Object.entries(db.invites)) if (v.expiresAt<t) {delete db.invites[k];changed=true;}
+  for (const [k,inv] of Object.entries(db.profileInvites||{}))if(inv.expiresAt<t-3*86400*1000){delete db.profileInvites[k];changed=true;}
   for (const [k,a] of Object.entries(db.alerts)) if (!a.active && a.endedAt<t-7*86400*1000) {delete db.alerts[k];changed=true;}
   for(const u of Object.values(db.users))if(u.lastLoginAt && u.lastLoginAt<t-30*86400e3 && u.lastLoginIp){delete u.lastLoginIp;changed=true;}
   for(const u of Object.values(db.users))if(u.registrationIp && u.createdAt<t-30*86400e3){delete u.registrationIp;changed=true;}

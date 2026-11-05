@@ -49,13 +49,16 @@ test('remote ring and lock actions require distinct authorization',()=>{
  assert.match(source,/remoteAccessFor\(req\.user,command\.by\)\[command\.action\]/);
  assert.match(source,/remoteActionsAuthorized:a\.kind==='pickpocket'/);
 });
-test('profile permission page lists all five specific toggles and SOS global microphone',()=>{
+test('profile permission page retains five toggles with one explicit SOS microphone consent',()=>{
  for(const t of ['Può vedere il mio GPS','Riceve i miei SOS',
   'Può ascoltare il mio microfono durante SOS',
   'Può far squillare il mio telefono','Può bloccare il mio telefono da remoto',
-  'Consento l’audio del microfono durante i miei SOS','Abilita tutte le opzioni'])assert.ok(client.includes(t),t);
+  'Abilita tutte le opzioni'])assert.ok(client.includes(t),t);
  for(const prop of ['sosAudioRecipients','pickRemoteRingContacts','pickRemoteLockContacts'])
    assert.ok(client.includes('current.me.'+prop),prop);
+ assert.doesNotMatch(client,/data\.sosAudioConsent\s*=|consentTitle\.textContent='Consento l’audio del microfono/);
+ assert.match(client,/consentSosAudio:kind==='audio'&&target\.checked/);
+ assert.match(source,/if\(req\.body\.consentSosAudio===true\)req\.user\.sosAudioConsent=true/);
  assert.match(client,/uniqueContacts\(\)\.some\(c=>c\.id===id\)/);
  assert.match(client,/\/api\/settings\/contact-access/);
 });
