@@ -39,6 +39,10 @@ test('Gallery, invitation acceptance, one-time codes, direct/group chat and free
     assert.equal(circle.status,200);
     const invite=await request('POST','/api/invites',{circleId:circle.data.circleId},a);
     assert.equal(invite.status,200);
+    const outstanding=await request('POST','/api/invites/status',{codes:[invite.data.code]},a);
+    assert.deepEqual(outstanding.data.activeCodes,[invite.data.code]);
+    const notIssuer=await request('POST','/api/invites/status',{codes:[invite.data.code]},b);
+    assert.deepEqual(notIssuer.data.activeCodes,[],'Other users cannot inspect a sender\'s invitations');
     const preview=await request('GET','/api/invites/preview?code='+encodeURIComponent(invite.data.code),null,b);
     assert.equal(preview.status,200);
     assert.equal(preview.data.inviterName,'Ada Alfa');
@@ -47,6 +51,8 @@ test('Gallery, invitation acceptance, one-time codes, direct/group chat and free
     assert.equal(stillOutside.data.circles.length,0,'Preview must not enroll a user');
     const joined=await request('POST','/api/invites/join',{code:invite.data.code},b);
     assert.equal(joined.status,200);
+    const consumed=await request('POST','/api/invites/status',{codes:[invite.data.code]},a);
+    assert.deepEqual(consumed.data.activeCodes,[],'Offline sender must remove consumed code on next refresh');
     assert.equal((await request('GET','/api/invites/preview?code='+invite.data.code,null,b)).status,400);
     assert.equal((await request('POST','/api/invites/join',{code:invite.data.code},b)).status,400);
     const aliceState=await request('GET','/api/state',null,a);
