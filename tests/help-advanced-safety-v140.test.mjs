@@ -16,10 +16,11 @@ test('help panel remains accessible in Settings and includes contact-permission 
    'Può bloccare il mio telefono da remoto'
  ]) assert.ok(section.includes(phrase),phrase);
 });
-test('SOS microphone explanation requires global opt-in, recipient and Family',()=>{
- assert.match(section,/Abilita microfono durante SOS/);
- assert.match(section,/soltanto con Family/);
- assert.match(section,/«Può ascoltare il mio microfono durante SOS»/);
+test('live SOS microphone has one explicit per-contact consent and paid access',()=>{
+ assert.match(section,/Può ascoltare il mio microfono durante SOS/);
+ assert.match(section,/Conferma il consenso esplicito/);
+ assert.match(section,/Non serve un secondo interruttore generale per il microfono/);
+ assert.match(section,/«Riceve i miei SOS»/);
  assert.match(section,/non può accendere il tuo microfono da remoto/);
  assert.match(section,/non registra né conserva l’audio/);
  assert.match(section,/senza crittografia end-to-end/);
@@ -42,12 +43,15 @@ test('leaving the last shared circle revokes rights and existing help is preserv
    assert.ok(section.includes(topic),topic);
  assert.ok(!section.includes('non blocca Android e non impedisce lo spegnimento'));
 });
-test('Premium and Family include device-lock and approved remote action explanations',()=>{
- assert.match(section,/Premium, 3,99 € al mese/);
- assert.match(section,/Family, 6,99 € al mese/);
- assert.match(section,/Premium.*blocco automatico dello schermo.*Non include audio SOS né squillo\/blocco da remoto/);
- assert.match(section,/Family.*in esclusiva, squillo e blocco da remoto/);
- assert.match(section,/Family.*audio SOS con consenso/);
+test('updated guide explains one Plus plan, free SOS and realistic rapid SOS limits',()=>{
+ assert.match(section,/ZYRO Plus/);
+ assert.match(section,/L’invio SOS è gratuito/);
+ assert.match(section,/SOS rapido: tre pressioni del tasto accensione/);
+ assert.match(section,/NON disponibile come protezione affidabile/);
+ assert.match(section,/SOS rapido \(non disponibile\)/);
+ assert.match(section,/Pick Pocket/);
+ assert.match(section,/blocco automatico dello schermo/);
+ assert.match(section,/blocco da remoto/);
  assert.match(html,/Come funziona l'app<small>Guida a cerchie, SOS e protezioni remote/);
  assert.match(html,/Persone invitate<small>GPS, SOS, microfono e controllo remoto/);
 });
