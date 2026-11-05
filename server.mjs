@@ -107,7 +107,9 @@ const premiumPlan = user => {
  return receipt?.plan||legacy;
 };
 const premiumActive = user => premiumPlan(user)!=='free';
-const familyActive = user => premiumPlan(user)==='family';
+// Single paid tier: keep historical Premium/Family receipts valid without
+// prematurely cancelling or rewriting subscriptions held by existing users.
+const familyActive = user => premiumActive(user);
 const planFeatures = user => ({sos:true,pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
@@ -984,7 +986,7 @@ app.post('/api/billing/google-notifications',async(req,res)=>{
 // provider URL before deploying at scale. Queries go to the selected provider.
 let lastDestinationSearchAt=0;
 app.post('/api/journey/geocode',requireAuth,limit,async(req,res)=>{
- if(!familyActive(req.user))return res.status(402).json({error:'Accompagnami richiede Family.'});
+ if(!familyActive(req.user))return res.status(402).json({error:'Accompagnami richiede l’abbonamento ZYRO Plus.'});
  if(process.env.ZYRO_DESTINATION_GEOCODER_ENABLED!=='true')
   return res.status(503).json({error:'Ricerca indirizzi non ancora configurata. Puoi scegliere il centro della mappa.'});
  const street=cleanText(req.body?.street,110),city=cleanText(req.body?.city,90),
@@ -1016,7 +1018,7 @@ app.post('/api/journey/geocode',requireAuth,limit,async(req,res)=>{
  }catch{return res.status(502).json({error:'Impossibile cercare l’indirizzo. Verifica la connessione.'});}
 });
 app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
- if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
+ if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede l’abbonamento ZYRO Plus.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients);
  const destination=cleanText(req.body.destination,70);
  if(!recipients||!destination)return res.status(400).json({error:'Indica la destinazione e i destinatari della cerchia.'});
@@ -1067,7 +1069,7 @@ app.post('/api/journey/end',requireAuth,(req,res)=>{
  save();refreshRelated(req.user.id);void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`);res.json({ok:true});
 });
 app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
- if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
+ if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede l’abbonamento ZYRO Plus.'});
  const recipients=journeyAudience(req.user.id,req.body.recipients),minutes=Number(req.body.minutes);
  if(!recipients||!Number.isInteger(minutes)||minutes<5||minutes>1440)return res.status(400).json({error:'Scegli i contatti e un controllo tra 5 e 1440 minuti.'});
  if(['pending','late'].includes(db.checkins[req.user.id]?.status))return res.status(409).json({error:'Hai già un check-in attivo.'});
@@ -1145,9 +1147,9 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
      !(req.body.listenSosAudio===true&&req.body.receiveSos===true&&familyActive(req.user)))
     return res.status(400).json({error:'Il consenso audio richiede un ascoltatore SOS autorizzato e un piano compatibile.'});
   if((req.body.remoteRing===true||req.body.remoteLock===true)&&!familyActive(req.user))
-    return res.status(402).json({error:'Squillo e blocco da remoto sono inclusi soltanto in ZYRO Family.'});
+    return res.status(402).json({error:'Squillo e blocco da remoto sono inclusi soltanto nell’abbonamento ZYRO Plus.'});
   if(req.body.listenSosAudio===true&&!familyActive(req.user))
-    return res.status(402).json({error:'Ascolto audio SOS incluso soltanto in Family.'});
+    return res.status(402).json({error:'Ascolto audio SOS incluso soltanto nell’abbonamento ZYRO Plus.'});
   req.body.shareGps?gps.add(otherId):gps.delete(otherId);
   req.body.receiveSos?sos.add(otherId):sos.delete(otherId);
   if(!req.body.receiveSos)audio.delete(otherId);
@@ -1185,7 +1187,7 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
 app.post('/api/settings/sos-audio',requireAuth,limit,(req,res)=>{
   const enabled=req.body?.enabled;
   if(typeof enabled!=='boolean')return res.status(400).json({error:'Impostazione audio non valida.'});
-  if(enabled&&!familyActive(req.user))return res.status(402).json({error:'L’audio SOS è incluso soltanto in ZYRO Family.'});
+  if(enabled&&!familyActive(req.user))return res.status(402).json({error:'L’audio SOS è incluso soltanto nell’abbonamento ZYRO Plus.'});
   req.user.sosAudioConsent=enabled;
   if(!enabled){
     // Immediately prevent new listening requests and signalling when revoked.
@@ -1362,7 +1364,7 @@ app.get('/api/pickpocket/remote/settings',requireAuth,(req,res)=>{
 });
 app.post('/api/pickpocket/remote/settings',requireAuth,limit,(req,res)=>{
   if(req.body?.enabled===true&&!familyActive(req.user))
-    return res.status(402).json({error:'Il controllo remoto Pick Pocket richiede ZYRO Family.'});
+    return res.status(402).json({error:'Il controllo remoto Pick Pocket richiede l’abbonamento ZYRO Plus.'});
   const enabled=req.body?.enabled;
   const contacts=req.body?.contacts;
   if(typeof enabled!=='boolean'||!Array.isArray(contacts)||contacts.length>60 ||
