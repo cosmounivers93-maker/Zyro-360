@@ -1437,7 +1437,7 @@ app.post('/api/pickpocket/remote/consume',requireAuth,(req,res)=>{
   res.json(valid?{ok:true,action:command.action}:{ok:false});
 });
 app.post('/api/pickpocket/start', requireAuth, limit, (req,res) => {
- if(!premiumActive(req.user))return res.status(402).json({error:'Pick Pocket richiede ZYRO Premium o Family.'});
+ if(!premiumActive(req.user))return res.status(402).json({error:'Pick Pocket richiede ZYRO Plus.'});
   const existing = currentAlert(req.user.id);
   if (existing) return res.status(409).json({error:'Un altro allarme è già attivo.'});
   const ids = req.body.recipients;
