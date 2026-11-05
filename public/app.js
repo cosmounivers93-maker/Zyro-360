@@ -689,7 +689,7 @@ const roomChatIcon=`<svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg
 function renderChatRooms(){
   if(!current)return;
   // Only groups explicitly created from 'Crea gruppo' appear as group conversations.
-  const circles=(current.circles||[]).filter(c=>c.kind==='chat'), contacts=uniqueContacts();
+  const circles=current.circles||[], contacts=uniqueContacts();
   const list=$('chatRooms');
   const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.kind,c.mine,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
   if(list._zyroSig===sig&&list.children.length)return;
@@ -2379,7 +2379,7 @@ function renderInvitedPeople(){
    const all=document.createElement('input');all.type='checkbox';
    all.dataset.accessAll=member.id;all.checked=enabledCount===available.length;
    all.indeterminate=enabledCount>0&&enabledCount<available.length;
-   all.disabled=!!current.me.sos;
+   all.disabled=!!current.me.sos&&enabledCount===0;
    all.setAttribute('aria-label','Abilita o disabilita tutte le autorizzazioni per '+member.name);
    allLabel.append(allText,all);options.append(allLabel);
    const addToggle=(type,labelText,help,checked)=>{
@@ -2391,33 +2391,14 @@ function renderInvitedPeople(){
      const input=document.createElement('input');input.type='checkbox';
      input.dataset.accessUser=member.id;input.dataset.accessType=type;
      input.checked=checked;
-     input.disabled=!!current.me.sos||(type==='audio'&&(!family||!sets.sos.has(member.id)))||
+     input.disabled=(!!current.me.sos&&!checked)||(type==='audio'&&!family)||
        ((type==='ring'||type==='lock')&&!family);
      input.setAttribute('aria-label',labelText+' per '+member.name);
      row.append(info,input);options.append(row);
    };
    addToggle('gps','Può vedere il mio GPS','Solo quando attivo la posizione LIVE.',sets.gps.has(member.id));
    addToggle('sos','Riceve i miei SOS','Notifiche di emergenza selezionate da te.',sets.sos.has(member.id));
-   addToggle('audio','Può ascoltare il mio microfono durante SOS','Solo Family: richiede SOS e consenso microfono generale.',sets.audio.has(member.id));
-   if(family){
-     // Il consenso è generale, ma l'utente lo gestisce dentro le opzioni della cerchia.
-     // Non si attiva con "Abilita tutte le opzioni": serve un gesto esplicito.
-     const consentRow=document.createElement('label');
-     consentRow.className='zyro-access-toggle zyro-contact-audio-consent';
-     const consentText=document.createElement('span');
-     const consentTitle=document.createElement('strong');
-     consentTitle.textContent='Consento l’audio del microfono durante i miei SOS';
-     const consentHelp=document.createElement('small');
-     consentHelp.textContent='Consenso generale Family: solo durante un SOS e solo ai contatti autorizzati. Non parte mai con la sola attivazione dei permessi.';
-     consentText.append(consentTitle,consentHelp);
-     const consentToggle=document.createElement('input');consentToggle.type='checkbox';
-     consentToggle.dataset.sosAudioConsent='true';
-     consentToggle.checked=current.me.sosAudioConsent===true;
-     consentToggle.disabled=!!current.me.sos;
-     consentToggle.setAttribute('aria-label','Consenti o revoca la trasmissione audio durante SOS');
-     consentRow.append(consentText,consentToggle);
-     options.append(consentRow);
-   }
+   addToggle('audio','Può ascoltare il mio microfono durante SOS','Family: consenso unico, valido solo durante un SOS attivo e revocabile in qualsiasi momento.',sets.audio.has(member.id)&&current.me.sosAudioConsent===true);
    addToggle('ring','Può far squillare il mio telefono','Solo Family: durante un vero allarme Pick Pocket.',sets.ring.has(member.id));
    addToggle('lock','Può bloccare il mio telefono da remoto','Solo Family: richiede anche l’autorizzazione amministratore Android.',sets.lock.has(member.id));
    card.append(options);root.append(card);
@@ -2433,7 +2414,7 @@ async function changeAllContactAccess(target){
  const confirmed=await zyroOwnerDialog({
   title:enabled?'Autorizza tutte le funzioni':'Revoca tutte le autorizzazioni',
   description:enabled
-   ?'Stai per autorizzare '+contact.name+' a utilizzare tutte le funzioni consentite dal tuo piano (GPS, SOS'+(family?', audio SOS e controllo remoto Pick Pocket':'')+'). Potrai disabilitarle o modificarle una per una, quando vuoi. GPS LIVE, SOS e microfono non si attivano automaticamente.'
+   ?'Stai per autorizzare '+contact.name+' a utilizzare tutte le funzioni del tuo piano (GPS, SOS'+(family?', ascolto audio in diretta solo DURANTE SOS e controllo remoto Pick Pocket':'')+'). Confermando concedi esplicitamente anche il consenso audio; la persona dovrà scegliere Ascolta. Il microfono resta disattivato fuori da SOS e puoi revocare il permesso.'
    :'Vuoi revocare tutte le autorizzazioni di '+contact.name+'? Potrai riabilitarle tutte insieme o singolarmente in qualsiasi momento.',
   submitLabel:enabled?'Conferma autorizzazioni':'Disabilita tutte'
  });
@@ -2445,7 +2426,7 @@ async function changeAllContactAccess(target){
  }
  const response=await post('/api/settings/contact-access',{
    userId:id,shareGps:enabled,receiveSos:enabled,
-   listenSosAudio:enabled&&family,remoteRing:enabled&&family,remoteLock:enabled&&family
+   listenSosAudio:enabled&&family,consentSosAudio:enabled&&family,remoteRing:enabled&&family,remoteLock:enabled&&family
  });
  current.me.gpsRecipients=response.gpsRecipients;
  current.me.sosRecipients=response.sosRecipients;
@@ -2453,7 +2434,7 @@ async function changeAllContactAccess(target){
  current.me.pickRemoteRingContacts=response.pickRemoteRingContacts;
  current.me.pickRemoteLockContacts=response.pickRemoteLockContacts;
  sosPending=null;await refresh();
- toast(enabled?'Opzioni del contatto abilitate. GPS LIVE e microfono richiedono attivazione separata.':'Tutte le autorizzazioni del contatto disabilitate.');
+ toast(enabled?'Autorizzazioni aggiornate. Audio disponibile solo durante SOS.':'Tutte le autorizzazioni del contatto disabilitate.');
 }
 async function changeContactAccess(target){
  if(!current)return;
@@ -2468,11 +2449,21 @@ async function changeContactAccess(target){
  const lock=new Set(current.me.pickRemoteLockContacts||[]);
  const groups={gps,sos,audio,ring,lock};
  if(!Object.hasOwn(groups,kind))throw Error('Permesso sconosciuto.');
+ if(kind==='audio'&&target.checked){
+   const contact=uniqueContacts().find(u=>u.id===id);
+   const allowed=await zyroOwnerDialog({
+     title:'Consenso ascolto microfono SOS',
+     description:'Confermi che '+(contact?.name||'questo contatto')+' potrà ascoltare il tuo microfono esclusivamente quando attivi SOS e soltanto dopo aver premuto «Ascolta»? Puoi revocare il permesso in qualsiasi momento.',
+     submitLabel:'Autorizza ascolto'
+   });
+   if(!allowed){target.checked=false;return;}
+   sos.add(id);
+ }
  groups[kind][target.checked?'add':'delete'](id);
  if(!sos.has(id))audio.delete(id);
  const response=await post('/api/settings/contact-access',{
    userId:id,shareGps:gps.has(id),receiveSos:sos.has(id),
-   listenSosAudio:audio.has(id),remoteRing:ring.has(id),remoteLock:lock.has(id)
+   listenSosAudio:audio.has(id),consentSosAudio:kind==='audio'&&target.checked,remoteRing:ring.has(id),remoteLock:lock.has(id)
  });
  current.me.gpsRecipients=response.gpsRecipients;
  current.me.sosRecipients=response.sosRecipients;
