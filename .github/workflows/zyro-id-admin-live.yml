@@ -32,9 +32,9 @@ jobs:
              && grep -Fq 'function renderProfileInvites()' /tmp/zyro-app.js \
              && grep -Fq "consentSosAudio:kind==='audio'&&target.checked" /tmp/zyro-app.js \
              && node -e "const h=require('/tmp/zyro-health.json');if(!h.ok||!h.persistentStorage)process.exit(1)"; then
-              invitecode=$(curl -sS -o /dev/null -w '%{http_code}' "$base/api/profile-invites")
+              invitecode=$(curl -sS -X POST -H 'Content-Type: application/json' -d '{}' -o /dev/null -w '%{http_code}' "$base/api/profile-invites")
               admincode=$(curl -sS -o /dev/null -w '%{http_code}' "$base/api/admin/overview")
-              if [ "$invitecode" = '404' ] && [ "$admincode" = '401' ]; then
+              if [ "$invitecode" = '401' ] && [ "$admincode" = '401' ]; then
                 echo 'SUCCESS: originale Zyro Online, ID invite + admin only owner, stable PostgreSQL.'
                 exit 0
               fi
