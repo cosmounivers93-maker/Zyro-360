@@ -619,6 +619,23 @@ app.post('/api/invites', requireAuth, limit, (req,res) => {
   db.invites[hash(code)] = { circleId:id, createdBy:req.user.id, expiresAt:now()+24*3600*1000 }; save();
   res.json({code, expiresInHours:24});
 });
+// Reconcile already-shared codes when their creator reconnects after an
+// acceptance. The client cannot mistake a stale local invite for a valid one.
+// Only the authenticated issuer may check their own outstanding codes.
+app.post('/api/invites/status', requireAuth, limit, (req,res) => {
+  const codes=req.body?.codes;
+  if(!Array.isArray(codes)||codes.length>30||
+     codes.some(code=>typeof code!=='string'||!/^[A-F0-9]{18}$/.test(code)))
+    return res.status(400).json({error:'Elenco codici non valido.'});
+  const activeCodes=codes.filter(code=>{
+    const inv=db.invites[hash(code)];
+    return inv?.createdBy===req.user.id && inv.kind!=='group' &&
+      inv.expiresAt>now() && Boolean(db.circles[inv.circleId]) &&
+      memberIds(inv.circleId).includes(req.user.id);
+  });
+  res.set('Cache-Control','no-store');
+  res.json({activeCodes});
+});
 // Preview does not join or consume a code. The recipient must expressly
 // accept; invitation metadata never includes private account information.
 app.get('/api/invites/preview', requireAuth, limit, (req,res) => {
