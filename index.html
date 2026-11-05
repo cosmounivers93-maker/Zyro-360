@@ -169,6 +169,21 @@ html{scroll-behavior:auto!important}
         <p class="pick-limits">La funzione non blocca Android, non impedisce lo spegnimento e può fermarsi a schermo spento. Rispetta il volume del dispositivo e può produrre falsi allarmi.</p>
       </section>
 
+      <section class="zyro-v15-panel" id="rapidSosPanel" aria-label="SOS rapido Android">
+        <div class="zyro-v15-heading">
+          <span class="zyro-v15-symbol" aria-hidden="true">🆘</span>
+          <div>
+            <p class="eyebrow muted">PROTEZIONE ANDROID · SPERIMENTALE</p>
+            <h2>SOS rapido con tasto fisico</h2>
+            <p>Puoi provare ad attivare un SOS con tre pressioni rapide del tasto di accensione, senza aprire l'app. Android non comunica direttamente queste pressioni a Zyro 360: la funzione riconosce tre rapidi cambi di stato dello schermo.</p>
+          </div>
+        </div>
+        <p id="rapidSosStatus" role="status" aria-live="polite">Verifica il servizio Android per conoscere lo stato reale.</p>
+        <button type="button" id="rapidSosEnable" class="zyro-v15-primary">Attiva SOS rapido sperimentale</button>
+        <button type="button" id="rapidSosDisable" class="zyro-v15-secondary" hidden>Disattiva SOS rapido</button>
+        <p class="zyro-native-monitor-note">Richiede un account Premium o Family, contatti SOS autorizzati, GPS e servizio Android attivo con notifica persistente. Può non funzionare con schermo bloccato, app arrestata, dopo riavvio o su alcuni telefoni; risvegli dello schermo non causati dal tasto possono provocare falsi allarmi. Non sostituisce il 112 né l'SOS del telefono. Il microfono non si avvia automaticamente.</p>
+      </section>
+
       <section class="zyro-v15-panel" id="journeyPanel">
         <div class="zyro-v15-heading"><span class="zyro-v15-symbol">↗</span><div><p class="eyebrow muted">VIAGGIA CON PIÙ TRANQUILLITÀ</p><h2>Accompagnami</h2><p>Condividi il percorso con i contatti scelti e indica quando pensi di arrivare.</p></div></div>
         <div id="journeyInactive">
