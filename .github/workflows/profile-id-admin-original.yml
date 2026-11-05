@@ -30,9 +30,5 @@ jobs:
           node --check play-billing.mjs
       - name: Test reale con quattro account isolati e amministratore
         run: node --test tests/profile-id-invites-owner-original-ui.test.mjs
-      - name: Regressioni fondamentali
-        run: |
-          node --test tests/realtime-presence.test.mjs
-          node --test tests/pick-remote-security.test.mjs
-          node --test tests/family-remote-only-v141.test.mjs
-          node --test tests/contact-permissions-v139.test.mjs
+      - name: Suite completa del progetto originale
+        run: npm test
