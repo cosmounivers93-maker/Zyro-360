@@ -39,8 +39,10 @@ test('invited people are compact with independent five permissions and master',(
   assert.match(app,/changeAllContactAccess\(target\)/);
   assert.match(app,/Abilita tutte le opzioni/);
   for(const key of ["'gps'","'sos'","'audio'","'ring'","'lock'"])assert.ok(app.includes(key),key);
-  assert.match(app,/consentToggle\.dataset\.sosAudioConsent='true'/);
-  assert.match(app,/consentToggle\.checked=current\.me\.sosAudioConsent===true/);
+  // An accepted contact gets ONE explicit listening toggle, not a second global switch.
+  assert.match(app,/addToggle\('audio','Può ascoltare il mio microfono durante SOS'/);
+  assert.doesNotMatch(app,/consentToggle\.dataset\.sosAudioConsent='true'/);
+  assert.match(app,/consentSosAudio:kind==='audio'&&target\.checked/);
   assert.doesNotMatch(app,/Consenso microfono SOS <small>/);
   assert.match(app,/listenSosAudio:enabled&&family/);
   assert.match(app,/remoteRing:enabled&&family/);
