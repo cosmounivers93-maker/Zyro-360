@@ -8,6 +8,7 @@ on:
       - 'public/app.js'
       - 'public/zyro-id-admin-v1.css'
       - 'tests/**'
+      - 'test/**'
       - '.github/workflows/profile-id-admin-original.yml'
   workflow_dispatch:
 permissions:
