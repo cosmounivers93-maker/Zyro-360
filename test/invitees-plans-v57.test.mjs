@@ -18,28 +18,27 @@ test('people invited show a single clear introduction without the old microphone
   assert.match(invitees,/addToggle\('lock'/);
 });
 
-test('explicit Family microphone consent is inside contact options, not the all switch',()=>{
-  assert.match(invitees,/if\(family\)\{[\s\S]*?consentToggle\.dataset\.sosAudioConsent='true'/);
-  assert.match(invitees,/consentToggle\.checked=current\.me\.sosAudioConsent===true/);
-  assert.match(app,/e\.target\.matches\('input\[data-sos-audio-consent\]'\)/);
-  assert.match(app,/post\('\/api\/settings\/sos-audio',\{enabled\}\)/);
-  assert.match(inviteesCss,/zyro-contact-audio-consent/);
+test('a single contact switch explicitly permits SOS live audio only after confirmation',()=>{
+  assert.match(invitees,/addToggle\('audio','Può ascoltare il mio microfono durante SOS'/);
+  assert.doesNotMatch(invitees,/consentToggle\.dataset\.sosAudioConsent/);
+  assert.match(app,/confirmCircleInvitation/);
+  assert.match(app,/consentSosAudio:kind==='audio'&&target\.checked/);
+  assert.match(app,/title:'Ascolto in diretta durante SOS'/);
 });
 
-test('subscription selector is collapsed by default and expands Base and Family',()=>{
+test('subscription selector shows exactly one Plus offer and keeps SOS free',()=>{
   assert.match(html,/<details id="zyroPlanOptions" class="zyro-mode-details zyro-mode-plans-details">/);
-  assert.match(html,/<summary><span class="zyro-mode-summary-label"><strong>Seleziona abbonamenti<\/strong>/);
-  assert.ok(html.indexOf('<header class="zyro-modes-group-title"><span aria-hidden="true">04</span>')<html.indexOf('Seleziona abbonamenti'));
-  assert.ok(html.indexOf('Seleziona abbonamenti')<html.indexOf('id="zyroPersonalTitle"'));
-  assert.ok(html.indexOf('id="zyroPersonalTitle"')<html.indexOf('id="zyroFamilyTitle"'));
-  assert.match(html,/id="zyroPersonalTitle">ZYRO Base/);
-  assert.match(html,/id="zyroFamilyTitle">ZYRO Family/);
+  assert.match(html,/id="zyroPlusTitle">ZYRO Plus/);
+  assert.match(html,/2,99 €/);
+  assert.match(html,/SOS sempre gratuito/);
+  assert.ok(!html.includes('id="zyroPersonalTitle"'));
+  assert.ok(!html.includes('id="zyroFamilyTitle"'));
+  assert.equal((html.match(/data-billing-open/g)||[]).length,1);
+  assert.match(html,/Check-in intelligente/);
+  assert.match(html,/Pick Pocket avanzato/);
+  assert.match(html,/Ascolto microfono in diretta/);
+  assert.match(html,/Blocco schermo/);
   assert.match(html,/id="zyroOpenSubscriptionPlans"/);
-  assert.match(app,/\$\('zyroOpenSubscriptionPlans'\)\?\.addEventListener\('click',\(\)=>openProfileSettings\('premium'\)\)/);
-  assert.match(html,/3,99 €/);
-  assert.match(html,/6,99 €/);
-  assert.match(html,/Audio SOS in diretta, con il tuo consenso/);
-  assert.match(html,/Accompagnami e segui percorso/);
-  assert.equal((html.match(/data-billing-open/g)||[]).length,2);
-  assert.match(plansCss,/zyro-plan-family/);
+  assert.match(app,/\$\('zyroOpenSubscriptionPlans'\)\?\.addEventListener/);
+  assert.match(plansCss,/zyro-plan/);
 });

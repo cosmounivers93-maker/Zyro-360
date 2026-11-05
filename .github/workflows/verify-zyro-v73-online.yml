@@ -1,0 +1,40 @@
+name: ZYRO 360 - Verifica release V73 realmente online su Render
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server.mjs'
+      - 'public/index.html'
+      - 'public/app.js'
+      - '.github/workflows/verify-zyro-v73-online.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  live-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Controlla server e pagina pubblicati (non basta APK firmato)
+        shell: bash
+        run: |
+          set -euo pipefail
+          target='https://zyro-360.onrender.com'
+          for attempt in $(seq 1 30); do
+            if curl --fail --location --silent --show-error --max-time 20 "$target/api/release-info" -o /tmp/zyro-release.json \
+              && curl --fail --location --silent --show-error --max-time 20 "$target/" -o /tmp/zyro-index.html \
+              && curl --fail --location --silent --show-error --max-time 20 "$target/app.js?v=73.2" -o /tmp/zyro-app.js \
+              && node -e "const s=require('/tmp/zyro-release.json');const c=s.capabilities; if(s.webRelease!=='73'||s.apiRelease!=='73'||!c.freeManualSos||!c.inviteReview||!c.oneTimeInviteStatus||!c.personalAndGroupChat||!c.sosAudioConsentPerContact||!c.singlePlusPlanPrepared) process.exit(1)" \
+              && grep -Fq 'name="zyro-web-release" content="73"' /tmp/zyro-index.html \
+              && grep -Fq 'id="circleInviteDialog"' /tmp/zyro-index.html \
+              && grep -Fq 'id="zyroPlusTitle"' /tmp/zyro-index.html \
+              && grep -Fq 'async function reconcileInviteCodes()' /tmp/zyro-app.js \
+              && grep -Fq 'async function confirmCircleInvitation' /tmp/zyro-app.js; then
+              echo 'RELEASE V73 ONLINE: server + frontend coerenti, nessuna versione vecchia servita.'
+              exit 0
+            fi
+            echo "Server non ancora aggiornato alla V73 (verifica $attempt/30)"
+            sleep 8
+          done
+          echo 'ERRORE: build GitHub verde, ma Render non sta servendo la V73. Non dichiarare APK completo.'
+          exit 1

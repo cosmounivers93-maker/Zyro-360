@@ -15,10 +15,11 @@ function receipt(productId,basePlanId,account=accountId(USER)){
   }]
  };
 }
-test('Google Play product IDs match current Play Console',()=>{
- assert.deepEqual(Object.keys(PRODUCTS).sort(),['zyro360_family','zyro360_premium']);
+test('New single Plus product is prepared and legacy Play subscriptions remain valid',()=>{
+ assert.deepEqual(Object.keys(PRODUCTS).sort(),['zyro360_family','zyro360_plus','zyro360_premium']);
  assert.equal(PRODUCTS.zyro360_premium.basePlanId,'premium-mensile');
  assert.equal(PRODUCTS.zyro360_family.basePlanId,'family-mensile');
+ assert.equal(PRODUCTS.zyro360_plus.basePlanId,'plus-mensile');
 });
 test('Premium monthly receipt grants only personal features',()=>{
  const result=evaluatePurchase(receipt('zyro360_premium','premium-mensile'),USER,NOW);
@@ -39,4 +40,9 @@ test('Expired subscription grants no active access',()=>{
  const r=receipt('zyro360_premium','premium-mensile');
  r.lineItems[0].expiryTime=new Date(NOW-1000).toISOString();
  assert.equal(evaluatePurchase(r,USER,NOW).active,false);
+});
+
+test('New Plus monthly receipt unlocks the one paid plan only after Google verification',()=>{
+ assert.equal(evaluatePurchase(receipt('zyro360_plus','plus-mensile'),USER,NOW).plan,'plus');
+ assert.throws(()=>evaluatePurchase(receipt('zyro360_plus','other-plan'),USER,NOW),/non riconosciuto/);
 });

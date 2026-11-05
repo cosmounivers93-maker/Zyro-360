@@ -1,0 +1,54 @@
+name: ZYRO 360 - Audit Render pubblico (sola lettura)
+on:
+  push:
+    branches: ['feature/zyro-20261105-cerchie-chat-ui-sos-gratis']
+    paths:
+      - '.github/workflows/zyro-live-environment-audit.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render-health-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Verifica pubblica senza credenziali
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://zyro-360.onrender.com/api/health'
+          for attempt in $(seq 1 15); do
+            if curl --silent --show-error --location --fail --max-time 23 "$url" -o /tmp/zyro-public-health.json; then
+              node -e '
+                const fs=require("node:fs");
+                const h=JSON.parse(fs.readFileSync("/tmp/zyro-public-health.json","utf8"));
+                if(h.ok!==true)process.exit(1);
+                console.log("Server live: raggiungibile");
+                console.log("Archivio PostgreSQL persistente: "+(h.persistentStorage===true?"SI":"NO / NON CONFERMATO"));
+                console.log("Notifiche Firebase: "+(h.firebaseConfigured===true?"configurate":"non confermate"));
+                console.log("Pagamenti verificati: "+(h.billingReady===true?"sistema pronto":"non confermato"));
+                if(h.persistentStorage!==true)console.log("::warning::NON eseguire deploy: rischio perdita account e chat al riavvio.");
+                if(h.firebaseConfigured!==true)console.log("::warning::Notifiche SOS non confermate sul servizio pubblico.");
+                if(h.billingReady!==true)console.log("::warning::Google Play Billing non confermato sul servizio pubblico.");
+              '
+              # Confirm the narrow connection-status fix has actually reached
+              # the public Render site (a GitHub merge alone is insufficient).
+              status_online='false'
+              if curl --silent --show-error --location --fail --max-time 23 'https://zyro-360.onrender.com/' -o /tmp/zyro-public-index.html \
+                 && curl --silent --show-error --location --fail --max-time 23 'https://zyro-360.onrender.com/app.js?v=79.0' -o /tmp/zyro-public-app.js \
+                 && grep -Fq 'class="connection-pill" role="status"' /tmp/zyro-public-index.html \
+                 && grep -Fq "function probeSocketPresence()" /tmp/zyro-public-app.js; then
+                status_online='true'
+              fi
+              if [ "$status_online" = 'true' ]; then
+                echo 'Connessione verde: correzione live presente nel frontend pubblico.'
+              else
+                echo "::warning::Correzione dello stato online non ancora confermata su Render."
+              fi
+              exit 0
+            fi
+            echo "Ambiente Render non ancora risponde ($attempt/15)"
+            sleep 8
+          done
+          echo "::warning::Impossibile verificare lo stato pubblico di Render. Non considerare il deploy sicuro."
+          exit 0
