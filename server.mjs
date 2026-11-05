@@ -1211,6 +1211,13 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
           .filter(id=>sharedCircle(req.user.id,id))),
         lock=new Set((req.user.pickRemoteLockContacts??req.user.pickRemoteContacts??[])
           .filter(id=>sharedCircle(req.user.id,id)));
+  // Single explicit audio permission per contact: microphone remains OFF unless
+  // the owner opts in, has Family and also authorizes this SOS recipient.
+  if('consentSosAudio' in req.body && typeof req.body.consentSosAudio!=='boolean')
+    return res.status(400).json({error:'Consenso audio non valido.'});
+  if(req.body.consentSosAudio===true &&
+      !(req.body.listenSosAudio===true && req.body.receiveSos===true && familyActive(req.user)))
+    return res.status(400).json({error:'Autorizza prima l’ascoltatore SOS e verifica il piano Family.'});
   if((req.body.remoteRing===true||req.body.remoteLock===true)&&!familyActive(req.user))
     return res.status(402).json({error:'Squillo e blocco da remoto sono inclusi soltanto in ZYRO Family.'});
   if(req.body.listenSosAudio===true&&!familyActive(req.user))
@@ -1225,6 +1232,15 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
   req.user.gpsRecipients=[...gps].slice(0,120);
   req.user.sosRecipients=[...sos].slice(0,60);
   req.user.sosAudioRecipients=[...audio].filter(id=>sos.has(id)).slice(0,60);
+  // Consented checkbox grants account opt-in only with verified per-contact
+  // consent. Revoking the last listener stops owner audio immediately.
+  if(req.body.consentSosAudio===true)req.user.sosAudioConsent=true;
+  if(!req.user.sosAudioRecipients.length){
+    req.user.sosAudioConsent=false;
+    const alert=currentAlert(req.user.id);
+    if(alert?.kind==='sos')alert.hasAudio=false;
+    for(const connection of connections(req.user.id))connection.microphoneReady=false;
+  }
   req.user.pickRemoteRingContacts=[...ring].slice(0,60);
   req.user.pickRemoteLockContacts=[...lock].slice(0,60);
   req.user.pickRemoteContacts=[...new Set([...ring,...lock])].slice(0,60);
