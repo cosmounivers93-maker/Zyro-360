@@ -1,5 +1,5 @@
 function hasFamilyPlan(){return current?.me?.features?.sosAudio===true;}
-function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione è inclusa in ZYRO Family.');}}
+function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione richiede l’abbonamento ZYRO Plus.');}}
 function updateMarkupIfChanged(node,html){
  if(node._zyroMarkup===html)return;
  node._zyroMarkup=html;node.innerHTML=html;
@@ -1853,7 +1853,7 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di Family.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Base'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):(current.billingReady?'Scegli il tuo piano nell’app Android. Prezzo e rinnovo vengono confermati da Google Play.':'Nessun piano attivo. Ti avviseremo qui quando gli abbonamenti saranno disponibili.');
+ $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include le funzioni di ZYRO Plus.':me.premiumActive?(me.premiumGiftLifetime?'ZYRO Plus a vita: accesso omaggio attivo.':`ZYRO Plus attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):(current.billingReady?'Scegli il tuo piano nell’app Android. Prezzo e rinnovo vengono confermati da Google Play.':'Nessun piano attivo. Ti avviseremo qui quando gli abbonamenti saranno disponibili.');
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  renderBillingActions();
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
@@ -2365,8 +2365,8 @@ function renderInvitedPeople(){
    addToggle('gps','Può vedere il mio GPS','Solo quando attivo la posizione LIVE.',sets.gps.has(member.id));
    addToggle('sos','Riceve i miei SOS','Notifiche di emergenza selezionate da te.',sets.sos.has(member.id));
    addToggle('audio','Può ascoltare il mio microfono durante SOS','Un unico consenso: durante il tuo SOS la persona potrà ascoltare in diretta premendo Ascolta. Si abilita anche la ricezione SOS; puoi revocarlo qui.',sets.audio.has(member.id)&&current.me.sosAudioConsent===true);
-   addToggle('ring','Può far squillare il mio telefono','Solo Family: durante un vero allarme Pick Pocket.',sets.ring.has(member.id));
-   addToggle('lock','Può bloccare il mio telefono da remoto','Solo Family: richiede anche l’autorizzazione amministratore Android.',sets.lock.has(member.id));
+   addToggle('ring','Può far squillare il mio telefono','Con ZYRO Plus: durante un vero allarme Pick Pocket.',sets.ring.has(member.id));
+   addToggle('lock','Può bloccare il mio telefono da remoto','Con ZYRO Plus: richiede anche l’autorizzazione amministratore Android.',sets.lock.has(member.id));
    card.append(options);root.append(card);
  }
  if(current.me.sos){const n=document.createElement('p');n.className='setting-description';
@@ -2487,28 +2487,6 @@ async function init(){
     void refreshPermissionStates();
   });
   $('savedInvitees').addEventListener('change',e=>{
-    if(e.target.matches('input[data-sos-audio-consent]')){
-      const input=e.target, enabled=input.checked;
-      if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede ZYRO Family.',true);return;}
-      input.disabled=true;
-      // Launch the permission check in this tap; never store or send test audio.
-      const probe=enabled?testSOSMicrophone().then(()=>null,error=>sosMicErrorMessage(error)):null;
-      void action(async()=>{
-        try{
-          await post('/api/settings/sos-audio',{enabled});
-          if(!enabled && localStream)stopAudio();
-          sosAudioError='';
-          await refresh();
-          const issue=probe?await probe:null;
-          if(issue)toast('Preferenza salvata, ma il microfono non è pronto: '+issue,true);
-          else toast(enabled?'Ascolto SOS automatico consentito. Si attiverà quando premi SOS.':'Ascolto ambientale SOS disattivato.');
-        }catch(err){
-          if(input.isConnected){input.checked=!enabled;input.disabled=false;}
-          throw err;
-        }
-      });
-      return;
-    }
     if(e.target.matches('input[data-access-all]')){
       const input=e.target;input.disabled=true;
       void action(async()=>{try{await changeAllContactAccess(input);}catch(err){input.checked=!input.checked;throw err;}
