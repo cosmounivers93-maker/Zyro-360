@@ -17,6 +17,10 @@ test('production header shows a real-time connection status dot',()=>{
   assert.match(tag,/role="status"/);
   assert.match(html,/#appScreen>\.topbar \.connection-pill\{display:flex!important/);
   assert.doesNotMatch(html,/#appScreen>\.topbar \.connection-pill\{display:none!important/);
+  // A legacy neon stylesheet forces all dots green using !important.
+  // The production header must override it with an amber offline color.
+  assert.ok(html.includes('background:#f5ad6b!important'));
+  assert.ok(html.includes('background:#36e5ac!important'));
   assert.match(html,/id="connectionDot"/);
   assert.match(html,/id="connectionText"/);
 });
