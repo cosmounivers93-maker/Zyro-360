@@ -930,7 +930,26 @@ function updateGeo(oldOn,newOn){
     renderHome();
   },err=>{geolocationError=`GPS: ${err.message||'permesso negato'}`;renderHome();toast(geolocationError,true);},{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
 }
-async function refresh(){if(!current)return;const data=await api('/api/state');setState(data);}
+// An invite may be accepted while its issuer's phone is offline: refresh the
+// server-owned one-time status instead of redisplaying a consumed local code.
+async function reconcileInviteCodes(){
+ if(!current||!inviteCodes.size)return;
+ const known=[...new Set(inviteCodes.values())].filter(c=>/^[A-F0-9]{18}$/.test(c));
+ if(!known.length)return;
+ const result=await post('/api/invites/status',{codes:known});
+ if(!Array.isArray(result.activeCodes))return;
+ const active=new Set(result.activeCodes);
+ let changed=false;
+ for(const [circleId,code] of inviteCodes){
+   if(!active.has(code)){inviteCodes.delete(circleId);changed=true;}
+ }
+ if(changed)renderCircles();
+}
+async function refresh(){
+ if(!current)return;
+ const data=await api('/api/state');setState(data);
+ if(inviteCodes.size)try{await reconcileInviteCodes();}catch{/* A transient network error must not block SOS or chat. */}
+}
 // The user opted-in in Profilo > Persone invitate. Begin requesting
 // microphone access in the physical SOS button gesture (before GPS/network
 // awaits), but publish a stream ONLY after the server accepts SOS.
