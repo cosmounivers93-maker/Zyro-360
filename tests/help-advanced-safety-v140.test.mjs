@@ -16,14 +16,16 @@ test('help panel remains accessible in Settings and includes contact-permission 
    'Può bloccare il mio telefono da remoto'
  ]) assert.ok(section.includes(phrase),phrase);
 });
-test('SOS microphone explanation requires global opt-in, recipient and Family',()=>{
- assert.match(section,/Abilita microfono durante SOS/);
+test('SOS microphone explanation requires per-contact consent and Family',()=>{
+ assert.match(section,/Può ascoltare il mio microfono durante SOS/);
  assert.match(section,/soltanto con Family/);
  assert.match(section,/«Può ascoltare il mio microfono durante SOS»/);
+ assert.match(section,/Non c’è un secondo interruttore di consenso generale da attivare/);
  assert.match(section,/non può accendere il tuo microfono da remoto/);
  assert.match(section,/non registra né conserva l’audio/);
  assert.match(section,/senza crittografia end-to-end/);
 });
+
 test('remote controls require theft alert, explicit authorization and Android device-admin',()=>{
  assert.match(section,/id="zyroHelpRemoteControl"/);
  assert.match(section,/Può far squillare il mio telefono/);
