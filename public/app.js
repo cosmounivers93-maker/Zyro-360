@@ -549,28 +549,46 @@ function renderHome(){
 function renderCircles(){
  if(!current)return;
  const list=$('circlesList');
- const sig=JSON.stringify([current.me.id,(current.circles||[]).map(c=>[c.id,c.name,c.kind,c.mine,(c.members||[]).map(m=>[m.id,m.name])])]);
+ const sig=JSON.stringify([current.me.id,$('profileInviteMode')?.value,(current.circles||[]).map(c=>[c.id,c.name,c.kind,c.mine,c.memberLimit,(c.members||[]).map(m=>[m.id,m.name])])]);
  if(list._zyroSig===sig&&list.children.length)return;
  list._zyroSig=sig;
- const eligible=current.circles.filter(c=>c.kind!=='chat');
+ const mode=$('profileInviteMode')?.value||'group';
+ const eligible=current.circles.filter(c=>
+   c.kind!=='chat' &&
+   (mode==='direct'?c.kind==='direct':c.kind!=='direct') &&
+   c.members.length<(c.memberLimit||(c.kind==='direct'?2:20)));
  const picker=$('profileInviteCircle');
  if(picker){
    const previous=picker.value;
-   picker.innerHTML=eligible.map(c=>'<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+'</option>').join('');
+   picker.innerHTML=eligible.length
+     ?eligible.map(c=>'<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+' · '+(c.kind==='direct'?'Singola persona':'Gruppo')+' ('+c.members.length+'/'+(c.memberLimit||(c.kind==='direct'?2:20))+')</option>').join('')
+     :'<option value="">Nessuna cerchia disponibile</option>';
    if(eligible.some(c=>c.id===previous))picker.value=previous;
+   picker.disabled=!eligible.length;
+   const submit=$('sendProfileInviteForm')?.querySelector('button[type="submit"]');
+   if(submit)submit.disabled=!eligible.length;
+   const hint=$('profileInviteInfo');
+   if(hint)hint.textContent=eligible.length
+     ?mode==='direct'?'La persona invitata sarà l’unico altro membro di questa cerchia.':'Puoi invitare più persone nella stessa cerchia, fino a 20 membri.'
+     :mode==='direct'?'Crea prima una cerchia singola con spazio per un contatto.':'Crea prima una cerchia di gruppo o libera un posto.';
  }
  list.innerHTML=current.circles.length?current.circles.map(c=>
   '<div class="circle-card" data-circle="'+escapeHtml(c.id)+'"><div class="circle-top"><div><strong>◎ '+escapeHtml(c.name)+'</strong><small>'+
-  c.members.length+' '+(c.members.length===1?'membro':'membri')+' · '+(c.mine?'Creata da te':'Cerchia condivisa')+
+  (c.kind==='direct'?'Singola persona':c.kind==='chat'?'Chat di gruppo':'Cerchia di gruppo')+' · '+c.members.length+'/'+(c.memberLimit||(c.kind==='direct'?2:20))+' membri · '+(c.mine?'Creata da te':'Cerchia condivisa')+
   '</small></div><span class="status-chip">Privata</span></div><div class="circle-members">'+
   c.members.map(m=>'<span class="member-pill">'+escapeHtml(m.name)+(m.id===current.me.id?' (tu)':'')+'</span>').join('')+
   '</div><div class="circle-actions">'+
   (c.kind==='chat'?'<button type="button" data-chatcircle="'+escapeHtml(c.id)+'">💬 Apri gruppo</button>':
-    '<button type="button" data-profile-invite="'+escapeHtml(c.id)+'">✚ Invita tramite ID</button>')+
+    c.members.length >= (c.memberLimit||(c.kind==='direct'?2:20))
+      ?'<button type="button" disabled aria-disabled="true">Limite membri raggiunto</button>'
+      :'<button type="button" data-profile-invite="'+escapeHtml(c.id)+'">✚ Invita tramite ID</button>')+
   (c.mine?'<button type="button" class="danger" data-delete="'+escapeHtml(c.id)+'">Elimina cerchia</button>':
     '<button type="button" class="danger" data-leave="'+escapeHtml(c.id)+'">Esci dalla cerchia</button>')+
   '</div></div>').join(''):'<div class="empty-state"><div class="empty-symbol">◎</div><strong>Ancora nessuna cerchia</strong>Crea una cerchia e invita persone tramite il loro ID profilo.</div>';
  list.querySelectorAll('[data-profile-invite]').forEach(b=>b.addEventListener('click',()=>{
+  const selected=current.circles.find(circle=>circle.id===b.dataset.profileInvite);
+  const modePicker=$('profileInviteMode');
+  if(modePicker){modePicker.value=selected?.kind==='direct'?'direct':'group';renderCircles();}
   if(picker)picker.value=b.dataset.profileInvite;
   $('sendProfileInviteForm')?.scrollIntoView({behavior:'smooth',block:'center'});
   $('profileInviteId')?.focus();
@@ -597,7 +615,7 @@ function renderProfileInvites(){
  incoming._sig=sig;outgoing._sig=sig;
  incoming.innerHTML='<h3>Richieste ricevute</h3>'+(pending.length?pending.map(x=>
    '<article class="zyro-id-invite-card"><strong>'+escapeHtml(x.peerName)+'</strong>'+
-   '<p>Vuole invitarti in «'+escapeHtml(x.circleName)+'». Vuoi accettare?</p>'+
+   '<p>Invito '+(x.circleKind==='direct'?'singolo':'di gruppo')+' per «'+escapeHtml(x.circleName)+'». Vuoi accettare?</p>'+ 
    '<div class="zyro-id-invite-actions">'+
    '<button type="button" data-profile-accept="'+escapeHtml(x.id)+'">Accetta</button>'+
    '<button type="button" data-profile-decline="'+escapeHtml(x.id)+'">Rifiuta</button>'+
@@ -605,7 +623,7 @@ function renderProfileInvites(){
    '</div></article>').join(''):'<p class="setting-description">Nessuna richiesta in attesa.</p>');
  outgoing.innerHTML='<h3>Richieste inviate</h3>'+(sent.length?sent.map(x=>
    '<article class="zyro-id-invite-card"><strong>'+escapeHtml(x.peerName)+'</strong>'+
-   '<p>'+escapeHtml(x.circleName)+' · '+(x.status==='pending'?'In attesa di risposta':x.status==='declined'?'Invito rifiutato':x.status==='accepted'?'Invito accettato':'Richiesta annullata')+'</p>'+
+   '<p>'+(x.circleKind==='direct'?'Singola persona':'Gruppo')+' · '+escapeHtml(x.circleName)+' · '+(x.status==='pending'?'In attesa di risposta':x.status==='declined'?'Invito rifiutato':x.status==='accepted'?'Invito accettato':'Richiesta annullata')+'</p>'+
    (x.status==='pending'?'<button type="button" data-profile-cancel="'+escapeHtml(x.id)+'">Annulla invito</button>':'')+
    '</article>').join(''):'<p class="setting-description">Non hai richieste inviate.</p>');
  for(const type of ['accept','decline','block']){
@@ -688,7 +706,7 @@ const roomGroupIcon=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
 const roomChatIcon=`<svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg>`;
 function renderChatRooms(){
   if(!current)return;
-  // Only groups explicitly created from 'Crea gruppo' appear as group conversations.
+  // A direct circle has a 1:1 chat only; group circles and dedicated chat groups share a multi-member room.
   const circles=current.circles||[], contacts=uniqueContacts();
   const list=$('chatRooms');
   const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.kind,c.mine,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
@@ -696,9 +714,9 @@ function renderChatRooms(){
   list._zyroSig=sig;
   const matching=(name)=>String(name).toLocaleLowerCase('it').includes(chatSearch.toLocaleLowerCase('it'));
   const rooms=[];
-  const showCircle=(c)=>chatCategory==='all'||(chatCategory==='circle'&&c.kind!=='chat')||(chatCategory==='group'&&c.kind==='chat');
-  if(chatCategory!=='direct')for(const c of circles.filter(c=>showCircle(c)&&matching(c.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(c.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(c.name)}</b><small>${c.kind==='chat'?'Gruppo chat':'Gruppo famiglia'} · ${c.members.length} ${c.members.length===1?'persona':'persone'}</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
-  if(chatCategory==='all'||chatCategory==='direct')for(const u of contacts.filter(u=>matching(u.name)))rooms.push(`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon person-room-icon">${avatarHTML(u)}</span><span class="chat-room-text"><b>${escapeHtml(u.name)}</b><small>Messaggio privato · cerchia condivisa</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  const showCircle=(group)=>group.kind!=='direct'&&(chatCategory==='all'||chatCategory==='group'||chatCategory==='circle');
+  if(chatCategory!=='direct')for(const group of circles.filter(group=>showCircle(group)&&matching(group.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(group.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(group.name)}</b><small>${group.kind==='chat'?'Chat di gruppo':'Cerchia di gruppo'} · ${group.members.length}/${group.memberLimit||20} partecipanti</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  if(chatCategory==='all'||chatCategory==='direct')for(const u of contacts.filter(u=>matching(u.name)))rooms.push(`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon person-room-icon">${avatarHTML(u)}</span><span class="chat-room-text"><b>${escapeHtml(u.name)}</b><small>Chat singola · solo voi due</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
   const hasAny = circles.length||contacts.length;
   $('chatRooms').innerHTML=rooms.length?rooms.join(''):chatSearch?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Nessun risultato</h3><p>Prova a cercare un altro nome.</p></div>`:hasAny?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Non ci sono chat qui</h3><p>Seleziona un'altra categoria.</p></div>`:`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Ogni legame inizia da qui</h3><p>Crea una cerchia o invita una persona fidata per iniziare una conversazione.</p><button type="button" class="btn btn-primary" id="chatInviteNow">Vai alle Cerchie <span aria-hidden="true">→</span></button></div>`;
   $('chatRooms').querySelectorAll('.chat-room').forEach(b=>b.addEventListener('click',()=>openChat(b.dataset.typ,b.dataset.id)));
@@ -2036,7 +2054,7 @@ async function v15JourneyStart(){
  }
  toast(result.ok?'Richiesta Accompagnami inviata. Puoi confermare l’arrivo o annullare il percorso in qualsiasi momento.':'Richiesta non inviata.');
 }
-async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato a destinazione?':'Vuoi annullare il percorso? I contatti che lo seguono saranno avvisati.'))return;await post('/api/journey/end',{arrived});journeyTarget=null;journeyAddressChoice=null;journeyAddressResults=[];$('journeyAddressResults').hidden=true;$('journeyAddressResults').replaceChildren();$('journeyViewMap').disabled=true;['journeyStreet','journeyCity','journeyPostal'].forEach(id=>$(id).value='');$('journeyDueAt').value='';$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
+async function v15JourneyEnd(arrived){if(!confirm(arrived?'Confermi di essere arrivato a destinazione?':'Vuoi annullare il percorso? I contatti che lo seguono saranno avvisati.'))return;await post('/api/journey/end',{arrived});journeyTarget=null;journeyAddressChoice=null;journeyAddressResults=[];$('journeyAddressResults').hidden=true;$('journeyAddressResults').replaceChildren();$('journeyViewMap').disabled=true;['journeyStreet','journeyCity','journeyPostal'].forEach(id=>$(id).value='');$('journeyDueAt').value='';updateZyroDueTrigger();$('journeyTargetInfo').textContent='Nessuna meta GPS impostata';$('journeyDestination').value='';journeySelected.clear();$('journeyRecipients').querySelectorAll('input').forEach(input=>input.checked=false);await refresh();toast(arrived?'Arrivo confermato nel server.':'Percorso terminato. Per ripartire crea una nuova richiesta.');}
 async function v15CheckinStart(){requireFamilyPlan();if(!checkinSelected.size)throw Error('Scegli almeno un destinatario.');await post('/api/checkin/start',{minutes:Number($('checkinMinutes').value),recipients:[...checkinSelected]});await refresh();toast('Check-in impostato sul server. Verifica che le notifiche siano abilitate.');}
 async function v15CheckinEnd(confirmed){await post('/api/checkin/end',{confirmed});await refresh();toast(confirmed?'Check-in confermato.':'Check-in annullato.');}
 
@@ -2483,7 +2501,104 @@ async function copyAccountId(id){
  try{control.select();if(!document.execCommand('copy'))throw Error('Copy blocked');}finally{control.remove();}
 }
 
+
+function zyroDueLocalValue(d){
+ const pad=x=>String(x).padStart(2,'0');
+ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
+let zyroDueSelectedDay=null,zyroDueVisibleMonth=null,zyroDueReturnFocus=null;
+function updateZyroDueTrigger(){
+ const input=$('journeyDueAt'),text=$('journeyDueText');
+ if(!input||!text)return;
+ const date=input.value?new Date(input.value):null;
+ text.textContent=date&&Number.isFinite(date.getTime())
+   ?date.toLocaleString('it-IT',{weekday:'short',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})
+   :'Seleziona data e ora';
+}
+function renderZyroDueCalendar(){
+ if(!zyroDueSelectedDay||!zyroDueVisibleMonth)return;
+ const year=zyroDueVisibleMonth.getFullYear(),month=zyroDueVisibleMonth.getMonth();
+ const first=new Date(year,month,1),last=new Date(year,month+1,0).getDate();
+ const min=new Date(Date.now()+5*60000),max=new Date(Date.now()+24*3600000);
+ $('zyroDueMonth').textContent=first.toLocaleDateString('it-IT',{month:'long',year:'numeric'});
+ const previous=new Date(year,month-1,1),next=new Date(year,month+1,1);
+ $('zyroDuePrev').disabled=previous.getFullYear()*12+previous.getMonth()<min.getFullYear()*12+min.getMonth();
+ $('zyroDueNext').disabled=next.getFullYear()*12+next.getMonth()>max.getFullYear()*12+max.getMonth();
+ const offset=(first.getDay()+6)%7;
+ let html='<span class="zyro-due-day-empty" aria-hidden="true"></span>'.repeat(offset);
+ for(let day=1;day<=last;day++){
+   const start=new Date(year,month,day),end=new Date(year,month,day,23,59,59,999);
+   const available=end>=min && start<=max;
+   const selected=day===zyroDueSelectedDay.getDate()&&year===zyroDueSelectedDay.getFullYear()&&month===zyroDueSelectedDay.getMonth();
+   const iso=zyroDueLocalValue(start).slice(0,10);
+   html+='<button type="button" data-zyro-day="'+iso+'"'+(available?'':' disabled')+
+     (selected?' class="selected" aria-pressed="true"':' aria-pressed="false"')+' aria-label="'+
+     start.toLocaleDateString('it-IT',{weekday:'long',day:'numeric',month:'long'})+'">'+day+'</button>';
+ }
+ const grid=$('zyroDueDayGrid');grid.innerHTML=html;
+ grid.querySelectorAll('[data-zyro-day]').forEach(b=>b.addEventListener('click',()=>{
+   const [y,m,d]=b.dataset.zyroDay.split('-').map(Number);
+   zyroDueSelectedDay=new Date(y,m-1,d);
+   renderZyroDueCalendar();
+ }));
+}
+function closeZyroDuePicker(){
+ const dialog=$('zyroJourneyDueDialog');if(!dialog||dialog.hidden)return;
+ dialog.hidden=true;document.body.classList.remove('zyro-due-open');
+ zyroDueReturnFocus?.focus?.();zyroDueReturnFocus=null;
+}
+function openZyroDuePicker(){
+ const value=$('journeyDueAt').value;
+ const old=value?new Date(value):null;
+ const initial=old&&Number.isFinite(old.getTime())?old:new Date(Date.now()+60*60000);
+ zyroDueSelectedDay=new Date(initial.getFullYear(),initial.getMonth(),initial.getDate());
+ zyroDueVisibleMonth=new Date(initial.getFullYear(),initial.getMonth(),1);
+ $('zyroDueHour').value=String(initial.getHours()).padStart(2,'0');
+ $('zyroDueMinute').value=String(initial.getMinutes()).padStart(2,'0');
+ zyroDueReturnFocus=document.activeElement;
+ $('zyroJourneyDueDialog').hidden=false;document.body.classList.add('zyro-due-open');
+ renderZyroDueCalendar();$('zyroDueClose').focus();
+}
+function confirmZyroDuePicker(){
+ if(!zyroDueSelectedDay)return;
+ const hours=Number($('zyroDueHour').value),minutes=Number($('zyroDueMinute').value);
+ if(!Number.isInteger(hours)||hours<0||hours>23||!Number.isInteger(minutes)||minutes<0||minutes>59){
+   toast('Inserisci un orario valido tra 00:00 e 23:59.',true);return;
+ }
+ const date=new Date(zyroDueSelectedDay.getFullYear(),zyroDueSelectedDay.getMonth(),zyroDueSelectedDay.getDate(),hours,minutes);
+ if(date.getHours()!==hours||date.getMinutes()!==minutes||date.getTime()<Date.now()+5*60000||date.getTime()>Date.now()+24*3600000){
+   toast('Scegli un orario valido tra 5 minuti e 24 ore da adesso.',true);return;
+ }
+ $('journeyDueAt').value=zyroDueLocalValue(date);
+ $('journeyDueAt').dispatchEvent(new Event('change',{bubbles:true}));
+ updateZyroDueTrigger();closeZyroDuePicker();
+}
+function initZyroDuePicker(){
+ if(!$('journeyDueOpen')||!$('zyroJourneyDueDialog'))return;
+ $('journeyDueOpen').addEventListener('click',openZyroDuePicker);
+ for(const id of ['zyroDueClose','zyroDueCancel'])$(id).addEventListener('click',closeZyroDuePicker);
+ $('zyroJourneyDueDialog').querySelector('[data-due-close]').addEventListener('click',closeZyroDuePicker);
+ $('zyroDueConfirm').addEventListener('click',confirmZyroDuePicker);
+ $('zyroDueClear').addEventListener('click',()=>{
+   $('journeyDueAt').value='';$('journeyDueAt').dispatchEvent(new Event('change',{bubbles:true}));
+   updateZyroDueTrigger();closeZyroDuePicker();
+ });
+ $('zyroDuePrev').addEventListener('click',()=>{zyroDueVisibleMonth.setMonth(zyroDueVisibleMonth.getMonth()-1);renderZyroDueCalendar();});
+ $('zyroDueNext').addEventListener('click',()=>{zyroDueVisibleMonth.setMonth(zyroDueVisibleMonth.getMonth()+1);renderZyroDueCalendar();});
+ $('journeyDueAt').addEventListener('change',updateZyroDueTrigger);
+ $('zyroJourneyDueDialog').addEventListener('keydown',event=>{
+   if(event.key==='Escape'){event.preventDefault();closeZyroDuePicker();return;}
+   if(event.key!=='Tab')return;
+   const focusable=[...$('zyroJourneyDueDialog').querySelectorAll('button:not([disabled]),input:not([disabled])')];
+   if(!focusable.length)return;
+   if(event.shiftKey&&document.activeElement===focusable[0]){event.preventDefault();focusable.at(-1).focus();}
+   else if(!event.shiftKey&&document.activeElement===focusable.at(-1)){event.preventDefault();focusable[0].focus();}
+ });
+ updateZyroDueTrigger();
+}
+
 async function init(){
+  initZyroDuePicker();
   let storedTheme=null;try{storedTheme=localStorage.getItem(ZYRO_THEME_KEY);}catch{}
   applyZyroTheme(storedTheme||'dark',false);
   await zyroWelcomeBeforeStart();
@@ -2646,11 +2761,12 @@ async function init(){
   $('pickArm').addEventListener('click',()=>action(armPick));
   $('pickTest').addEventListener('click',()=>action(previewSiren));
   $('theftStop').addEventListener('click',()=>action(stopTheft));
-  $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{await post('/api/circles',{name:$('circleName').value});$('circleName').value='';await refresh();toast('Cerchia creata! Ora puoi generare un invito.');});});
+  $('createCircleForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const kind=$('circleType').value;await post('/api/circles',{name:$('circleName').value,kind});$('circleName').value='';if($('profileInviteMode'))$('profileInviteMode').value=kind;await refresh();toast(kind==='direct'?'Cerchia singola creata. Ora invita il tuo contatto tramite ID.':'Cerchia di gruppo creata. Puoi invitare fino a 19 persone.');});});
+  $('profileInviteMode')?.addEventListener('change',renderCircles);
   $('sendProfileInviteForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
   const profileId=$('profileInviteId').value.trim().toUpperCase();
   const circleId=$('profileInviteCircle').value;
-  if(!/^ZYRO-[A-F0-9]{16}$/.test(profileId))throw Error('Inserisci l’ID completo: ZYRO- seguito da 16 caratteri.');
+  if(!/^[A-Z0-9]{2,20}-[A-F0-9]{16}$/.test(profileId))throw Error('Inserisci l’ID completo che inizia con il nome registrato, seguito da 16 caratteri.');
   const sent=await post('/api/profile-invites',{profileId,circleId});
   $('profileInviteId').value='';await refresh();
   toast('Richiesta inviata a '+sent.recipientName+'. Potrà accettare o rifiutare.');
