@@ -183,7 +183,7 @@ function verifyPassword(p, u) { const stored = Buffer.from(u.passwordHash, 'hex'
 function getCookie(req, key) { const raw = req.headers.cookie || ''; const part = raw.split(';').map(x => x.trim()).find(x => x.startsWith(`${key}=`)); return part ? decodeURIComponent(part.slice(key.length + 1)) : null; }
 function auth(req) { const sid = getCookie(req, 'cs_session'); const s = sid && db.sessions[hash(sid)]; return s && s.expiresAt > now() && !deletingAccounts.has(s.userId) ? db.users[s.userId] : null; }
 function setCookie(res, sid) { res.cookie('cs_session', sid, { httpOnly: true, secure: prod, sameSite: 'lax', path: '/', maxAge: SESSION_MAX_AGE }); }
-function loginUser(res, id) { const sid = token(32); db.sessions[hash(sid)] = { userId: id, expiresAt: now() + SESSION_MAX_AGE }; setCookie(res, sid); save(); }
+function loginUser(res, id) { const account=db.users[id]; if(account&&!account.profileNamePrefix)account.profileNamePrefix=profileSlug(account.name); const sid = token(32); db.sessions[hash(sid)] = { userId: id, expiresAt: now() + SESSION_MAX_AGE }; setCookie(res, sid); save(); }
 function memberIds(circleId) { return db.memberships.filter(m => m.circleId === circleId).map(m => m.userId); }
 function userCircles(id) { return db.memberships.filter(m => m.userId === id).map(m => db.circles[m.circleId]).filter(Boolean); }
 function sharedCircle(a, b) { return a === b || userCircles(a).some(c => memberIds(c.id).includes(b)); }
@@ -276,7 +276,7 @@ function stateFor(id) {
     address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
   const myInvites = Object.values(db.profileInvites||{}).filter(inv => inv && inv.expiresAt>now() && (inv.to===id || inv.from===id)).map(inv=>({
-    id:inv.id, circleId:inv.circleId, circleName:db.circles[inv.circleId]?.name||'Cerchia',
+    id:inv.id, circleId:inv.circleId, circleName:db.circles[inv.circleId]?.name||'Cerchia', circleKind:db.circles[inv.circleId]?.kind==='direct'?'direct':'group',
     status:inv.status, expiresAt:inv.expiresAt, createdAt:inv.createdAt,
     direction:inv.to===id?'received':'sent',
     peerName:db.users[inv.to===id?inv.from:inv.to]?.name||'Utente'
