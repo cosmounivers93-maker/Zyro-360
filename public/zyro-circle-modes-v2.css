@@ -1,0 +1,83 @@
+/* ZYRO 360 · additive glass controls for circles and Accompagnami. */
+#circlesView .zyro-circle-create-form{display:grid;gap:9px;margin-top:14px}
+#circlesView .zyro-circle-create-form>label{font-size:13px;font-weight:750;color:#254163}
+#circlesView .zyro-circle-create-form select,
+#circlesView .zyro-circle-create-form input{
+ width:100%;min-width:0;box-sizing:border-box;border-radius:16px;
+ background:rgba(247,252,255,.79);border:1px solid rgba(124,161,211,.39);
+ box-shadow:inset 0 1px 1px rgba(255,255,255,.76);
+ padding:14px 15px;font:inherit;color:#203b5b}
+#circlesView .zyro-circle-create-form select:focus-visible,
+#circlesView .zyro-circle-create-form input:focus-visible{
+ outline:2px solid #7e7be8;outline-offset:2px}
+#circlesView #circleTypeHelp,.zyro-invite-hint{font-size:12px;line-height:1.55;color:#5d7189}
+#circlesView .zyro-circle-create-row{display:flex;gap:9px;min-width:0}
+#circlesView .zyro-circle-create-row>input{flex:1}
+#circlesView .zyro-circle-create-row>button{flex:0 0 auto;min-width:90px}
+#circlesView #profileInviteCircle:disabled,
+#circlesView .zyro-profile-invite-form button[type=submit]:disabled{opacity:.57;cursor:not-allowed}
+#circlesView .circle-card button:disabled{opacity:.6;cursor:not-allowed}
+#journeyPanel #journeyDueAt[hidden]{display:none!important}
+#journeyPanel .zyro-due-trigger{
+ display:flex!important;align-items:center;gap:13px;width:100%;min-height:60px;
+ margin-top:9px;padding:13px 15px;border-radius:18px;
+ color:#29456c!important;font:inherit;font-size:15px;font-weight:720;text-align:left;
+ border:1px solid rgba(122,147,217,.46);
+ background:linear-gradient(125deg,rgba(255,255,255,.88),rgba(227,242,255,.75),rgba(236,232,255,.78));
+ box-shadow:0 9px 22px rgba(68,100,166,.10),inset 0 1px rgba(255,255,255,.98);
+ cursor:pointer;-webkit-tap-highlight-color:transparent}
+#journeyPanel .zyro-due-trigger:focus-visible{outline:2px solid #8171ed;outline-offset:2px}
+#journeyPanel .zyro-due-trigger #journeyDueText{flex:1;min-width:0;line-height:1.35}
+#journeyPanel .zyro-due-trigger-icon{
+ display:grid;place-items:center;height:36px;width:36px;border-radius:13px;flex-shrink:0;
+ color:#5c57ba;background:linear-gradient(135deg,#e3f4ff,#ece5ff);
+ border:1px solid #cddaf3;font-size:21px}
+#journeyPanel .zyro-due-chevron{font-size:26px;line-height:1;color:#7575d4}
+body.zyro-due-open{overflow:hidden}
+.zyro-due-overlay[hidden]{display:none!important}
+.zyro-due-overlay{position:fixed;inset:0;z-index:2147483000;display:flex;
+ align-items:center;justify-content:center;padding:20px 14px;
+ padding-top:max(20px,env(safe-area-inset-top));padding-bottom:max(20px,env(safe-area-inset-bottom))}
+.zyro-due-backdrop{position:absolute;inset:0;background:rgba(25,43,70,.57);
+ backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.zyro-due-card{position:relative;isolation:isolate;width:100%;max-width:460px;max-height:min(88dvh,760px);
+ overflow-y:auto;overscroll-behavior:contain;padding:20px 17px 18px;border-radius:28px;
+ background:linear-gradient(160deg,rgba(252,254,255,.98),rgba(235,245,255,.98) 52%,rgba(239,235,255,.98));
+ border:1px solid rgba(255,255,255,.95);
+ color:#213958;box-shadow:0 30px 80px rgba(26,41,86,.28),inset 0 1px rgba(255,255,255,1)}
+.zyro-due-head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:15px}
+.zyro-due-head small{font-size:10px;letter-spacing:.13em;font-weight:800;color:#7771d0}
+.zyro-due-head h2{font-size:23px;line-height:1.15;margin:5px 0 5px;color:#243c64}
+.zyro-due-head p{font-size:13px;line-height:1.4;margin:0;color:#6d7f95}
+.zyro-due-head>button{display:grid;place-items:center;width:36px;height:36px;border-radius:13px;flex-shrink:0;border:1px solid #d1dded;background:rgba(255,255,255,.73);color:#476087;font-size:17px}
+.zyro-due-calendar{padding:10px 10px 13px;background:rgba(255,255,255,.75);border:1px solid #d9e3f5;border-radius:20px}
+.zyro-due-month-header{display:flex;align-items:center;justify-content:space-between;margin:2px 0 11px}
+.zyro-due-month-header strong{text-transform:capitalize;font-size:15px;font-weight:800;color:#284267}
+.zyro-due-month-header button{display:grid;place-items:center;width:36px;height:36px;background:#eff5ff;border:1px solid #d6e2fa;border-radius:11px;color:#655dc1;font-size:24px}
+.zyro-due-month-header button:disabled{opacity:.30}
+.zyro-due-weekdays,.zyro-due-day-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;text-align:center}
+.zyro-due-weekdays{margin:0 0 6px;font-size:11px;color:#7084a2;font-weight:750}
+.zyro-due-weekdays span{padding:5px 0}
+.zyro-due-day-grid button{aspect-ratio:1;min-width:0;min-height:35px;border:1px solid transparent;border-radius:12px;font:inherit;
+ background:transparent;color:#2c4c70;font-weight:700;font-size:14px;cursor:pointer}
+.zyro-due-day-grid button:hover:not(:disabled){background:#e6efff}
+.zyro-due-day-grid button.selected{color:white;background:linear-gradient(130deg,#218bc6,#6858d2);box-shadow:0 6px 13px rgba(80,80,177,.26)}
+.zyro-due-day-grid button:disabled{opacity:.30;cursor:default}
+.zyro-due-time{display:flex;align-items:flex-end;justify-content:center;gap:13px;margin:16px 0 8px}
+.zyro-due-time label{display:grid;gap:6px;font-size:12px;font-weight:750;color:#56708c;text-align:center}
+.zyro-due-time input{width:80px;height:55px;text-align:center;box-sizing:border-box;font:inherit;font-size:25px;font-weight:750;color:#334a75;
+ border-radius:16px;border:1px solid #c5d7f2;background:rgba(255,255,255,.87);appearance:textfield;-moz-appearance:textfield}
+.zyro-due-time input::-webkit-inner-spin-button,.zyro-due-time input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.zyro-due-time>span{font-size:29px;line-height:53px;color:#7679b9}
+.zyro-due-note{font-size:11px;line-height:1.45;color:#657c95;text-align:center;margin:6px 0 16px}
+.zyro-due-actions{display:flex;gap:8px;justify-content:space-between}
+.zyro-due-actions button{border-radius:13px;padding:13px 10px;min-width:0;flex:1;
+ font:inherit;font-size:13px;font-weight:800;cursor:pointer;border:1px solid #c8d8ed;
+ background:rgba(255,255,255,.82);color:#365f83}
+.zyro-due-actions #zyroDueConfirm{color:white;border-color:transparent;background:linear-gradient(115deg,#1e9ccf,#655ad3)}
+.zyro-due-card button:focus-visible,.zyro-due-card input:focus-visible{outline:2px solid #7066de;outline-offset:2px}
+@media(max-width:370px){#circlesView .zyro-circle-create-row{flex-wrap:wrap}
+ #circlesView .zyro-circle-create-row>button{width:100%}.zyro-due-card{padding:16px 12px 14px}
+ .zyro-due-overlay{padding-inline:8px}.zyro-due-actions button{font-size:12px;padding:12px 5px}}
+@media(prefers-reduced-motion:no-preference){.zyro-due-card{animation:zyroDueIn .17s ease-out}
+ @keyframes zyroDueIn{from{transform:translateY(12px);opacity:.4}to{transform:translateY(0);opacity:1}}}

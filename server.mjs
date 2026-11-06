@@ -93,10 +93,21 @@ const PORT = Number(process.env.PORT || 3000);
 const prod = process.env.NODE_ENV === 'production';
 const SESSION_MAX_AGE = 30 * 24 * 3600 * 1000;
 const MAX_USER_CIRCLES = 12;
+const MAX_GROUP_MEMBERS = 20;
+const circleCapacity = circle => circle?.kind === 'direct' ? 2 : MAX_GROUP_MEMBERS;
 const hash = v => crypto.createHash('sha256').update(v).digest('hex');
-// Stable, non-email, non-internal profile identifier for invitations. Legacy accounts
-// receive the same address without a database migration or leaking their secret ID.
-const publicProfileId = id => 'ZYRO-' + hash('zyro-profile-public-v1:'+id).slice(0,16).toUpperCase();
+// The public address starts with the registration name, never a fixed ZYRO prefix.
+// The opaque hash protects internal IDs; registration slugs are stable for new accounts.
+const profileSlug = name => String(name||'Utente').normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,20)||'UTENTE';
+const publicProfileId = value => {
+  const u = typeof value === 'object' ? value : db.users[value];
+  const id = u?.id || value;
+  return (u?.profileNamePrefix || profileSlug(u?.name)) + '-' +
+    hash('zyro-profile-public-v1:'+id).slice(0,16).toUpperCase();
+};
+// Previous addresses remain accepted for existing contacts/invites during migration.
+const legacyProfileId = id => 'ZYRO-' + hash('zyro-profile-public-v1:'+id).slice(0,16).toUpperCase();
 const token = (n = 24) => crypto.randomBytes(n).toString('base64url');
 const now = () => Date.now();
 // Only a verified, server-side purchase may set premiumUntil. Never trust premium=true from a browser.
@@ -148,7 +159,7 @@ const publicJourney = (j,viewer) => {
 const publicCheckin = (c,viewer) => c && (c.userId===viewer || (c.recipients||[]).includes(viewer)) ? {id:c.id,userId:c.userId,name:db.users[c.userId]?.name||'Contatto',dueAt:c.dueAt,status:c.status,completedAt:c.completedAt||null} : null;
 
 const cleanText = (s, max = 60) => String(s || '').trim().replace(/[\u0000-\u001F\u007F<>]/g, '').slice(0, max);
-const publicUser = u => ({ id: u.id, profileId:publicProfileId(u.id), name: u.name, avatar: u.avatar || null });
+const publicUser = u => ({ id: u.id, profileId:publicProfileId(u), name: u.name, avatar: u.avatar || null });
 function save() {
   if (persistenceFailure) throw new Error('Database temporaneamente indisponibile: modifica non confermata.');
   const snapshot = JSON.stringify(db);
@@ -172,7 +183,7 @@ function verifyPassword(p, u) { const stored = Buffer.from(u.passwordHash, 'hex'
 function getCookie(req, key) { const raw = req.headers.cookie || ''; const part = raw.split(';').map(x => x.trim()).find(x => x.startsWith(`${key}=`)); return part ? decodeURIComponent(part.slice(key.length + 1)) : null; }
 function auth(req) { const sid = getCookie(req, 'cs_session'); const s = sid && db.sessions[hash(sid)]; return s && s.expiresAt > now() && !deletingAccounts.has(s.userId) ? db.users[s.userId] : null; }
 function setCookie(res, sid) { res.cookie('cs_session', sid, { httpOnly: true, secure: prod, sameSite: 'lax', path: '/', maxAge: SESSION_MAX_AGE }); }
-function loginUser(res, id) { const sid = token(32); db.sessions[hash(sid)] = { userId: id, expiresAt: now() + SESSION_MAX_AGE }; setCookie(res, sid); save(); }
+function loginUser(res, id) { const account=db.users[id]; if(account&&!account.profileNamePrefix)account.profileNamePrefix=profileSlug(account.name); const sid = token(32); db.sessions[hash(sid)] = { userId: id, expiresAt: now() + SESSION_MAX_AGE }; setCookie(res, sid); save(); }
 function memberIds(circleId) { return db.memberships.filter(m => m.circleId === circleId).map(m => m.userId); }
 function userCircles(id) { return db.memberships.filter(m => m.userId === id).map(m => db.circles[m.circleId]).filter(Boolean); }
 function sharedCircle(a, b) { return a === b || userCircles(a).some(c => memberIds(c.id).includes(b)); }
@@ -243,7 +254,7 @@ function stateFor(id) {
   const me = db.users[id];
   if (!me) return null;
   const circles = userCircles(id).map(c => ({
-    id: c.id, name: c.name, kind: c.kind === 'chat' ? 'chat' : 'circle', ownerId: c.ownerId, mine: c.ownerId === id,
+    id: c.id, name: c.name, kind: c.kind === 'chat' ? 'chat' : c.kind === 'direct' ? 'direct' : 'group', memberLimit:circleCapacity(c), ownerId: c.ownerId, mine: c.ownerId === id,
     members: memberIds(c.id).filter(x => db.users[x]).map(x => {
       const u = db.users[x]; const alert = currentAlert(x);
       const visibleAlert = alert && canSeeAlert(id,alert) ? alert : null;
@@ -265,7 +276,7 @@ function stateFor(id) {
     address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
   const myInvites = Object.values(db.profileInvites||{}).filter(inv => inv && inv.expiresAt>now() && (inv.to===id || inv.from===id)).map(inv=>({
-    id:inv.id, circleId:inv.circleId, circleName:db.circles[inv.circleId]?.name||'Cerchia',
+    id:inv.id, circleId:inv.circleId, circleName:db.circles[inv.circleId]?.name||'Cerchia', circleKind:db.circles[inv.circleId]?.kind==='direct'?'direct':'group',
     status:inv.status, expiresAt:inv.expiresAt, createdAt:inv.createdAt,
     direction:inv.to===id?'received':'sent',
     peerName:db.users[inv.to===id?inv.from:inv.to]?.name||'Utente'
@@ -437,7 +448,7 @@ app.post('/api/register', limit, (req, res) => {
   if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || password.length < 10 || password.length > 128) return res.status(400).json({error:'Inserisci nome, email valida e una password di almeno 10 caratteri.'});
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({error:'Email già registrata.'});
   const id = token(12), salt = token(16);
-  db.users[id] = { id, name, email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], sosAudioConsent: false, avatar: null };
+  db.users[id] = { id, name, profileNamePrefix:profileSlug(name), email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], sosAudioConsent: false, avatar: null };
   auditLogin(req, db.users[id]);db.users[id].registrationIp=db.users[id].lastLoginIp;db.users[id].registrationDevice=db.users[id].lastDevice; loginUser(res, id);notifyAdminUsers(); res.json({ ok:true });
 });
 app.post('/api/login', limit, (req, res) => {
@@ -501,7 +512,7 @@ app.post('/api/legal/accept',requireAuth,(req,res)=>{
 });
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
-const adminUser = u => ({id:u.id,profileId:publicProfileId(u.id),name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
+const adminUser = u => ({id:u.id,profileId:publicProfileId(u),name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
 app.post('/api/settings/device',requireAuth,limit,(req,res)=>{
  const device=deviceForRequest(req);
  req.user.lastDevice=device;save();notifyAdminUsers();res.json({ok:true});
@@ -620,7 +631,7 @@ app.post('/api/chat/groups/join', requireAuth, limit, (req,res) => {
     return res.status(400).json({error:'Sei già nel gruppo.'});
   if(userCircles(req.user.id).length>=MAX_USER_CIRCLES)
     return res.status(400).json({error:'Limite gruppi e cerchie raggiunto.'});
-  if(memberIds(group.id).length>=30)
+  if(memberIds(group.id).length>=MAX_GROUP_MEMBERS)
     return res.status(400).json({error:'Questo gruppo è pieno.'});
   db.memberships.push({circleId:group.id,userId:req.user.id,invitedBy:inv.createdBy,joinedAt:now()});
   // Unlike one-time personal invites, a group code remains valid for 24h.
@@ -632,7 +643,8 @@ app.post('/api/circles', requireAuth, limit, (req,res) => {
   const name = cleanText(req.body.name, 48);
   if (name.length < 2) return res.status(400).json({error:'Dai un nome alla cerchia.'});
   if (userCircles(req.user.id).length >= MAX_USER_CIRCLES) return res.status(400).json({error:'Limite cerchie raggiunto.'});
-  const id = token(12); db.circles[id] = {id, name, ownerId:req.user.id, createdAt:now()};
+  const kind = req.body?.kind === 'direct' ? 'direct' : 'group';
+  const id = token(12); db.circles[id] = {id, name, ownerId:req.user.id, kind, createdAt:now()};
   db.memberships.push({circleId:id, userId:req.user.id, joinedAt:now()}); save(); refreshRelated(req.user.id); res.json({ok:true, circleId:id});
 });
 // Recipient-controlled requests by permanent PUBLIC PROFILE ID. Nothing joins
@@ -640,16 +652,16 @@ app.post('/api/circles', requireAuth, limit, (req,res) => {
 app.post('/api/profile-invites', requireAuth, limit, (req,res)=>{
  const profileId=String(req.body?.profileId||'').trim().toUpperCase();
  const circleId=String(req.body?.circleId||'');
- if(!/^ZYRO-[A-F0-9]{16}$/.test(profileId))return res.status(400).json({error:'ID profilo non valido.'});
+ if(!/^[A-Z0-9]{2,20}-[A-F0-9]{16}$/.test(profileId))return res.status(400).json({error:'ID profilo non valido.'});
  const circle=db.circles[circleId];
  if(!circle||circle.kind==='chat'||!memberIds(circleId).includes(req.user.id))
    return res.status(403).json({error:'Seleziona una tua cerchia valida.'});
- const target=Object.values(db.users).find(u=>publicProfileId(u.id)===profileId);
+ const target=Object.values(db.users).find(u=>publicProfileId(u)===profileId || legacyProfileId(u.id)===profileId);
  if(!target||target.bannedAt||target.id===req.user.id)return res.status(404).json({error:'Profilo non disponibile.'});
  if((target.inviteBlockedIds||[]).includes(req.user.id))
    return res.status(403).json({error:'Non puoi inviare richieste a questo profilo.'});
  if(memberIds(circleId).includes(target.id))return res.status(409).json({error:'Questa persona è già nella cerchia.'});
- if(memberIds(circleId).length>=30)return res.status(409).json({error:'Cerchia completa.'});
+ if(memberIds(circleId).length>=circleCapacity(circle))return res.status(409).json({error:circle.kind==='direct'?'La cerchia singola ha già un contatto.':'Cerchia di gruppo completa (20 persone).'});
  const requests=Object.values(db.profileInvites||{});
  const recent=requests.find(i=>i.from===req.user.id&&i.to===target.id&&i.circleId===circleId &&
    (i.status==='pending'&&i.expiresAt>now()||i.status==='declined'&&i.createdAt>now()-24*3600*1000));
@@ -675,7 +687,7 @@ app.post('/api/profile-invites/respond',requireAuth,limit,(req,res)=>{
  if(decision==='accept'){
    if(!circle||!sender||sender.bannedAt||!memberIds(circle.id).includes(sender.id))
      return res.status(410).json({error:'La cerchia non è più disponibile.'});
-   if(userCircles(req.user.id).length>=MAX_USER_CIRCLES||memberIds(circle.id).length>=30)
+   if(userCircles(req.user.id).length>=MAX_USER_CIRCLES||memberIds(circle.id).length>=circleCapacity(circle))
      return res.status(409).json({error:'Limite cerchie o membri raggiunto.'});
    if(!memberIds(circle.id).includes(req.user.id))
      db.memberships.push({circleId:circle.id,userId:req.user.id,invitedBy:invite.from,joinedAt:now()});
@@ -698,6 +710,7 @@ app.post('/api/profile-invites/cancel',requireAuth,limit,(req,res)=>{
 app.post('/api/invites', requireAuth, limit, (req,res) => {
   const id = String(req.body.circleId || '');
   if (db.circles[id]?.kind==='chat') return res.status(400).json({error:'Per i gruppi chat genera un codice dalla sezione Chat.'});
+  if (db.circles[id]?.kind==='direct') return res.status(400).json({error:'Le cerchie singole richiedono inviti nominativi tramite ID.'});
    if (!memberIds(id).includes(req.user.id)) return res.status(403).json({error:'Non fai parte della cerchia.'});
   const code = crypto.randomBytes(9).toString('hex').toUpperCase();
   db.invites[hash(code)] = { circleId:id, createdBy:req.user.id, expiresAt:now()+24*3600*1000 }; save();
@@ -709,7 +722,8 @@ app.post('/api/invites/join', requireAuth, limit, (req,res) => {
   if (!inv || inv.kind==='group' || inv.expiresAt < now() || !db.circles[inv.circleId]) return res.status(400).json({error:'Codice non valido o scaduto.'});
   if (userCircles(req.user.id).length >= MAX_USER_CIRCLES) return res.status(400).json({error:'Limite cerchie raggiunto.'});
   if (memberIds(inv.circleId).includes(req.user.id)) return res.status(400).json({error:'Sei già nella cerchia.'});
-  if (memberIds(inv.circleId).length >= 30) return res.status(400).json({error:'Cerchia piena.'});
+  if (db.circles[inv.circleId]?.kind==='direct') return res.status(400).json({error:'Le cerchie singole richiedono un invito tramite ID.'});
+  if (memberIds(inv.circleId).length >= circleCapacity(db.circles[inv.circleId])) return res.status(400).json({error:'Cerchia piena.'});
   db.memberships.push({circleId:inv.circleId,userId:req.user.id,invitedBy:inv.createdBy,joinedAt:now()}); delete db.invites[key]; save();
   for (const id of memberIds(inv.circleId)) refreshRelated(id);
   res.json({ok:true});

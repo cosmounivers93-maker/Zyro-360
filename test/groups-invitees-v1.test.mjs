@@ -21,7 +21,7 @@ test('only creator regenerates group code and permissions stay opt in',()=>{
   assert.match(server,/group\.ownerId!==req\.user\.id/);
   assert.match(server,/const legacy=new Set\(\)/);
   assert.match(server,/filter\(c=>c\.kind!=='chat'\)/);
-  assert.match(server,/if\(memberIds\(group\.id\)\.length>=30\)/);
+  assert.match(server,/if\(memberIds\(group\.id\)\.length>=MAX_GROUP_MEMBERS\)/);
 });
 test('chat forms and copy controls are all wired',()=>{
   for(const id of ['chatGroupCreateForm','chatGroupJoinForm','chatGroupInviteButton','chatGroupInviteResult','chatGroupCopy','chatGroupShare','chatGroupCreateOpen','chatGroupJoinOpen']) {
