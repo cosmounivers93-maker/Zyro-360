@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="/zyro-sos-card-v34.css?v=34.0">
   <link rel="stylesheet" href="/zyro-chat-groups-invitees-v1.css?v=2">
   <link rel="stylesheet" href="/zyro-id-admin-v1.css?v=1">
+  <link rel="stylesheet" href="/zyro-circle-modes-v2.css?v=2">
   <link rel="stylesheet" href="/zyro-journey-v71.css?v=6">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
@@ -386,19 +387,35 @@ html,body{overscroll-behavior-x:none}
 
     <section id="circlesView" class="view hidden circles-clean-page">
       <div class="page-heading"><p class="eyebrow muted">LE PERSONE DI CUI TI FIDI</p><h1>Le tue cerchie <span>✧</span></h1><p>Crea un gruppo privato, invita amici e familiari e decidi con chi condividere la posizione.</p></div>
-      <div class="panel"><div class="panel-title"><span class="panel-icon">＋</span><div><h2>Crea una cerchia</h2><p>Amici, famiglia o persone fidate</p></div></div><form id="createCircleForm" class="inline-form"><input id="circleName" maxlength="48" required placeholder="Es. Famiglia ❤️" aria-label="Nome cerchia"><button class="btn btn-primary" type="submit">Crea</button></form></div>
+      <div class="panel zyro-circle-create"><div class="panel-title"><span class="panel-icon">＋</span><div><h2>Crea una cerchia</h2><p>Scegli come collegarti alle persone fidate</p></div></div>
+  <form id="createCircleForm" class="zyro-circle-create-form">
+    <label for="circleType">Modalità della cerchia</label>
+    <select id="circleType" required aria-describedby="circleTypeHelp">
+      <option value="direct">Singola persona · tu e un contatto</option>
+      <option value="group">Cerchia di gruppo · fino a 20 persone</option>
+    </select>
+    <small id="circleTypeHelp">La cerchia singola è privata tra due persone. Nel gruppo possono partecipare fino a 20 membri, incluso chi lo crea.</small>
+    <label for="circleName">Nome della cerchia</label>
+    <div class="zyro-circle-create-row"><input id="circleName" maxlength="48" required placeholder="Es. Famiglia o Persona fidata" aria-label="Nome cerchia"><button class="btn btn-primary" type="submit">Crea</button></div>
+  </form></div>
       <div class="panel zyro-id-invites">
   <div class="panel-title"><span class="panel-icon lavender">⌘</span><div><h2>Invita tramite ID profilo</h2><p>La persona entrerà solo dopo aver accettato la tua richiesta.</p></div></div>
   <form id="sendProfileInviteForm" class="zyro-profile-invite-form">
+    <label for="profileInviteMode">Tipo di invito</label>
+    <select id="profileInviteMode" aria-label="Tipo di cerchia a cui invitare">
+      <option value="direct">Singola persona · invito privato</option>
+      <option value="group">Gruppo · fino a 20 persone</option>
+    </select>
     <label for="profileInviteCircle">Cerchia di destinazione</label><select id="profileInviteCircle" required aria-label="Seleziona la cerchia"></select>
+    <small id="profileInviteInfo" class="zyro-invite-hint">Scegli una cerchia e inserisci l’ID del destinatario.</small>
     <label for="profileInviteId">ID pubblico del destinatario</label>
-    <input id="profileInviteId" required maxlength="21" placeholder="ZYRO-0123456789ABCDEF" autocapitalize="characters" spellcheck="false" autocomplete="off" aria-label="ID profilo da invitare">
+    <input id="profileInviteId" required maxlength="37" placeholder="NOME-0123456789ABCDEF" autocapitalize="characters" spellcheck="false" autocomplete="off" aria-label="ID profilo da invitare">
     <button class="btn btn-dark" type="submit">Invia richiesta</button>
   </form>
   <div id="profileIncomingInvites" class="zyro-profile-invites" aria-live="polite"></div>
   <div id="profileOutgoingInvites" class="zyro-profile-invites" aria-live="polite"></div>
 </div>
-      <div class="section-head space-top"><div><h2>I miei gruppi</h2><p>Gli inviti tramite ID richiedono sempre l’accettazione del destinatario</p></div></div>
+      <div class="section-head space-top"><div><h2>Le mie cerchie</h2><p>Singole o di gruppo · gli inviti richiedono sempre l’accettazione</p></div></div>
       <div id="circlesList" class="circle-list"></div>
     </section>
 
@@ -495,10 +512,13 @@ html,body{overscroll-behavior-x:none}
           </div>
           <label class="zyro-v15-field">Dove stai andando?<input id="journeyDestination" maxlength="70" placeholder="Es. Casa, Lavoro, Palestra, Altro" autocomplete="off"></label>
           <div class="zyro-v15-destination">
-            <label class="zyro-journey-deadline-label" for="journeyDueAt">
-              <strong>Orario previsto di arrivo (facoltativo)</strong>
-              <input id="journeyDueAt" type="datetime-local" step="60" aria-describedby="journeyDeadlineHelp">
-            </label>
+            <div class="zyro-journey-deadline-label">
+              <strong id="journeyDueLabel">Orario previsto di arrivo (facoltativo)</strong>
+              <input id="journeyDueAt" type="datetime-local" step="60" hidden aria-describedby="journeyDeadlineHelp">
+              <button id="journeyDueOpen" class="zyro-due-trigger" type="button" aria-haspopup="dialog" aria-controls="zyroJourneyDueDialog" aria-labelledby="journeyDueLabel journeyDueText">
+                <span class="zyro-due-trigger-icon" aria-hidden="true">▦</span><span id="journeyDueText">Seleziona data e ora</span><span class="zyro-due-chevron" aria-hidden="true">›</span>
+              </button>
+            </div>
             <small id="journeyDeadlineHelp">Se vuoi il controllo automatico, scegli data e ora (da 5 minuti a 24 ore). Se non premi «Sono arrivato a destinazione» entro l’orario, il server tenterà di attivare un SOS per i contatti fidati selezionati. La ricezione delle notifiche non è garantita: servono Internet, notifiche abilitate e un server sempre attivo.</small>
             <button id="journeySetTarget" type="button" class="zyro-v15-secondary">Scegli manualmente sulla mappa</button>
             <span id="journeyTargetInfo">Nessuna meta GPS impostata</span>
@@ -579,13 +599,13 @@ html,body{overscroll-behavior-x:none}
       </div>
       <section class="chat-hub" id="chatHub">
         <div class="chat-heading-row"><div><span class="mini-overline">I TUOI MESSAGGI</span><h2>Conversazioni</h2></div><div class="chat-heading-emblem" aria-hidden="true"><svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg></div></div>
-        <div class="chat-filter-bar" aria-label="Filtra le conversazioni"><button type="button" class="chat-filter active" data-chat-filter="all" aria-pressed="true">Tutte</button><button type="button" class="chat-filter" data-chat-filter="circle" aria-pressed="false">Famiglia</button><button type="button" class="chat-filter" data-chat-filter="group" aria-pressed="false">Gruppi</button><button type="button" class="chat-filter" data-chat-filter="direct" aria-pressed="false">Amici</button></div>
+        <div class="chat-filter-bar" aria-label="Filtra le conversazioni"><button type="button" class="chat-filter active" data-chat-filter="all" aria-pressed="true">Tutte</button><button type="button" class="chat-filter" data-chat-filter="direct" aria-pressed="false">Chat singole</button><button type="button" class="chat-filter" data-chat-filter="group" aria-pressed="false">Chat di gruppo</button></div>
         <div class="zyro-group-toolbar" aria-label="Gestione gruppi chat">
           <button type="button" id="chatGroupCreateOpen" class="zyro-group-tool-btn">＋ Crea gruppo</button>
           <button type="button" id="chatGroupJoinOpen" class="zyro-group-tool-btn">⌘ Entra con codice</button>
         </div>
         <div id="chatGroupCreatePanel" class="zyro-group-editor" hidden>
-          <h3>Nuovo gruppo privato</h3><p>Scegli un nome: tutti i partecipanti potranno scrivere nella stessa chat.</p>
+          <h3>Nuovo gruppo privato</h3><p>Scegli un nome: fino a 20 partecipanti, tutti possono scrivere nella stessa chat. La posizione non è condivisa automaticamente.</p>
           <form id="chatGroupCreateForm" class="zyro-group-form"><input id="chatGroupName" maxlength="48" required minlength="2" placeholder="Es. Amici del cuore" aria-label="Nome del nuovo gruppo"><button type="submit" class="btn btn-primary">Crea gruppo</button></form>
         </div>
         <div id="chatGroupJoinPanel" class="zyro-group-editor" hidden>
@@ -788,7 +808,21 @@ html,body{overscroll-behavior-x:none}
 </div>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
-<script src="/app.js?v=80.1" defer></script>
+<div id="zyroJourneyDueDialog" class="zyro-due-overlay" hidden>
+ <div class="zyro-due-backdrop" data-due-close></div>
+ <section class="zyro-due-card" role="dialog" aria-modal="true" aria-labelledby="zyroDueTitle" aria-describedby="zyroDueDescription">
+   <header class="zyro-due-head"><div><small>ACCOMPAGNAMI</small><h2 id="zyroDueTitle">Imposta data e ora</h2><p id="zyroDueDescription">Scegli quando prevedi di arrivare.</p></div><button type="button" id="zyroDueClose" aria-label="Chiudi il calendario">✕</button></header>
+   <div class="zyro-due-calendar">
+     <div class="zyro-due-month-header"><button type="button" id="zyroDuePrev" aria-label="Mese precedente">‹</button><strong id="zyroDueMonth" aria-live="polite"></strong><button type="button" id="zyroDueNext" aria-label="Mese successivo">›</button></div>
+     <div class="zyro-due-weekdays" aria-hidden="true"><span>L</span><span>M</span><span>M</span><span>G</span><span>V</span><span>S</span><span>D</span></div>
+     <div id="zyroDueDayGrid" class="zyro-due-day-grid" aria-label="Scegli il giorno"></div>
+   </div>
+   <div class="zyro-due-time"><label for="zyroDueHour">Ora<input type="number" id="zyroDueHour" inputmode="numeric" min="0" max="23" value="12"></label><span aria-hidden="true">:</span><label for="zyroDueMinute">Minuti<input type="number" id="zyroDueMinute" inputmode="numeric" min="0" max="59" value="00"></label></div>
+   <p class="zyro-due-note">Puoi selezionare un orario tra 5 minuti e 24 ore da adesso.</p>
+   <div class="zyro-due-actions"><button type="button" id="zyroDueClear">Cancella</button><button type="button" id="zyroDueCancel">Annulla</button><button type="button" id="zyroDueConfirm">Imposta</button></div>
+ </section>
+</div>
+<script src="/app.js?v=80.2" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
 </html>
