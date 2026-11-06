@@ -615,7 +615,7 @@ function renderProfileInvites(){
  incoming._sig=sig;outgoing._sig=sig;
  incoming.innerHTML='<h3>Richieste ricevute</h3>'+(pending.length?pending.map(x=>
    '<article class="zyro-id-invite-card"><strong>'+escapeHtml(x.peerName)+'</strong>'+
-   '<p>Vuole invitarti in «'+escapeHtml(x.circleName)+'». Vuoi accettare?</p>'+
+   '<p>Invito '+(x.circleKind==='direct'?'singolo':'di gruppo')+' per «'+escapeHtml(x.circleName)+'». Vuoi accettare?</p>'+ 
    '<div class="zyro-id-invite-actions">'+
    '<button type="button" data-profile-accept="'+escapeHtml(x.id)+'">Accetta</button>'+
    '<button type="button" data-profile-decline="'+escapeHtml(x.id)+'">Rifiuta</button>'+
@@ -623,7 +623,7 @@ function renderProfileInvites(){
    '</div></article>').join(''):'<p class="setting-description">Nessuna richiesta in attesa.</p>');
  outgoing.innerHTML='<h3>Richieste inviate</h3>'+(sent.length?sent.map(x=>
    '<article class="zyro-id-invite-card"><strong>'+escapeHtml(x.peerName)+'</strong>'+
-   '<p>'+escapeHtml(x.circleName)+' · '+(x.status==='pending'?'In attesa di risposta':x.status==='declined'?'Invito rifiutato':x.status==='accepted'?'Invito accettato':'Richiesta annullata')+'</p>'+
+   '<p>'+(x.circleKind==='direct'?'Singola persona':'Gruppo')+' · '+escapeHtml(x.circleName)+' · '+(x.status==='pending'?'In attesa di risposta':x.status==='declined'?'Invito rifiutato':x.status==='accepted'?'Invito accettato':'Richiesta annullata')+'</p>'+
    (x.status==='pending'?'<button type="button" data-profile-cancel="'+escapeHtml(x.id)+'">Annulla invito</button>':'')+
    '</article>').join(''):'<p class="setting-description">Non hai richieste inviate.</p>');
  for(const type of ['accept','decline','block']){
