@@ -730,6 +730,50 @@ app.post('/api/profile-invites/cancel',requireAuth,limit,(req,res)=>{
  invite.status='cancelled';invite.respondedAt=now();save();
  pushState(invite.to);pushState(invite.from);res.json({ok:true});
 });
+// Group-circle codes are different from personal ID requests and legacy chat codes.
+// Each code can be used by multiple consenting members of one shared map/chat circle.
+app.post('/api/circles/group-code', requireAuth, limit, (req,res) => {
+ const circleId=String(req.body?.circleId||''),circle=db.circles[circleId];
+ if(!circle||circle.kind!=='group'||circle.ownerId!==req.user.id||!memberIds(circleId).includes(req.user.id))
+   return res.status(403).json({error:'Solo chi ha creato la cerchia di gruppo può generare un codice.'});
+ if(memberIds(circleId).length>=MAX_GROUP_MEMBERS)
+   return res.status(409).json({error:'Cerchia di gruppo completa: massimo 20 partecipanti.'});
+ // Rotating the code revokes all previous group-circle codes, never personal IDs or chat codes.
+ for(const [key,inv] of Object.entries(db.invites))
+   if(inv.kind==='circle-group'&&inv.circleId===circleId)delete db.invites[key];
+ const code='C'+crypto.randomBytes(9).toString('hex').toUpperCase();
+ db.invites[hash(code)]={kind:'circle-group',circleId,createdBy:req.user.id,createdAt:now(),expiresAt:now()+24*3600*1000};
+ save();res.set('Cache-Control','no-store');
+ res.json({ok:true,code,expiresInHours:24,multipleUses:true,circleName:circle.name,memberLimit:MAX_GROUP_MEMBERS});
+});
+app.post('/api/circles/group-code/revoke', requireAuth, limit, (req,res) => {
+ const circleId=String(req.body?.circleId||''),circle=db.circles[circleId];
+ if(!circle||circle.kind!=='group'||circle.ownerId!==req.user.id)
+   return res.status(403).json({error:'Solo chi ha creato la cerchia può revocare il codice.'});
+ for(const [key,inv] of Object.entries(db.invites))
+   if(inv.kind==='circle-group'&&inv.circleId===circleId)delete db.invites[key];
+ save();res.json({ok:true,revoked:true});
+});
+app.post('/api/circles/group-code/join', requireAuth, limit, (req,res) => {
+ const code=String(req.body?.code||'').replace(/[\s-]/g,'').toUpperCase();
+ if(!/^C[A-F0-9]{18}$/.test(code))return res.status(400).json({error:'Codice della cerchia non valido.'});
+ const invite=db.invites[hash(code)],circle=invite&&db.circles[invite.circleId];
+ if(!invite||invite.kind!=='circle-group'||invite.expiresAt<=now()||!circle||circle.kind!=='group')
+   return res.status(400).json({error:'Codice non valido, scaduto o revocato.'});
+ if(!memberIds(circle.id).includes(invite.createdBy)||circle.ownerId!==invite.createdBy)
+   return res.status(410).json({error:'Questo codice non è più valido.'});
+ if(memberIds(circle.id).includes(req.user.id))
+   return res.status(409).json({error:'Sei già membro della cerchia.'});
+ if(userCircles(req.user.id).length>=MAX_USER_CIRCLES)
+   return res.status(409).json({error:'Hai raggiunto il limite di cerchie.'});
+ if(memberIds(circle.id).length>=MAX_GROUP_MEMBERS)
+   return res.status(409).json({error:'Cerchia di gruppo completa (20 persone).'});
+ // Explicit join adds membership only. Sharing/GPS/SOS/audio/remote grants remain unchanged.
+ db.memberships.push({circleId:circle.id,userId:req.user.id,invitedBy:invite.createdBy,joinedAt:now()});
+ save();
+ for(const member of memberIds(circle.id))refreshRelated(member);
+ res.json({ok:true,circleId:circle.id,circleName:circle.name,memberCount:memberIds(circle.id).length,memberLimit:MAX_GROUP_MEMBERS});
+});
 app.post('/api/invites', requireAuth, limit, (req,res) => {
   const id = String(req.body.circleId || '');
   if (db.circles[id]?.kind==='chat') return res.status(400).json({error:'Per i gruppi chat genera un codice dalla sezione Chat.'});
@@ -742,7 +786,7 @@ app.post('/api/invites', requireAuth, limit, (req,res) => {
 app.post('/api/invites/join', requireAuth, limit, (req,res) => {
   const code = String(req.body.code || '').replace(/[\s-]/g,'').toUpperCase();
   const key = hash(code), inv = db.invites[key];
-  if (!inv || inv.kind==='group' || inv.expiresAt < now() || !db.circles[inv.circleId]) return res.status(400).json({error:'Codice non valido o scaduto.'});
+  if (!inv || inv.kind==='group' || inv.kind==='circle-group' || inv.expiresAt < now() || !db.circles[inv.circleId]) return res.status(400).json({error:'Codice non valido o scaduto.'});
   if (userCircles(req.user.id).length >= MAX_USER_CIRCLES) return res.status(400).json({error:'Limite cerchie raggiunto.'});
   if (memberIds(inv.circleId).includes(req.user.id)) return res.status(400).json({error:'Sei già nella cerchia.'});
   if (db.circles[inv.circleId]?.kind==='direct') return res.status(400).json({error:'Le cerchie singole richiedono un invito tramite ID.'});

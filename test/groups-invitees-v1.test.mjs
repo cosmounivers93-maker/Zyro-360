@@ -15,7 +15,7 @@ test('codici gruppo distinti, riutilizzabili e a scadenza',()=>{
   const join=server.slice(server.indexOf("app.post('/api/chat/groups/join'"),server.indexOf("app.post('/api/circles'"));
   assert.match(join,/db\.memberships\.push/);
   assert.doesNotMatch(join,/delete db\.invites\[key\]/);
-  assert.match(server,/inv\.kind==='group' \|\| inv\.expiresAt/);
+  assert.match(server,/inv\.kind==='group' \|\| inv\.kind==='circle-group' \|\| inv\.expiresAt/);
 });
 test('only creator regenerates group code and permissions stay opt in',()=>{
   assert.match(server,/group\.ownerId!==req\.user\.id/);

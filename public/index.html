@@ -35,6 +35,7 @@
   <link rel="stylesheet" href="/zyro-journey-v71.css?v=6">
   <link rel="stylesheet" href="/zyro-circle-picker-v3.css?v=3">
   <link rel="stylesheet" href="/zyro-final-circle-status-v4.css?v=4">
+  <link rel="stylesheet" href="/zyro-group-circle-code-v5.css?v=5">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
 .zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult,[data-zyro-permission="testpush"]{display:none!important}
@@ -419,6 +420,30 @@ html,body{overscroll-behavior-x:none}
 </div>
       <div class="section-head space-top"><div><h2>Le mie cerchie</h2><p>Singole o di gruppo · gli inviti richiedono sempre l’accettazione</p></div></div>
       <div id="circlesList" class="circle-list"></div>
+<section class="zyro-group-code-panel" aria-labelledby="zyroGroupCodeHeading">
+  <div class="zyro-group-code-heading">
+    <span class="zyro-group-code-symbol" aria-hidden="true">⌘</span>
+    <div><h3 id="zyroGroupCodeHeading">Entra in una cerchia di gruppo</h3>
+    <p>Un codice specifico per la cerchia ti collega alla stessa mappa e alla stessa chat, fino a 20 persone.</p></div>
+  </div>
+  <form id="zyroGroupCodeJoinForm" class="zyro-group-code-join-form">
+    <label for="zyroGroupCodeInput">Codice della cerchia ricevuto</label>
+    <div class="zyro-group-code-row"><input id="zyroGroupCodeInput" required minlength="19" maxlength="28" autocapitalize="characters" spellcheck="false" autocomplete="off" placeholder="C… · codice della famiglia" aria-describedby="zyroGroupCodePrivacy"/>
+    <button type="submit" class="btn btn-primary">Entra</button></div>
+  </form>
+  <small id="zyroGroupCodePrivacy" class="zyro-group-code-privacy">Entrando accetti di far parte della cerchia. La tua posizione non viene condivisa automaticamente: gestisci GPS e permessi per ogni contatto.</small>
+  <div id="zyroGroupCodeIssued" class="zyro-group-code-result" role="status" aria-live="polite" hidden>
+    <strong id="zyroGroupCodeIssuedName">Codice di gruppo</strong>
+    <span class="zyro-group-code-caption">CODICE DELLA CERCHIA · PIÙ PERSONE · 24 ORE</span>
+    <code id="zyroGroupCodeIssuedValue" aria-label="Codice della cerchia"></code>
+    <div class="zyro-group-code-actions">
+      <button type="button" id="zyroGroupCodeCopy">Copia codice</button>
+      <button type="button" id="zyroGroupCodeShare">Condividi</button>
+      <button type="button" id="zyroGroupCodeRevoke">Revoca codice</button>
+    </div>
+    <small>Il codice può essere usato da più persone. Generandone uno nuovo, quello precedente viene revocato.</small>
+  </div>
+</section>
     </section>
 
     <section id="modesView" class="view hidden modes-page">
@@ -689,7 +714,7 @@ html,body{overscroll-behavior-x:none}
         <details><summary>Inizia da qui <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea il tuo account, scegli nome e foto dal Profilo e apri «Abilita permessi». Autorizza soltanto le funzioni che vuoi usare: posizione per il GPS, notifiche per gli avvisi, microfono per l’audio SOS e sensori per Pick Pocket. I permessi da soli non avviano la condivisione né il microfono.</p></div></details>
         <details><summary>Home: mappa e posizione <span aria-hidden="true">＋</span></summary><div class="how-content"><p>«Trova la mia posizione» centra la mappa sul telefono. «Attiva posizione» condivide il GPS con le persone autorizzate nelle tue cerchie; puoi interrompere la condivisione in ogni momento. In «Persone invitate» gestisci chi può vedere la posizione e chi riceve i tuoi SOS. La precisione dipende dal segnale GPS e dalle autorizzazioni.</p></div></details>
         <details><summary>Collegamento privato tramite ID profilo <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Ogni account dispone di un ID pubblico univoco, associato al nome di registrazione. In Cerchie scegli «Singola persona», inserisci l’ID e invia la richiesta. Non devi creare prima una cerchia: il destinatario può accettare, rifiutare oppure bloccare ulteriori inviti. <strong>Soltanto dopo l’accettazione</strong> viene creata automaticamente una cerchia privata fra voi due, con chat individuale. Nessuna richiesta accende automaticamente GPS, SOS o microfono.</p><p><strong>Uscire dalla cerchia:</strong> se non fate più parte di nessun’altra cerchia in comune, vengono revocati i permessi GPS, SOS, ascolto audio e controllo remoto concessi a quel contatto.</p></div></details>
-        <details><summary>Cerchia di gruppo: famiglia e amici <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea una sola cerchia di gruppo, per esempio «Famiglia». Fino a <strong>20 persone</strong>, incluso il creatore, possono farne parte. Invita tramite ID o codice della cerchia: ciascuno entra solo dopo aver accettato o scelto di partecipare. Tutti i membri utilizzano la stessa chat e possono comparire sulla mappa comune.</p><p>Ogni partecipante deve attivare volontariamente GPS LIVE e autorizzare i contatti che potranno vedere la sua posizione. Se dieci familiari abilitano la condivisione reciproca, potranno vedersi contemporaneamente sulla mappa. Disattivando GPS LIVE si interrompe la propria condivisione; SOS, microfono e controllo remoto richiedono autorizzazioni indipendenti.</p></div></details>
+        <details><summary>Cerchia di gruppo: famiglia e amici <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea una sola cerchia di gruppo, per esempio «Famiglia». Fino a <strong>20 persone</strong>, incluso il creatore, possono farne parte. Invita tramite ID oppure genera dalla scheda della cerchia un <strong>codice riservato che inizia per C</strong>, diverso dai codici della Chat e dagli ID personali. Puoi inviare lo stesso codice a più persone: ognuna deve inserirlo in Cerchie e confermare «Entra». Il codice dura 24 ore, è revocabile o rigenerabile dal creatore e funziona fino al limite dei 20 membri. Tutti i membri utilizzano la stessa chat e possono comparire sulla mappa comune.</p><p>Ogni partecipante deve attivare volontariamente GPS LIVE e autorizzare i contatti che potranno vedere la sua posizione. Se dieci familiari abilitano la condivisione reciproca, potranno vedersi contemporaneamente sulla mappa. Disattivando GPS LIVE si interrompe la propria condivisione; SOS, microfono e controllo remoto richiedono autorizzazioni indipendenti.</p></div></details>
         <details id="zyroHelpContactPermissions"><summary>Persone invitate: scegli i permessi per ogni contatto <span aria-hidden="true">＋</span></summary><div class="how-content">
           <p><strong>Dove si trovano:</strong> apri Profilo → Impostazioni aggiuntive → Persone invitate. Per ogni persona ancora presente nella tua cerchia trovi interruttori indipendenti: sei tu a scegliere quali abilitare e puoi revocarli.</p>
           <p><strong>1. Può vedere il mio GPS:</strong> la persona può vedere la tua posizione soltanto quando attivi «GPS LIVE» e hai autorizzato la posizione sul telefono. Non vede il GPS se disattivi la condivisione.</p>
@@ -818,7 +843,7 @@ html,body{overscroll-behavior-x:none}
    <div class="zyro-due-actions"><button type="button" id="zyroDueClear">Cancella</button><button type="button" id="zyroDueCancel">Annulla</button><button type="button" id="zyroDueConfirm">Imposta</button></div>
  </section>
 </div>
-<script src="/app.js?v=80.4" defer></script>
+<script src="/app.js?v=80.5" defer></script>
 <script src="/zyro-circle-picker-v3.js?v=3" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>

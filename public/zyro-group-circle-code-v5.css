@@ -1,0 +1,63 @@
+/* ZYRO 360 · V5 family circle code and minimal Home topbar.
+   Preserve original light/glass visual design and navigation. */
+html body.zyro-home-no-brand #appScreen > header.topbar > .brand{
+ display:none!important;visibility:hidden!important;
+}
+/* On Home keep the connected indicator, not the duplicate ZYRO 360 title. */
+html body.zyro-home-no-brand #appScreen > header.topbar{
+ justify-content:flex-end!important;
+ min-height:52px!important;
+}
+html body.zyro-home-no-brand #appScreen > header.topbar > .connection-pill{
+ margin-left:auto!important;
+}
+#circlesView .zyro-group-code-panel{
+ margin:17px 0 4px;padding:19px 17px 17px;
+ border-radius:24px;border:1px solid rgba(156,184,220,.57);
+ background:linear-gradient(145deg,rgba(251,254,255,.94),rgba(230,245,254,.91) 62%,rgba(239,233,255,.91));
+ box-shadow:0 7px 24px rgba(70,105,156,.09),inset 0 1px rgba(255,255,255,.97);
+ color:#294c6d;overflow-wrap:anywhere;
+}
+#circlesView .zyro-group-code-heading{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+#circlesView .zyro-group-code-symbol{flex:0 0 42px;height:42px;border-radius:15px;display:grid;place-items:center;
+ background:linear-gradient(132deg,#dcf5fe,#e9e4ff);border:1px solid #c7daee;color:#5c60b6;font-size:27px}
+#circlesView .zyro-group-code-heading h3{font-size:18px;line-height:1.3;color:#234667;margin:2px 0 5px;font-weight:830}
+#circlesView .zyro-group-code-heading p{font-size:13px;line-height:1.55;margin:0;color:#58708a}
+#circlesView .zyro-group-code-join-form{display:grid;gap:8px;margin:7px 0}
+#circlesView .zyro-group-code-join-form label{font-size:13px;font-weight:770;color:#294a68}
+#circlesView .zyro-group-code-row{display:flex;gap:9px;align-items:stretch}
+#circlesView .zyro-group-code-row input{min-width:0;flex:1;width:100%;box-sizing:border-box;
+ border-radius:15px;border:1px solid #bed3e5;padding:12px 13px;
+ background:rgba(251,254,255,.92);font-size:14px;font-weight:650;
+ color:#234968!important;-webkit-text-fill-color:#234968!important}
+#circlesView .zyro-group-code-row input::placeholder{color:#71859a}
+#circlesView .zyro-group-code-row .btn{border-radius:15px;padding:10px 15px;white-space:nowrap}
+#circlesView .zyro-group-code-privacy{display:block;margin-top:9px;font-size:12px;line-height:1.55;color:#4e6a83}
+#circlesView .zyro-group-code-result{margin-top:16px;padding:15px;border:1px solid rgba(113,111,213,.39);
+ border-radius:18px;background:linear-gradient(115deg,rgba(241,251,255,.94),rgba(239,234,255,.91));display:grid;gap:9px}
+#circlesView .zyro-group-code-result[hidden]{display:none!important}
+#circlesView .zyro-group-code-result>strong{color:#29496c;font-size:15px}
+#circlesView .zyro-group-code-caption{font-size:10px;font-weight:790;letter-spacing:.08em;color:#6f61b7}
+#circlesView #zyroGroupCodeIssuedValue{font-size:17px;font-weight:800;letter-spacing:.07em;color:#264774!important;
+ display:block;overflow-wrap:anywhere;padding:12px;border-radius:13px;background:rgba(255,255,255,.9);border:1px dashed #acbce2;
+ user-select:all}
+#circlesView .zyro-group-code-actions{display:flex;flex-wrap:wrap;gap:9px}
+#circlesView .zyro-group-code-actions button,
+#circlesView .circle-actions .zyro-circle-code-generate{
+ color:#443a96!important;-webkit-text-fill-color:#443a96!important;
+ background:linear-gradient(130deg,#e8f8ff,#eeeaff)!important;
+ border:1px solid #c5caec!important;border-radius:13px;
+ font-size:12px;font-weight:790;padding:10px 12px;min-height:42px;cursor:pointer;
+}
+#circlesView .zyro-group-code-actions button:focus-visible,#circlesView .zyro-group-code-row input:focus-visible{
+ outline:3px solid #7466d4;outline-offset:2px
+}
+#circlesView #zyroGroupCodeRevoke{color:#96435b!important;-webkit-text-fill-color:#96435b!important;
+ background:#fff4f7!important;border-color:#ecc0d1!important}
+#circlesView .zyro-group-code-result>small{color:#5c7390;font-size:12px;line-height:1.5}
+@media(max-width:390px){
+ #circlesView .zyro-group-code-panel{padding:15px 12px}
+ #circlesView .zyro-group-code-row{gap:6px}
+ #circlesView .zyro-group-code-row input{font-size:12px;padding:10px}
+ #circlesView .zyro-group-code-row .btn{padding:9px 11px;font-size:12px}
+}
