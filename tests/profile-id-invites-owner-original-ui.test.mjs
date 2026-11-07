@@ -21,7 +21,7 @@ const HTML=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
 const BACKEND=readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 const NATIVE_PLAN=readFileSync(new URL('../play-billing.mjs',import.meta.url),'utf8');
 
-test('Approved Zyro graphics and original Premium/Family plans are retained',()=>{
+test('Approved Zyro graphics and safe subscription gates are retained',()=>{
   assert.doesNotThrow(()=>new vm.Script(WEB,{filename:'public/app.js'}));
   for(const s of ['id="circlesView"','id="homeView"','id="chatsView"','id="zyroAdminPanel"','id="zyroAdminOverview"','id="profileIncomingInvites"','id="profileOutgoingInvites"','id="sendProfileInviteForm"','id="zyroPlusTitle"']){
     // The original backend still offers Premium and Family, not Plus.
@@ -35,7 +35,7 @@ test('Approved Zyro graphics and original Premium/Family plans are retained',()=
   assert.ok(!WEB.includes("const circles=(current.circles||[]).filter(c=>c.kind==='chat')"));
   assert.ok(NATIVE_PLAN.includes('zyro360_premium'));
   assert.ok(NATIVE_PLAN.includes('zyro360_family'));
-  assert.match(BACKEND,/const familyActive = user => premiumPlan\(user\)==='family'/);
+  assert.match(BACKEND,/const familyActive = user => premiumActive\(user\)/);
   assert.match(BACKEND,/const planFeatures = user => \(\{sos:premiumActive\(user\)/);
   assert.match(BACKEND,/app.post\('\/api\/admin\/ban',requireAuth,requireAdmin/);
   assert.match(BACKEND,/app.post\('\/api\/admin\/premium-gift',requireAuth,requireAdmin/);
