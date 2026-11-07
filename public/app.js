@@ -2784,7 +2784,7 @@ async function init(){
   $('profileInviteMode')?.addEventListener('change',renderCircles);
   $('zyroGroupCodeJoinForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
     const code=$('zyroGroupCodeInput').value.trim();
-    if(!/^C[A-F0-9]{18}$/i.test(code.replace(/[\\s-]/g,'')))throw Error('Inserisci il codice completo della cerchia, che inizia per C.');
+    if(!/^C[A-F0-9]{18}$/i.test(code.replace(/[\s-]/g,'')))throw Error('Inserisci il codice completo della cerchia, che inizia per C.');
     const result=await post('/api/circles/group-code/join',{code});
     $('zyroGroupCodeInput').value='';
     await refresh();
@@ -2932,7 +2932,7 @@ async function init(){
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=22-single-groups-plan-guide').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=23-group-code-home-clean').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);
