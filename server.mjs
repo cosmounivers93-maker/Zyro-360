@@ -786,7 +786,7 @@ app.post('/api/invites', requireAuth, limit, (req,res) => {
 app.post('/api/invites/join', requireAuth, limit, (req,res) => {
   const code = String(req.body.code || '').replace(/[\s-]/g,'').toUpperCase();
   const key = hash(code), inv = db.invites[key];
-  if (!inv || inv.kind==='group' || inv.expiresAt < now() || !db.circles[inv.circleId]) return res.status(400).json({error:'Codice non valido o scaduto.'});
+  if (!inv || inv.kind==='group' || inv.kind==='circle-group' || inv.expiresAt < now() || !db.circles[inv.circleId]) return res.status(400).json({error:'Codice non valido o scaduto.'});
   if (userCircles(req.user.id).length >= MAX_USER_CIRCLES) return res.status(400).json({error:'Limite cerchie raggiunto.'});
   if (memberIds(inv.circleId).includes(req.user.id)) return res.status(400).json({error:'Sei già nella cerchia.'});
   if (db.circles[inv.circleId]?.kind==='direct') return res.status(400).json({error:'Le cerchie singole richiedono un invito tramite ID.'});
