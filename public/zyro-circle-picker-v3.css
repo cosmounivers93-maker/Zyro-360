@@ -1,0 +1,130 @@
+/* ZYRO 360 V3 · legibility and custom glass-mode circle dropdowns.
+   Intentionally scoped to 3 selectors + Accompagnami date label only. */
+html body #journeyPanel button#journeyDueOpen span#journeyDueText,
+html body #journeyPanel .zyro-due-trigger #journeyDueText{
+  color:#193f65!important;
+  -webkit-text-fill-color:#193f65!important;
+  opacity:1!important;filter:none!important;
+  font-size:16px!important;font-weight:800!important;
+  letter-spacing:0!important;text-shadow:none!important;
+}
+html body #journeyPanel button#journeyDueOpen{
+  color:#193f65!important;
+  border-color:#b6cbe9!important;
+  background:linear-gradient(112deg,#f9fdff 0%,#edf5ff 51%,#f1eaff 100%)!important;
+}
+html body #journeyPanel button#journeyDueOpen:focus-visible{
+  outline:3px solid #7666db!important;outline-offset:2px!important;
+}
+/* Hide the platform control visually while keeping the original select in
+   the DOM for forms, change listeners, and the existing server-side rules. */
+#circlesView .zyro-choice-control{position:relative;display:block;width:100%;min-width:0}
+html body #circlesView select.zyro-choice-native{
+  position:absolute!important;width:1px!important;height:1px!important;
+  margin:0!important;padding:0!important;border:0!important;
+  opacity:0!important;pointer-events:none!important;
+  clip-path:inset(50%)!important;overflow:hidden!important;
+}
+html body #circlesView button.zyro-choice-trigger{
+  width:100%!important;min-height:65px!important;
+  display:flex!important;align-items:center!important;gap:12px!important;
+  padding:11px 13px!important;text-align:left!important;
+  border:1px solid rgba(120,157,213,.45)!important;
+  border-radius:19px!important;
+  background:linear-gradient(122deg,rgba(250,254,255,.98),rgba(233,245,255,.93) 62%,rgba(241,235,255,.91))!important;
+  box-shadow:0 7px 20px rgba(49,90,143,.07),inset 0 1px rgba(255,255,255,.96)!important;
+  cursor:pointer!important;line-height:1.25!important;
+  color:#224568!important;-webkit-text-fill-color:#224568!important;
+  opacity:1!important;text-shadow:none!important;
+}
+#circlesView .zyro-choice-trigger-copy{flex:1;min-width:0;display:grid;gap:4px}
+html body #circlesView .zyro-choice-trigger-title{
+  display:block;font-size:16px!important;font-weight:800!important;
+  color:#24476b!important;-webkit-text-fill-color:#24476b!important;
+  text-overflow:ellipsis;white-space:normal;overflow-wrap:anywhere;
+}
+html body #circlesView .zyro-choice-trigger-meta{
+  display:block;font-size:12px!important;font-weight:600!important;
+  color:#576f89!important;-webkit-text-fill-color:#576f89!important;
+}
+#circlesView .zyro-choice-trigger:disabled{opacity:.6!important;cursor:not-allowed!important}
+#circlesView .zyro-choice-trigger:focus-visible{outline:3px solid #7b6ce0;outline-offset:2px}
+.zyro-choice-icon{
+  flex:0 0 42px;display:grid;place-items:center;
+  width:42px;height:42px;border-radius:15px;
+  background:linear-gradient(145deg,#e0f4ff,#ebe5ff);
+  border:1px solid #d0dff3;color:#6459bb!important;
+  -webkit-text-fill-color:#6459bb!important;
+}
+.zyro-choice-icon.is-group{color:#2875a6!important;-webkit-text-fill-color:#2875a6!important}
+.zyro-choice-icon svg{width:24px;height:24px;display:block;overflow:visible}
+#circlesView .zyro-choice-arrow{font-size:26px;line-height:1;flex-shrink:0;color:#7365c6!important;-webkit-text-fill-color:#7365c6!important}
+.zyro-choice-overlay{
+  position:fixed;z-index:2147483300;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  padding:14px;box-sizing:border-box;
+  padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(14px,env(safe-area-inset-bottom));
+}
+.zyro-choice-backdrop{position:absolute;inset:0;background:rgba(30,50,82,.48);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.zyro-choice-sheet{
+  box-sizing:border-box;position:relative;isolation:isolate;
+  width:100%;max-width:450px;max-height:calc(100dvh - 44px);
+  overflow:auto;overscroll-behavior:contain;
+  border:1px solid rgba(255,255,255,.96);border-radius:28px;
+  background:linear-gradient(148deg,#fbfdff 0%,#eaf5ff 55%,#f1ebff 100%);
+  box-shadow:0 28px 70px rgba(26,45,95,.28),inset 0 1px #fff;
+  padding:20px 17px 18px;color:#263f60;
+}
+.zyro-choice-heading{display:flex;align-items:flex-start;gap:12px;justify-content:space-between;margin-bottom:16px}
+.zyro-choice-eyebrow{font-size:10px;letter-spacing:.14em;font-weight:800;color:#776aca}
+.zyro-choice-heading h2{font-size:22px;font-weight:850;line-height:1.2;margin:6px 0;color:#23436a}
+.zyro-choice-heading p{font-size:13px;line-height:1.55;margin:0;color:#647992}
+.zyro-choice-dismiss{flex:0 0 38px;width:38px;height:38px;border-radius:13px;
+  border:1px solid #ceddee;background:rgba(255,255,255,.8);
+  font-size:25px;font-weight:400;color:#4f608a!important;cursor:pointer}
+.zyro-choice-list{display:grid;gap:10px}
+.zyro-choice-option{
+  box-sizing:border-box;width:100%;display:flex;align-items:center;
+  gap:12px;text-align:left;min-height:81px;padding:13px 12px;
+  border-radius:20px;border:1px solid #c6d9ed;
+  background:rgba(255,255,255,.83);
+  box-shadow:0 3px 11px rgba(76,95,140,.05);
+  color:#254669!important;-webkit-text-fill-color:#254669!important;
+  font:inherit;cursor:pointer;
+}
+.zyro-choice-option[aria-pressed="true"]{
+  border:2px solid #7269d9;
+  background:linear-gradient(120deg,#eaf7ff 0%,#eee9ff 100%);
+  box-shadow:0 0 0 3px rgba(123,107,225,.12),0 7px 19px rgba(69,82,166,.11);
+}
+.zyro-choice-option-copy{display:grid;gap:5px;flex:1;min-width:0;overflow-wrap:anywhere}
+.zyro-choice-option-copy strong{
+  color:#214365!important;-webkit-text-fill-color:#214365!important;
+  font-size:16px;font-weight:800;line-height:1.3;
+}
+.zyro-choice-option-copy small{
+  color:#61768e!important;-webkit-text-fill-color:#61768e!important;
+  font-size:12px;font-weight:600;line-height:1.45;
+}
+.zyro-choice-check{
+  flex:0 0 25px;display:grid;place-items:center;width:25px;height:25px;
+  border:2px solid #b7c8dc;border-radius:50%;color:#fff!important;
+}
+.zyro-choice-option[aria-pressed="true"] .zyro-choice-check{
+  border-color:#7060cf;background:linear-gradient(140deg,#299ad1,#6d57cf);
+  color:#fff!important;-webkit-text-fill-color:#fff!important;
+}
+.zyro-choice-empty{font-size:14px;line-height:1.5;color:#576e87}
+.zyro-choice-option:focus-visible,.zyro-choice-dismiss:focus-visible{
+  outline:3px solid #695acb;outline-offset:2px;
+}
+@media(max-width:390px){
+  .zyro-choice-sheet{padding:17px 13px 14px;border-radius:23px}
+  .zyro-choice-option{padding:11px 10px}
+  .zyro-choice-heading h2{font-size:20px}
+}
+@media(prefers-reduced-motion:no-preference){
+  .zyro-choice-sheet{animation:zyroV3Show .2s ease-out}
+  @keyframes zyroV3Show{from{opacity:.4;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+}

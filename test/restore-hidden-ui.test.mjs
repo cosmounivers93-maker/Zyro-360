@@ -20,6 +20,8 @@ test('billing UI does not reinsert the restore button, while retaining automatic
 });
 
 test('service worker cache version changes so refreshed UI can be installed',()=>{
-  assert.match(sw,/zyro-360-v20-circle-modes/);
+  assert.match(sw,/zyro-360-v21-circle-picker-glass/);
   assert.match(sw,/zyro-circle-modes-v2\.css/);
+  assert.match(sw,/zyro-circle-picker-v3\.css/);
+  assert.match(sw,/zyro-circle-picker-v3\.js/);
 });
