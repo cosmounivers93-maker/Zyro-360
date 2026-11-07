@@ -121,7 +121,9 @@ const premiumPlan = user => {
  return receipt?.plan||legacy;
 };
 const premiumActive = user => premiumPlan(user)!=='free';
-const familyActive = user => premiumPlan(user)==='family';
+// Transitional unified entitlement: an ACTIVE verified subscription unlocks all features.
+// The new Google Play product/price migration is deliberately a separate final step.
+const familyActive = user => premiumActive(user);
 const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
@@ -276,7 +278,7 @@ function stateFor(id) {
     address:a.address||null, location: (mayViewSharedGps(db.users[a.userId],id) || a.recipients?.includes(id)) ? (locations.get(a.userId)||null) : null
   })).sort((a,b) => b.startedAt - a.startedAt);
   const myInvites = Object.values(db.profileInvites||{}).filter(inv => inv && inv.expiresAt>now() && (inv.to===id || inv.from===id)).map(inv=>({
-    id:inv.id, circleId:inv.circleId, circleName:db.circles[inv.circleId]?.name||'Cerchia', circleKind:db.circles[inv.circleId]?.kind==='direct'?'direct':'group',
+    id:inv.id, circleId:inv.circleId, circleName:db.circles[inv.circleId]?.name||(inv.kind==='direct'?'Collegamento privato':'Cerchia'), circleKind:inv.kind==='direct'||db.circles[inv.circleId]?.kind==='direct'?'direct':'group',
     status:inv.status, expiresAt:inv.expiresAt, createdAt:inv.createdAt,
     direction:inv.to===id?'received':'sent',
     peerName:db.users[inv.to===id?inv.from:inv.to]?.name||'Utente'
@@ -605,13 +607,15 @@ app.post('/api/chat/groups', requireAuth, limit, (req,res) => {
   if(userCircles(req.user.id).length>=MAX_USER_CIRCLES)
     return res.status(400).json({error:'Limite gruppi e cerchie raggiunto.'});
   const id=token(12);
-  db.circles[id]={id,name,ownerId:req.user.id,kind:'chat',createdAt:now()};
+  // A new group is a real shared circle: one membership list for map, privacy and chat.
+  // Existing kind:'chat' groups remain supported as legacy chat-only spaces.
+  db.circles[id]={id,name,ownerId:req.user.id,kind:'group',createdAt:now()};
   db.memberships.push({circleId:id,userId:req.user.id,joinedAt:now()});
   save();refreshRelated(req.user.id);res.json({ok:true,groupId:id});
 });
 app.post('/api/chat/groups/invite', requireAuth, limit, (req,res) => {
   const id=String(req.body?.groupId||''),group=db.circles[id];
-  if(!group||group.kind!=='chat'||group.ownerId!==req.user.id)
+  if(!group||!['chat','group'].includes(group.kind)||group.ownerId!==req.user.id)
     return res.status(403).json({error:'Solo chi ha creato il gruppo può generare il codice.'});
   // One active code per group. Regenerating revokes the previous code.
   for(const [key,inv] of Object.entries(db.invites))
@@ -625,7 +629,7 @@ app.post('/api/chat/groups/join', requireAuth, limit, (req,res) => {
   if(!/^G[A-F0-9]{18}$/.test(code))
     return res.status(400).json({error:'Codice gruppo non valido.'});
   const inv=db.invites[hash(code)],group=inv&&db.circles[inv.circleId];
-  if(!inv||inv.kind!=='group'||inv.expiresAt<now()||!group||group.kind!=='chat')
+  if(!inv||inv.kind!=='group'||inv.expiresAt<now()||!group||!['chat','group'].includes(group.kind))
     return res.status(400).json({error:'Codice gruppo non valido o scaduto.'});
   if(memberIds(group.id).includes(req.user.id))
     return res.status(400).json({error:'Sei già nel gruppo.'});
@@ -651,17 +655,22 @@ app.post('/api/circles', requireAuth, limit, (req,res) => {
 // a circle or grants location/SOS/audio/remote access before explicit consent.
 app.post('/api/profile-invites', requireAuth, limit, (req,res)=>{
  const profileId=String(req.body?.profileId||'').trim().toUpperCase();
- const circleId=String(req.body?.circleId||'');
+ const newDirect=req.body?.mode==='direct'&&!String(req.body?.circleId||'');
+ const circleId=newDirect?'':String(req.body?.circleId||'');
  if(!/^[A-Z0-9]{2,20}-[A-F0-9]{16}$/.test(profileId))return res.status(400).json({error:'ID profilo non valido.'});
- const circle=db.circles[circleId];
- if(!circle||circle.kind==='chat'||!memberIds(circleId).includes(req.user.id))
+ const circle=newDirect?null:db.circles[circleId];
+ if(!newDirect&&(!circle||circle.kind==='chat'||!memberIds(circleId).includes(req.user.id)))
    return res.status(403).json({error:'Seleziona una tua cerchia valida.'});
+ if(newDirect&&userCircles(req.user.id).length>=MAX_USER_CIRCLES)
+   return res.status(409).json({error:'Limite cerchie raggiunto.'});
  const target=Object.values(db.users).find(u=>publicProfileId(u)===profileId || legacyProfileId(u.id)===profileId);
  if(!target||target.bannedAt||target.id===req.user.id)return res.status(404).json({error:'Profilo non disponibile.'});
  if((target.inviteBlockedIds||[]).includes(req.user.id))
    return res.status(403).json({error:'Non puoi inviare richieste a questo profilo.'});
- if(memberIds(circleId).includes(target.id))return res.status(409).json({error:'Questa persona è già nella cerchia.'});
- if(memberIds(circleId).length>=circleCapacity(circle))return res.status(409).json({error:circle.kind==='direct'?'La cerchia singola ha già un contatto.':'Cerchia di gruppo completa (20 persone).'});
+ if(newDirect&&userCircles(req.user.id).some(c=>c.kind==='direct'&&memberIds(c.id).includes(target.id)))
+   return res.status(409).json({error:'Hai già una cerchia privata con questa persona.'});
+ if(circle&&memberIds(circleId).includes(target.id))return res.status(409).json({error:'Questa persona è già nella cerchia.'});
+ if(circle&&memberIds(circleId).length>=circleCapacity(circle))return res.status(409).json({error:circle.kind==='direct'?'La cerchia singola ha già un contatto.':'Cerchia di gruppo completa (20 persone).'});
  const requests=Object.values(db.profileInvites||{});
  const recent=requests.find(i=>i.from===req.user.id&&i.to===target.id&&i.circleId===circleId &&
    (i.status==='pending'&&i.expiresAt>now()||i.status==='declined'&&i.createdAt>now()-24*3600*1000));
@@ -670,8 +679,8 @@ app.post('/api/profile-invites', requireAuth, limit, (req,res)=>{
     requests.filter(i=>i.to===target.id&&i.status==='pending'&&i.expiresAt>now()).length>=30)
    return res.status(429).json({error:'Limite di richieste in sospeso raggiunto.'});
  const id=token(12);
- db.profileInvites[id]={id,circleId,from:req.user.id,to:target.id,status:'pending',
-   createdAt:now(),expiresAt:now()+24*3600*1000};
+ db.profileInvites[id]={id,circleId,kind:newDirect?'direct':circle?.kind==='direct'?'direct':'group',
+   from:req.user.id,to:target.id,status:'pending',createdAt:now(),expiresAt:now()+24*3600*1000};
  save();pushState(target.id);pushState(req.user.id);
  void sendEventPush([target.id],'Invito alla cerchia • ZYRO 360',
    req.user.name+' ti ha invitato in una cerchia. Apri l’app per accettare o rifiutare.');
@@ -683,9 +692,23 @@ app.post('/api/profile-invites/respond',requireAuth,limit,(req,res)=>{
  if(!invite || invite.to!==req.user.id || invite.status!=='pending' ||
      invite.expiresAt<=now() || !['accept','decline'].includes(decision))
    return res.status(404).json({error:'Richiesta non disponibile o scaduta.'});
- const circle=db.circles[invite.circleId],sender=db.users[invite.from];
+ let circle=db.circles[invite.circleId];const sender=db.users[invite.from];
  if(decision==='accept'){
-   if(!circle||!sender||sender.bannedAt||!memberIds(circle.id).includes(sender.id))
+   if(!sender||sender.bannedAt||!db.users[req.user.id])
+     return res.status(410).json({error:'Il profilo non è più disponibile.'});
+   if(invite.kind==='direct'&&!invite.circleId){
+     // A direct invitation creates the 2-person circle ONLY after recipient consent.
+     if(userCircles(sender.id).length>=MAX_USER_CIRCLES||userCircles(req.user.id).length>=MAX_USER_CIRCLES)
+       return res.status(409).json({error:'Limite cerchie raggiunto.'});
+     if(userCircles(sender.id).some(c=>c.kind==='direct'&&memberIds(c.id).includes(req.user.id)))
+       return res.status(409).json({error:'Esiste già una cerchia privata con questo contatto.'});
+     const id=token(12);
+     circle={id,name:cleanText(sender.name+' e '+req.user.name,48),ownerId:sender.id,kind:'direct',createdAt:now()};
+     db.circles[id]=circle;
+     db.memberships.push({circleId:id,userId:sender.id,joinedAt:now()});
+     invite.circleId=id;
+   }
+   if(!circle||!memberIds(circle.id).includes(sender.id))
      return res.status(410).json({error:'La cerchia non è più disponibile.'});
    if(userCircles(req.user.id).length>=MAX_USER_CIRCLES||memberIds(circle.id).length>=circleCapacity(circle))
      return res.status(409).json({error:'Limite cerchie o membri raggiunto.'});
@@ -1401,7 +1424,7 @@ app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
 });
 app.post('/api/sos/start', requireAuth, async (req,res) => {
  // Premium is enforced server-side. A UI claim or client flag never grants access.
- if (!premiumActive(req.user)) return res.status(402).json({error:'SOS Premium non attivo. Nessun avviso è stato inviato. Per un pericolo reale chiama il 112.'});
+ if (!premiumActive(req.user)) return res.status(402).json({error:'SOS non disponibile: serve un abbonamento ZYRO 360 attivo. Nessun avviso inviato. Per un pericolo reale chiama il 112.'});
  let alert=currentAlert(req.user.id);
  const recipients=[...new Set((req.user.sosRecipients||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)))];
  if(!recipients.length&&!alert)return res.status(400).json({error:'Seleziona prima almeno un destinatario SOS nella sezione Modalità.'});
