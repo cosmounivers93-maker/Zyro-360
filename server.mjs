@@ -121,7 +121,9 @@ const premiumPlan = user => {
  return receipt?.plan||legacy;
 };
 const premiumActive = user => premiumPlan(user)!=='free';
-const familyActive = user => premiumPlan(user)==='family';
+// Transitional unified entitlement: an ACTIVE verified subscription unlocks all features.
+// The new Google Play product/price migration is deliberately a separate final step.
+const familyActive = user => premiumActive(user);
 const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
@@ -1422,7 +1424,7 @@ app.post('/api/chat/:type/:target',requireAuth,(req,res)=>{
 });
 app.post('/api/sos/start', requireAuth, async (req,res) => {
  // Premium is enforced server-side. A UI claim or client flag never grants access.
- if (!premiumActive(req.user)) return res.status(402).json({error:'SOS Premium non attivo. Nessun avviso è stato inviato. Per un pericolo reale chiama il 112.'});
+ if (!premiumActive(req.user)) return res.status(402).json({error:'SOS non disponibile: serve un abbonamento ZYRO 360 attivo. Nessun avviso inviato. Per un pericolo reale chiama il 112.'});
  let alert=currentAlert(req.user.id);
  const recipients=[...new Set((req.user.sosRecipients||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)))];
  if(!recipients.length&&!alert)return res.status(400).json({error:'Seleziona prima almeno un destinatario SOS nella sezione Modalità.'});
