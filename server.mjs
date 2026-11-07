@@ -121,7 +121,7 @@ const premiumPlan = user => {
  return receipt?.plan||legacy;
 };
 const premiumActive = user => premiumPlan(user)!=='free';
-const familyActive = user => premiumPlan(user)==='family';
+const familyActive = user => premiumActive(user); // Unico abbonamento: include le funzioni prima riservate a Family.
 const planFeatures = user => ({sos:premiumActive(user),pickpocket:premiumActive(user),pickAdvanced:premiumActive(user),remoteControl:familyActive(user),sosAudio:familyActive(user),journey:familyActive(user),checkin:familyActive(user)});
 const isAdmin = user => Boolean(ADMIN_ID && user && user.id === ADMIN_ID && !user.bannedAt);
 const banNotice = 'A causa di una violazione delle norme e delle politiche di utilizzo, risulta che tu abbia utilizzato in modo scorretto ZYRO 360. Il tuo account è stato sospeso. Se ritieni si tratti di un errore, contatta l’assistenza tramite i recapiti dell’informativa privacy.';
