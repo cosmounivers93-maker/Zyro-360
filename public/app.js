@@ -1,5 +1,5 @@
 function hasFamilyPlan(){return current?.me?.features?.sosAudio===true;}
-function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione è inclusa in ZYRO Family.');}}
+function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione è inclusa nell’abbonamento ZYRO 360.');}}
 function updateMarkupIfChanged(node,html){
  if(node._zyroMarkup===html)return;
  node._zyroMarkup=html;node.innerHTML=html;
@@ -1845,7 +1845,7 @@ async function armPick(){
     updateGeo(null,current?.me?.sharing||!!current?.me?.sos||mapTracking);
     renderPickControls();toast('Pick Pocket disattivata.');return;
   }
-  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Pick Pocket è incluso in ZYRO Premium e Family.');}
+  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Pick Pocket è incluso nell’abbonamento ZYRO 360.');}
   if($('pickNotify').checked && !pickSelected.size)throw Error('Seleziona almeno un familiare o un amico da avvisare.');
   if(isZyroNativeAvailable()){
     const confirmed=confirm('Attiva Pick Pocket: il monitoraggio continuerà a schermo bloccato tramite una notifica Android. Movimenti bruschi possono creare falsi allarmi. Vuoi attivarlo?');
@@ -1905,7 +1905,7 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di Family.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Base'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):(current.billingReady?'Scegli il tuo piano nell’app Android. Prezzo e rinnovo vengono confermati da Google Play.':'Nessun piano attivo. Ti avviseremo qui quando gli abbonamenti saranno disponibili.');
+ $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di ZYRO 360.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO 360 attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):(current.billingReady?'Scegli l’abbonamento unico nell’app Android. Prezzo e rinnovo vengono confermati da Google Play.':'Nessun piano attivo. Ti avviseremo qui quando gli abbonamenti saranno disponibili.');
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  renderBillingActions();
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
@@ -2416,9 +2416,9 @@ function renderInvitedPeople(){
    };
    addToggle('gps','Può vedere il mio GPS','Solo quando attivo la posizione LIVE.',sets.gps.has(member.id));
    addToggle('sos','Riceve i miei SOS','Notifiche di emergenza selezionate da te.',sets.sos.has(member.id));
-   addToggle('audio','Può ascoltare il mio microfono durante SOS','Family: consenso unico, valido solo durante un SOS attivo e revocabile in qualsiasi momento.',sets.audio.has(member.id)&&current.me.sosAudioConsent===true);
-   addToggle('ring','Può far squillare il mio telefono','Solo Family: durante un vero allarme Pick Pocket.',sets.ring.has(member.id));
-   addToggle('lock','Può bloccare il mio telefono da remoto','Solo Family: richiede anche l’autorizzazione amministratore Android.',sets.lock.has(member.id));
+   addToggle('audio','Può ascoltare il mio microfono durante SOS','Piano unico: consenso valido solo durante un SOS attivo e revocabile in qualsiasi momento.',sets.audio.has(member.id)&&current.me.sosAudioConsent===true);
+   addToggle('ring','Può far squillare il mio telefono','Piano unico: durante un allarme Pick Pocket attivo e con consenso.',sets.ring.has(member.id));
+   addToggle('lock','Può bloccare il mio telefono da remoto','Piano unico: richiede anche l’autorizzazione amministratore Android.',sets.lock.has(member.id));
    card.append(options);root.append(card);
  }
  if(current.me.sos){const n=document.createElement('p');n.className='setting-description';
@@ -2640,7 +2640,7 @@ async function init(){
   $('savedInvitees').addEventListener('change',e=>{
     if(e.target.matches('input[data-sos-audio-consent]')){
       const input=e.target, enabled=input.checked;
-      if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede ZYRO Family.',true);return;}
+      if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede l’abbonamento ZYRO 360.',true);return;}
       input.disabled=true;
       // Launch the permission check in this tap; never store or send test audio.
       const probe=enabled?testSOSMicrophone().then(()=>null,error=>sosMicErrorMessage(error)):null;
@@ -2980,7 +2980,7 @@ async function zyroWelcomeBeforeStart(){
  }
  const screen=document.createElement('section');screen.className='zyro-welcome-screen';screen.setAttribute('aria-label','Benvenuto in ZYRO 360');
  screen.innerHTML=`<div class="zyro-welcome-wrap"><div class="zyro-welcome-content" tabindex="0" aria-label="Le funzioni di ZYRO 360"><header class="zyro-welcome-header"><div class="zyro-welcome-brand">ZYRO <span>360</span></div><p class="zyro-welcome-kicker">IL TUO SPAZIO DI SICUREZZA</p><h1>Più vicini.<br>Più consapevoli.</h1></header><p class="zyro-welcome-intro">Resta in contatto con le persone fidate e chiedi aiuto quando ne hai bisogno.</p>
- <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Avvisa i contatti scelti e condividi la posizione. Con Family puoi attivare l’audio in diretta, con il tuo consenso.</p></div></article>
+ <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Avvisa i contatti scelti e condividi la posizione. Con l’abbonamento ZYRO 360 puoi attivare l’audio in diretta, con il tuo consenso.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">↗</span><div><h2>Pick Pocket</h2><p>Se attivo, un movimento sospetto può far partire la sirena e un SOS con posizione in tempo reale ai contatti scelti, quando abiliti gli avvisi.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">➤</span><div><h2>Segui il percorso SOS e possibile furto</h2><p>Con Premium puoi seguire sulla mappa un percorso indicativo verso il contatto che invia un SOS o una segnalazione Pick Pocket. Premi «Portami da» e autorizza l’uso del GPS e del servizio stradale esterno.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">◎</span><div><h2>Accompagnami e Check-in</h2><p>Condividi un percorso o conferma che stai bene entro un orario. I contatti possono ricevere un avviso se sei in ritardo.</p></div></article>
