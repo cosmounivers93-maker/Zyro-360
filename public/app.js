@@ -1,5 +1,5 @@
 function hasFamilyPlan(){return current?.me?.features?.sosAudio===true;}
-function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione è inclusa in ZYRO Family.');}}
+function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Per questa funzione serve l’abbonamento ZYRO 360.');}}
 function updateMarkupIfChanged(node,html){
  if(node._zyroMarkup===html)return;
  node._zyroMarkup=html;node.innerHTML=html;
@@ -486,9 +486,9 @@ function renderHome(){
   $('myLocationText').textContent= sos?'SOS attivo. Posizione condivisa solo se già autorizzata.':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
   $('sosCard').classList.toggle('is-active',!!me.sos);
   $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS attivo sul server (consegna non garantita)':'Hai bisogno di aiuto?';
-  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'SOS registrato. I destinatari selezionati possono visualizzare l’allarme; la consegna non è garantita.':'Nessun contatto nella tua cerchia: il SOS non raggiunge nessuno. Chiama il 112 in emergenza.'):'SOS Premium richiede un abbonamento attivo. In caso di pericolo reale chiama il 112.';
+  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'SOS registrato. I destinatari selezionati possono visualizzare l’allarme; la consegna non è garantita.':'Nessun contatto nella tua cerchia: il SOS non raggiunge nessuno. Chiama il 112 in emergenza.'):'SOS rapido: serve un abbonamento ZYRO 360 attivo. Per un pericolo reale chiama il 112.';
   $('sosButton').disabled=!!me.sos;
-  $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Apri SOS Premium');
+  $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Invia SOS rapido ai contatti autorizzati');
   $('sosActiveActions').classList.toggle('hidden',!sos);
   $('sosInactiveNote').classList.toggle('hidden',!!me.sos);
   const micState=$('sosAudioState');
@@ -553,10 +553,11 @@ function renderCircles(){
  if(list._zyroSig===sig&&list.children.length)return;
  list._zyroSig=sig;
  const mode=$('profileInviteMode')?.value||'group';
- const eligible=current.circles.filter(c=>
-   c.kind!=='chat' &&
-   (mode==='direct'?c.kind==='direct':c.kind!=='direct') &&
-   c.members.length<(c.memberLimit||(c.kind==='direct'?2:20)));
+ const isDirect=mode==='direct';
+ const eligible=current.circles.filter(c=>c.kind!=='chat'&&c.kind!=='direct'&&
+   c.members.length<(c.memberLimit||20));
+ const inviteForm=$('sendProfileInviteForm');
+ if(inviteForm)inviteForm.classList.toggle('zyro-direct-invite',isDirect);
  const picker=$('profileInviteCircle');
  if(picker){
    const previous=picker.value;
@@ -564,17 +565,18 @@ function renderCircles(){
      ?eligible.map(c=>'<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name)+' · '+(c.kind==='direct'?'Singola persona':'Gruppo')+' ('+c.members.length+'/'+(c.memberLimit||(c.kind==='direct'?2:20))+')</option>').join('')
      :'<option value="">Nessuna cerchia disponibile</option>';
    if(eligible.some(c=>c.id===previous))picker.value=previous;
-   picker.disabled=!eligible.length;
+   picker.disabled=isDirect||!eligible.length;
    const submit=$('sendProfileInviteForm')?.querySelector('button[type="submit"]');
-   if(submit)submit.disabled=!eligible.length;
+   if(submit)submit.disabled=!isDirect&&!eligible.length;
    const hint=$('profileInviteInfo');
-   if(hint)hint.textContent=eligible.length
-     ?mode==='direct'?'La persona invitata sarà l’unico altro membro di questa cerchia.':'Puoi invitare più persone nella stessa cerchia, fino a 20 membri.'
-     :mode==='direct'?'Crea prima una cerchia singola con spazio per un contatto.':'Crea prima una cerchia di gruppo o libera un posto.';
+   if(hint)hint.textContent=isDirect
+     ?'Inserisci l’ID: la cerchia privata tra voi due nasce soltanto se l’altra persona accetta.'
+     :eligible.length?'Scegli una cerchia di gruppo. I nuovi membri entrano soltanto dopo aver accettato. GPS e SOS restano autorizzazioni individuali.'
+     :'Crea prima una cerchia di gruppo con posti disponibili.';
  }
  list.innerHTML=current.circles.length?current.circles.map(c=>
   '<div class="circle-card" data-circle="'+escapeHtml(c.id)+'"><div class="circle-top"><div><strong>◎ '+escapeHtml(c.name)+'</strong><small>'+
-  (c.kind==='direct'?'Singola persona':c.kind==='chat'?'Chat di gruppo':'Cerchia di gruppo')+' · '+c.members.length+'/'+(c.memberLimit||(c.kind==='direct'?2:20))+' membri · '+(c.mine?'Creata da te':'Cerchia condivisa')+
+  (c.kind==='direct'?'Cerchia privata':c.kind==='chat'?'Gruppo chat precedente':'Cerchia di gruppo')+' · '+c.members.length+'/'+(c.memberLimit||(c.kind==='direct'?2:20))+' membri · '+(c.mine?'Creata da te':'Cerchia condivisa')+
   '</small></div><span class="status-chip">Privata</span></div><div class="circle-members">'+
   c.members.map(m=>'<span class="member-pill">'+escapeHtml(m.name)+(m.id===current.me.id?' (tu)':'')+'</span>').join('')+
   '</div><div class="circle-actions">'+
@@ -588,7 +590,7 @@ function renderCircles(){
  list.querySelectorAll('[data-profile-invite]').forEach(b=>b.addEventListener('click',()=>{
   const selected=current.circles.find(circle=>circle.id===b.dataset.profileInvite);
   const modePicker=$('profileInviteMode');
-  if(modePicker){modePicker.value=selected?.kind==='direct'?'direct':'group';renderCircles();}
+  if(modePicker){modePicker.value='group';renderCircles();}
   if(picker)picker.value=b.dataset.profileInvite;
   $('sendProfileInviteForm')?.scrollIntoView({behavior:'smooth',block:'center'});
   $('profileInviteId')?.focus();
@@ -694,7 +696,7 @@ function showChatGroupInviteCode(code){
 async function makeChatGroupInvite(){
  if(!chatRoom||chatRoom.type!=='circle')throw Error('Apri prima un gruppo chat.');
  const group=current.circles.find(c=>c.id===chatRoom.id);
- if(!group||group.kind!=='chat'||!group.mine)throw Error('Solo chi ha creato il gruppo può invitare.');
+ if(!group||!['chat','group'].includes(group.kind)||!group.mine)throw Error('Solo chi ha creato la cerchia può invitare.');
  const response=await post('/api/chat/groups/invite',{groupId:group.id});
  showChatGroupInviteCode(response.code);
  toast('Codice gruppo creato: può essere usato da più persone per 24 ore.');
@@ -744,7 +746,7 @@ function openChat(type,id){
   const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);
   $('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';
   $('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · accesso riservato':'Chat riservata ai partecipanti';
-  $('chatGroupInviteButton')?.classList.toggle('hidden',!(type==='circle'&&circle?.kind==='chat'&&circle?.mine));
+  $('chatGroupInviteButton')?.classList.toggle('hidden',!(type==='circle'&&['chat','group'].includes(circle?.kind)&&circle?.mine));
   $('chatMessages').innerHTML='<p class="chat-empty">Caricamento messaggi…</p>';
   loadChat().catch(e=>toast(e.message,true));
 }
@@ -1009,7 +1011,7 @@ function acquireSOSEmergencyAudio(){
  return openZyroMicrophone().then(stream=>({stream}),error=>({error}));
 }
 async function startSOS(){
- if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS Premium non attivo: nessun allarme è stato inviato. In emergenza chiama il 112.',true);return;}
+ if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS non disponibile: occorre un abbonamento ZYRO 360 attivo e almeno un destinatario autorizzato. In emergenza chiama il 112.',true);return;}
  const optedIn=hasFamilyPlan()&&current.me.sosAudioConsent===true;
  sosAudioError='';
  const preparedAudio=optedIn?acquireSOSEmergencyAudio():null;
@@ -1845,7 +1847,7 @@ async function armPick(){
     updateGeo(null,current?.me?.sharing||!!current?.me?.sos||mapTracking);
     renderPickControls();toast('Pick Pocket disattivata.');return;
   }
-  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Pick Pocket è incluso in ZYRO Premium e Family.');}
+  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Pick Pocket richiede un abbonamento ZYRO 360 attivo.');}
   if($('pickNotify').checked && !pickSelected.size)throw Error('Seleziona almeno un familiare o un amico da avvisare.');
   if(isZyroNativeAvailable()){
     const confirmed=confirm('Attiva Pick Pocket: il monitoraggio continuerà a schermo bloccato tramite una notifica Android. Movimenti bruschi possono creare falsi allarmi. Vuoi attivarlo?');
@@ -1905,7 +1907,7 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di Family.':me.premiumActive?(me.premiumGiftLifetime?'Premium a vita: accesso omaggio attivo.':`ZYRO ${me.premiumPlan==='family'?'Family':'Base'} attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):(current.billingReady?'Scegli il tuo piano nell’app Android. Prezzo e rinnovo vengono confermati da Google Play.':'Nessun piano attivo. Ti avviseremo qui quando gli abbonamenti saranno disponibili.');
+ $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di ZYRO 360.':me.premiumActive?(me.premiumGiftLifetime?'Accesso gratuito a vita: tutte le funzioni ZYRO 360 attive.':`ZYRO 360 attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):(current.billingReady?'Piano unico previsto: 2,99 €/mese. Verifica prezzo e disponibilità effettivi su Google Play prima dell’acquisto.':'Nessun piano attivo. Ti avviseremo qui quando gli abbonamenti saranno disponibili.');
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  renderBillingActions();
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
@@ -2416,9 +2418,9 @@ function renderInvitedPeople(){
    };
    addToggle('gps','Può vedere il mio GPS','Solo quando attivo la posizione LIVE.',sets.gps.has(member.id));
    addToggle('sos','Riceve i miei SOS','Notifiche di emergenza selezionate da te.',sets.sos.has(member.id));
-   addToggle('audio','Può ascoltare il mio microfono durante SOS','Family: consenso unico, valido solo durante un SOS attivo e revocabile in qualsiasi momento.',sets.audio.has(member.id)&&current.me.sosAudioConsent===true);
-   addToggle('ring','Può far squillare il mio telefono','Solo Family: durante un vero allarme Pick Pocket.',sets.ring.has(member.id));
-   addToggle('lock','Può bloccare il mio telefono da remoto','Solo Family: richiede anche l’autorizzazione amministratore Android.',sets.lock.has(member.id));
+   addToggle('audio','Può ascoltare il mio microfono durante SOS','Piano unico ZYRO 360: consenso valido solo durante un SOS attivo e revocabile.',sets.audio.has(member.id)&&current.me.sosAudioConsent===true);
+   addToggle('ring','Può far squillare il mio telefono','Piano unico ZYRO 360: durante un allarme Pick Pocket attivo e con consenso.',sets.ring.has(member.id));
+   addToggle('lock','Può bloccare il mio telefono da remoto','Piano unico ZYRO 360: richiede il permesso di amministratore Android.',sets.lock.has(member.id));
    card.append(options);root.append(card);
  }
  if(current.me.sos){const n=document.createElement('p');n.className='setting-description';
@@ -2640,7 +2642,7 @@ async function init(){
   $('savedInvitees').addEventListener('change',e=>{
     if(e.target.matches('input[data-sos-audio-consent]')){
       const input=e.target, enabled=input.checked;
-      if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede ZYRO Family.',true);return;}
+      if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede un abbonamento ZYRO 360 attivo.',true);return;}
       input.disabled=true;
       // Launch the permission check in this tap; never store or send test audio.
       const probe=enabled?testSOSMicrophone().then(()=>null,error=>sosMicErrorMessage(error)):null;
@@ -2765,11 +2767,13 @@ async function init(){
   $('profileInviteMode')?.addEventListener('change',renderCircles);
   $('sendProfileInviteForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
   const profileId=$('profileInviteId').value.trim().toUpperCase();
-  const circleId=$('profileInviteCircle').value;
+  const mode=$('profileInviteMode').value;
+  const circleId=mode==='group' ? $('profileInviteCircle').value : '';
+  if(mode==='group'&&!circleId)throw Error('Scegli una cerchia di gruppo.');
   if(!/^[A-Z0-9]{2,20}-[A-F0-9]{16}$/.test(profileId))throw Error('Inserisci l’ID completo che inizia con il nome registrato, seguito da 16 caratteri.');
-  const sent=await post('/api/profile-invites',{profileId,circleId});
+  const sent=await post('/api/profile-invites',mode==='direct'?{profileId,mode:'direct'}:{profileId,circleId,mode:'group'});
   $('profileInviteId').value='';await refresh();
-  toast('Richiesta inviata a '+sent.recipientName+'. Potrà accettare o rifiutare.');
+  toast('Invito inviato a '+sent.recipientName+'. '+(mode==='direct'?'La cerchia privata nascerà dopo l’accettazione.':'Potrà entrare nel gruppo dopo aver accettato.'));
  });});
   $('shareToggle').addEventListener('change',async e=>{const enabled=e.target.checked;await action(async()=>{await post('/api/sharing',{enabled});await refresh();if(isZyroNativeAvailable()){try{await nativeBackgroundSync();}catch(err){toast('GPS web attivo, ma background non disponibile: '+err.message,true);}}toast(enabled?'Posizione condivisa con le tue cerchie.':'Condivisione della posizione interrotta.');});if(current)$('shareToggle').checked=!!current.me.sharing;});
   $('journeyRecipients').addEventListener('change',e=>{if(e.target.matches('[data-journey-to]')){e.target.checked?journeySelected.add(e.target.dataset.journeyTo):journeySelected.delete(e.target.dataset.journeyTo);}});
@@ -2829,13 +2833,13 @@ async function init(){
     const result=await post('/api/chat/groups',{name});
     $('chatGroupName').value='';$('chatGroupCreatePanel').hidden=true;
     await refresh();openChat('circle',result.groupId);
-    toast('Gruppo creato. Premi Invita per condividere il codice del gruppo.');
+    toast('Cerchia di gruppo creata: mappa e chat condivise. Il GPS dei partecipanti richiede consenso e autorizzazioni.');
   });});
   $('chatGroupJoinForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
     const result=await post('/api/chat/groups/join',{code:$('chatGroupCode').value.trim()});
     $('chatGroupCode').value='';$('chatGroupJoinPanel').hidden=true;
     await refresh();openChat('circle',result.groupId);
-    toast('Sei entrato nel gruppo! Puoi chattare con tutti i partecipanti.');
+    toast('Sei nella cerchia di gruppo. Puoi chattare; la posizione GPS non viene attivata automaticamente.');
   });});
   $('chatGroupInviteButton').addEventListener('click',()=>void action(makeChatGroupInvite));
   $('chatGroupCopy').addEventListener('click',()=>void action(async()=>{
@@ -2882,7 +2886,7 @@ async function init(){
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=21-circle-picker-glass').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=22-single-groups-plan-guide').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);
