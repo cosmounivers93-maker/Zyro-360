@@ -14,7 +14,7 @@ test('v3 scripts and style are included after existing CSS and app initializatio
   assert.ok(html.includes('/zyro-circle-picker-v3.css?v=3'));
   assert.ok(html.includes('/zyro-circle-picker-v3.js?v=3'));
   assert.ok(html.indexOf('/zyro-circle-picker-v3.css')>html.indexOf('/zyro-journey-v71.css'));
-  assert.ok(html.indexOf('/zyro-circle-picker-v3.js')>html.indexOf('/app.js?v=80.4'));
+  assert.ok(html.indexOf('/zyro-circle-picker-v3.js')>html.indexOf('/app.js?v=80.5'));
   assert.match(sw,/zyro-360-v23-group-code-home-clean/);
   assert.match(sw,/zyro-circle-picker-v3\.js/);
   assert.match(sw,/zyro-circle-picker-v3\.css/);
