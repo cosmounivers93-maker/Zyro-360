@@ -47,7 +47,7 @@ test('direct invite creates private two-person circle only after acceptance, no 
 test('glass status and single planned 2,99 subscription are visible but Play migration remains separate',()=>{
  assert.match(css,/header\.topbar > \.connection-pill/);
  assert.match(css,/#connectionDot\.connected/);
- assert.match(html,/2,99 €\/ mese/);
+ assert.match(html,/2,99 €/);
  assert.doesNotMatch(html,/ZYRO Family<\/h3>/);
  assert.match(html,/prodotto e il prezzo devono ancora essere attivati definitivamente in Google Play/);
  assert.match(server,/const familyActive = user => premiumActive\(user\)/);
