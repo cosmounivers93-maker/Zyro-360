@@ -34,21 +34,15 @@ test('Premium maintains optional automatic screen lock and other safety features
 });
 test('client disables remote contact switches for non-Family without blocking GPS/SOS',()=>{
  assert.match(client,/\(\(type==='ring'\|\|type==='lock'\)\&\&!family\)/);
- assert.match(client,/Solo Family: durante un vero allarme Pick Pocket/);
- assert.match(client,/Solo Family: richiede anche l’autorizzazione amministratore Android/);
+ assert.match(client,/Piano unico ZYRO 360: durante un allarme Pick Pocket attivo e con consenso/);
+ assert.match(client,/Piano unico ZYRO 360: richiede il permesso di amministratore Android/);
  assert.match(client,/addToggle\('gps'/);
  assert.match(client,/addToggle\('sos'/);
 });
-test('storefront and help say Premium local lock, Family exclusive remote controls',()=>{
- const p=html.slice(html.indexOf('id="zyroPersonalTitle"'),html.indexOf('id="zyroFamilyTitle"'));
- const f=html.slice(html.indexOf('id="zyroFamilyTitle"'),html.indexOf('id="premiumStatus"'));
- assert.match(p,/Blocco automatico dello schermo/);
- assert.match(p,/soltanto nel piano Family/);
- assert.ok(!p.includes('<li>Blocca il telefono da remoto'));
- assert.match(f,/Fai squillare il telefono da remoto/);
- assert.match(f,/Blocca il telefono da remoto/);
- assert.match(html,/Non include audio SOS né squillo\/blocco da remoto/);
- assert.match(html,/Family, 6,99 € al mese/);
- assert.match(css,/pickAdvanced1381/);
- assert.match(css,/display:none!important/);
+test('single 2,99 store plan lists remote and local Pick Pocket, not old tiers',()=>{
+ assert.match(html,/id="zyroUnicoTitle">ZYRO 360/);
+ assert.match(html,/2,99 €/);
+ assert.match(html,/Pick Pocket e protezione dello schermo/);
+ assert.match(html,/Squillo e blocco da remoto/);
+ assert.doesNotMatch(html,/id="zyroFamilyTitle"/);
 });
