@@ -18,7 +18,7 @@ test('help panel remains accessible in Settings and includes contact-permission 
 });
 test('SOS microphone explanation requires per-contact consent and Family',()=>{
  assert.match(section,/Può ascoltare il mio microfono durante SOS/);
- assert.match(section,/soltanto con Family/);
+ assert.match(section,/piano unico ZYRO 360/);
  assert.match(section,/«Può ascoltare il mio microfono durante SOS»/);
  assert.match(section,/Non c’è un secondo interruttore di consenso generale da attivare/);
  assert.match(section,/Nessuno può accendere il tuo microfono da remoto/);
@@ -44,15 +44,16 @@ test('leaving the last shared circle revokes rights and existing help is preserv
    assert.ok(section.includes(topic),topic);
  assert.ok(!section.includes('non blocca Android e non impedisce lo spegnimento'));
 });
-test('Premium and Family include device-lock and approved remote action explanations',()=>{
- assert.match(section,/Premium, 3,99 € al mese/);
- assert.match(section,/Family, 6,99 € al mese/);
- assert.match(section,/Premium.*blocco automatico dello schermo.*Non include audio SOS né squillo\/blocco da remoto/);
- assert.match(section,/Family.*in esclusiva, squillo e blocco da remoto/);
- assert.match(section,/Family.*audio SOS con consenso/);
+test('single subscription help covers local lock, remote consent and Google Play confirmation',()=>{
+ assert.match(section,/Piano unico ZYRO 360/);
+ assert.match(section,/2,99 € al mese/);
+ assert.match(section,/blocco schermo locale autorizzato/);
+ assert.match(section,/squillo\/blocco remoto/);
+ assert.match(section,/Google Play/);
  assert.match(html,/Come funziona l'app<small>Guida a cerchie, SOS e protezioni remote/);
  assert.match(html,/Persone invitate<small>GPS, SOS, microfono e controllo remoto/);
 });
+
 test('accordion uses matching summary/detail structure',()=>{
  const details=section.match(/<details\b/g)||[];
  const closes=section.match(/<\/details>/g)||[];
