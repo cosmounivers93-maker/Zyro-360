@@ -1,5 +1,5 @@
 function hasFamilyPlan(){return current?.me?.features?.sosAudio===true;}
-function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione è inclusa nell'abbonamento ZYRO 360.');}}
+function requireFamilyPlan(){if(!hasFamilyPlan()){showView('settings');openProfileSettings('premium');throw Error('Questa funzione è inclusa nell’abbonamento ZYRO 360.');}}
 function updateMarkupIfChanged(node,html){
  if(node._zyroMarkup===html)return;
  node._zyroMarkup=html;node.innerHTML=html;
@@ -1845,7 +1845,7 @@ async function armPick(){
     updateGeo(null,current?.me?.sharing||!!current?.me?.sos||mapTracking);
     renderPickControls();toast('Pick Pocket disattivata.');return;
   }
-  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Pick Pocket è incluso nell'abbonamento ZYRO 360.');}
+  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');throw Error('Pick Pocket è incluso nell’abbonamento ZYRO 360.');}
   if($('pickNotify').checked && !pickSelected.size)throw Error('Seleziona almeno un familiare o un amico da avvisare.');
   if(isZyroNativeAvailable()){
     const confirmed=confirm('Attiva Pick Pocket: il monitoraggio continuerà a schermo bloccato tramite una notifica Android. Movimenti bruschi possono creare falsi allarmi. Vuoi attivarlo?');
@@ -2640,7 +2640,7 @@ async function init(){
   $('savedInvitees').addEventListener('change',e=>{
     if(e.target.matches('input[data-sos-audio-consent]')){
       const input=e.target, enabled=input.checked;
-      if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede l'abbonamento ZYRO 360.',true);return;}
+      if(enabled&&!hasFamilyPlan()){input.checked=false;toast('L’audio SOS richiede l’abbonamento ZYRO 360.',true);return;}
       input.disabled=true;
       // Launch the permission check in this tap; never store or send test audio.
       const probe=enabled?testSOSMicrophone().then(()=>null,error=>sosMicErrorMessage(error)):null;
