@@ -27,20 +27,18 @@ test('Family microphone has one per-contact consent, original plans remain uncha
   assert.match(inviteesCss,/zyro-contact-audio-consent/);
 });
 
-test('subscription selector is collapsed by default and expands Base and Family',()=>{
+test('subscription selector is collapsed and displays one complete monthly plan',()=>{
   assert.match(html,/<details id="zyroPlanOptions" class="zyro-mode-details zyro-mode-plans-details">/);
   assert.match(html,/<summary><span class="zyro-mode-summary-label"><strong>Seleziona abbonamenti<\/strong>/);
   assert.ok(html.indexOf('<header class="zyro-modes-group-title"><span aria-hidden="true">04</span>')<html.indexOf('Seleziona abbonamenti'));
-  assert.ok(html.indexOf('Seleziona abbonamenti')<html.indexOf('id="zyroPersonalTitle"'));
-  assert.ok(html.indexOf('id="zyroPersonalTitle"')<html.indexOf('id="zyroFamilyTitle"'));
-  assert.match(html,/id="zyroPersonalTitle">ZYRO Base/);
-  assert.match(html,/id="zyroFamilyTitle">ZYRO Family/);
+  assert.match(html,/id="zyroUnicoTitle">ZYRO 360/);
+  assert.match(html,/2,99 €/);
+  assert.doesNotMatch(html,/id="zyroPersonalTitle"|id="zyroFamilyTitle"/);
+  assert.match(html,/Audio SOS soltanto con consenso esplicito/);
+  assert.match(html,/Accompagnami e Check-in/);
+  assert.match(html,/Squillo e blocco da remoto soltanto con autorizzazione/);
+  assert.equal((html.match(/data-billing-open/g)||[]).length,1);
   assert.match(html,/id="zyroOpenSubscriptionPlans"/);
   assert.match(app,/\$\('zyroOpenSubscriptionPlans'\)\?\.addEventListener\('click',\(\)=>openProfileSettings\('premium'\)\)/);
-  assert.match(html,/3,99 €/);
-  assert.match(html,/6,99 €/);
-  assert.match(html,/Audio SOS in diretta, con il tuo consenso/);
-  assert.match(html,/Accompagnami e segui percorso/);
-  assert.equal((html.match(/data-billing-open/g)||[]).length,2);
   assert.match(plansCss,/zyro-plan-family/);
 });
