@@ -1,5 +1,5 @@
 'use strict';
-const CACHE='zyro-360-v23-group-code-home-clean';
+const CACHE='zyro-360-v24-unico-299-sos-navigation';
 const ASSETS=['/','/index.html','/style.css','/zyro-settings-compact.css','/zyro-glass-v162.css','/zyro-settings-balanced-v163.css','/zyro-home-glass-v169.css','/zyro-home-true-glass-v170.css','/zyro-gradient-admin-v171.css','/zyro-id-admin-v1.css','/zyro-circle-modes-v2.css','/zyro-circle-picker-v3.css','/zyro-final-circle-status-v4.css','/zyro-group-circle-code-v5.css','/zyro-circle-picker-v3.js','/app.js','/manifest.webmanifest','/assets/icon192.png','/assets/icon512.png'];
 self.addEventListener('install',event=>{event.waitUntil(caches.open(CACHE).then(async cache=>{await Promise.all(ASSETS.map(async url=>{try{await cache.add(url);}catch{/* Asset opzionale mancante: installa comunque l'aggiornamento. */}}));}));self.skipWaiting();});
 self.addEventListener('activate',event=>{event.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
