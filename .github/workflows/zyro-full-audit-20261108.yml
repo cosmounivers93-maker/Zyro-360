@@ -36,6 +36,7 @@ jobs:
           tail -n 55 /tmp/zyro-audit-tests.log
       - name: "Analisi vulnerabilita dipendenze produzione"
         run: |
+          npm install --package-lock-only --ignore-scripts --no-save --no-fund
           set +e
           npm audit --omit=dev --audit-level=high --json > /tmp/zyro-audit-npm.json 2>/tmp/zyro-audit-error.txt
           rc=$?
@@ -46,7 +47,7 @@ jobs:
             try {
               const d=JSON.parse(fs.readFileSync("/tmp/zyro-audit-npm.json","utf8"));
               const v=d.metadata?.vulnerabilities||{};
-              console.log("DEPENDENCY SCAN:",JSON.stringify({info:v.info||0,low:v.low||0,moderate:v.moderate||0,high:v.high||0,critical:v.critical||0,total:v.total||0}));
+              console.log("DEPENDENCY SCAN:",JSON.stringify({error:d.error||null,info:v.info||0,low:v.low||0,moderate:v.moderate||0,high:v.high||0,critical:v.critical||0,total:v.total||0}));
               console.log("VULNERABLE DEPENDENCY NAMES:",Object.keys(d.vulnerabilities||{}).join(", ")||"none");
             }catch(error){console.log("Audit result could not be parsed:",error.message)}
           '
