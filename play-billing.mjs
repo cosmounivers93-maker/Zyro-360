@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 export const PACKAGE='com.zyro360.app';
-// Single new monthly product. Old IDs remain accepted ONLY to restore existing paid receipts.\nexport const PRODUCTS={zyro360_unico:{plan:'unico',basePlanId:'unico-mensile'},zyro360_premium:{plan:'personal',basePlanId:'premium-mensile'},zyro360_family:{plan:'family',basePlanId:'family-mensile'}};
+// Single new monthly product. Old IDs remain accepted ONLY to restore existing paid receipts.
+export const PRODUCTS={zyro360_unico:{plan:'unico',basePlanId:'unico-mensile'},zyro360_premium:{plan:'personal',basePlanId:'premium-mensile'},zyro360_family:{plan:'family',basePlanId:'family-mensile'}};
 export const accountId=id=>crypto.createHash('sha256').update(`zyro360:${id}`).digest('hex');
 const digest=token=>crypto.createHash('sha256').update(token).digest('hex');
 const allowedStates=new Set(['SUBSCRIPTION_STATE_ACTIVE','SUBSCRIPTION_STATE_IN_GRACE_PERIOD','SUBSCRIPTION_STATE_CANCELED']);
