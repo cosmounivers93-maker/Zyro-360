@@ -619,17 +619,9 @@ html,body{overscroll-behavior-x:none}
       <section class="chat-hub" id="chatHub">
         <div class="chat-heading-row"><div><span class="mini-overline">I TUOI MESSAGGI</span><h2>Conversazioni</h2></div><div class="chat-heading-emblem" aria-hidden="true"><svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg></div></div>
         <div class="chat-filter-bar" aria-label="Filtra le conversazioni"><button type="button" class="chat-filter active" data-chat-filter="all" aria-pressed="true">Tutte</button><button type="button" class="chat-filter" data-chat-filter="direct" aria-pressed="false">Chat singole</button><button type="button" class="chat-filter" data-chat-filter="group" aria-pressed="false">Chat di gruppo</button></div>
-        <div class="zyro-group-toolbar" aria-label="Gestione gruppi chat">
-          <button type="button" id="chatGroupCreateOpen" class="zyro-group-tool-btn">＋ Crea gruppo</button>
-          <button type="button" id="chatGroupJoinOpen" class="zyro-group-tool-btn">⌘ Entra con codice</button>
-        </div>
-        <div id="chatGroupCreatePanel" class="zyro-group-editor" hidden>
-          <h3>Nuova cerchia di gruppo</h3><p>Crea una cerchia di gruppo fino a 20 persone con una chat comune e una mappa condivisa. La posizione di ciascuno resta disattivata finché non la abilita e non autorizza gli altri.</p>
-          <form id="chatGroupCreateForm" class="zyro-group-form"><input id="chatGroupName" maxlength="48" required minlength="2" placeholder="Es. Amici del cuore" aria-label="Nome del nuovo gruppo"><button type="submit" class="btn btn-primary">Crea gruppo</button></form>
-        </div>
-        <div id="chatGroupJoinPanel" class="zyro-group-editor" hidden>
-          <h3>Entra nella cerchia di gruppo</h3><p>Inserisci il codice ricevuto. Potrai chattare con gli altri membri; il GPS resta sotto il tuo controllo.</p>
-          <form id="chatGroupJoinForm" class="zyro-group-form"><input id="chatGroupCode" maxlength="28" required autocomplete="off" autocapitalize="characters" placeholder="Codice gruppo G…" aria-label="Codice di invito al gruppo"><button type="submit" class="btn btn-primary">Entra</button></form>
+        <div class="zyro-group-toolbar" aria-label="Gestione delle cerchie">
+          <p>Le chat private e di gruppo compaiono automaticamente quando i membri entrano nella tua cerchia.</p>
+          <button type="button" id="chatManageCirclesButton" class="zyro-group-tool-btn">◎ Gestisci cerchie e gruppi</button>
         </div>
         <label class="chat-search"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.6"/><path d="m16 16 5 5"/></svg><input id="chatSearch" autocomplete="off" placeholder="Cerca una persona o un gruppo" aria-label="Cerca conversazioni"></label>
         <div id="chatRooms" class="chat-rooms" aria-live="polite"></div>
@@ -849,7 +841,7 @@ html,body{overscroll-behavior-x:none}
    <div class="zyro-due-actions"><button type="button" id="zyroDueClear">Cancella</button><button type="button" id="zyroDueCancel">Annulla</button><button type="button" id="zyroDueConfirm">Imposta</button></div>
  </section>
 </div>
-<script src="/app.js?v=80.6" defer></script>
+<script src="/app.js?v=80.7" defer></script>
 <script src="/zyro-circle-picker-v3.js?v=3" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
