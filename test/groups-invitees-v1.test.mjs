@@ -23,14 +23,23 @@ test('only creator regenerates group code and permissions stay opt in',()=>{
   assert.match(server,/filter\(c=>c\.kind!=='chat'\)/);
   assert.match(server,/if\(memberIds\(group\.id\)\.length>=MAX_GROUP_MEMBERS\)/);
 });
-test('chat forms and copy controls are all wired',()=>{
-  for(const id of ['chatGroupCreateForm','chatGroupJoinForm','chatGroupInviteButton','chatGroupInviteResult','chatGroupCopy','chatGroupShare','chatGroupCreateOpen','chatGroupJoinOpen']) {
+test('Chat is a read-only room hub: circles manage creation and membership',()=>{
+  for(const id of ['chatManageCirclesButton','chatGroupInviteButton','chatGroupInviteResult','chatGroupCopy','chatGroupShare']) {
     assert.ok(html.includes('id="'+id+'"'),id);
     assert.ok(app.includes("$('"+id+"')"),id);
   }
-  assert.ok(html.includes('data-chat-filter="group"'));
+  for(const obsolete of ['chatGroupCreateOpen','chatGroupJoinOpen','chatGroupCreateForm','chatGroupJoinForm']) {
+    assert.ok(!html.includes('id="'+obsolete+'"'),'Duplicate Chat control '+obsolete);
+    assert.ok(!app.includes("$('"+obsolete+"')"),'Duplicate Chat listener '+obsolete);
+  }
+  assert.match(html,/Le chat private e di gruppo compaiono automaticamente/);
+  assert.match(html,/data-chat-filter="group"/);
+  assert.match(app,/data-chatdirect/);
+  assert.match(app,/openChat\('direct',b\.dataset\.chatdirect\)/);
+  assert.match(app,/chatCategory='all'/);
+  assert.match(app,/chatManageCirclesButton'\)\.addEventListener\('click',\(\)=>showView\('circles'\)/);
   assert.match(app,/showChatGroupInviteCode/);
-  assert.match(style,/\.zyro-group-editor/);
+  assert.match(style,/\.zyro-group-toolbar/);
 });
 test('invited people are compact with independent five permissions and master',()=>{
   assert.match(app,/expand\.dataset\.accessExpand=member\.id/);
