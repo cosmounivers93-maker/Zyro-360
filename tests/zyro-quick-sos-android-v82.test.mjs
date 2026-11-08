@@ -11,7 +11,7 @@ test('SOS rapido: opt-in in settings, not automatic rear gesture interception',(
   assert.match(html,/data-settings-target="quickSos"/);
   assert.match(html,/id="zyroHelpQuickSOS"/);
   assert.match(html,/Triplo tocco/);
-  assert.match(html,/Soltanto se il telefono propone/);
+  assert.match(html,/scorciatoia specifica/);
   assert.match(html,/non è possibile associare il triplo tocco/);
   assert.match(html,/non le rileva/);
   assert.match(ui,/zyro:quick-sos-request/);
