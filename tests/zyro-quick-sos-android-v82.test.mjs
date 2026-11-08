@@ -16,6 +16,7 @@ test('SOS rapido: opt-in in settings, not automatic rear gesture interception',(
   assert.match(html,/non le rileva/);
   assert.match(ui,/zyro:quick-sos-request/);
   assert.match(ui,/zyroQuickSOSStorageKey/);
+  assert.match(ui,/ZyroAndroidQuickSOSSupported/);
   assert.match(ui,/zyroQuickSOSEnabled\(\)/);
   assert.match(ui,/if\(!zyroQuickSOSEnabled\(\)\)/);
   assert.match(ui,/startSOS\(\{quick:true\}\)/);
