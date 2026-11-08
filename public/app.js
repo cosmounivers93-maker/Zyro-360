@@ -332,10 +332,10 @@ function renderAdminUsers(){
  const term=$('adminFilter').value.trim().toLowerCase();
  const users=adminUsersCache.filter(u=>Boolean(u.adminArchivedAt)===adminArchivedView).filter(u=>[u.name,u.email,u.id,u.profileId,u.lastLoginIp,u.registrationIp,u.lastDevice?.manufacturer,u.lastDevice?.model].some(v=>String(v||'').toLowerCase().includes(term)));
  $('adminUsers').innerHTML=users.length?users.map(u=>`<article class="zyro-admin-user">
- <div class="zyro-admin-user-title"><b>${escapeHtml(u.name)}</b><span class="zyro-admin-chip ${u.bannedAt?'is-banned':u.premiumGiftLifetime?'is-gift':''}">${u.bannedAt?'Sospeso':u.premiumGiftLifetime?'Premium a vita':u.premiumActive?'Premium attivo':'Standard'}</span></div>
+ <div class="zyro-admin-user-title"><b>${escapeHtml(u.name)}</b><span class="zyro-admin-chip ${u.bannedAt?'is-banned':u.premiumGiftLifetime?'is-gift':''}">${u.bannedAt?'Sospeso':u.premiumGiftLifetime?'Accesso a vita':u.premiumActive?'Piano attivo':'Standard'}</span></div>
  <p>${escapeHtml(u.email)}</p><div class="zyro-admin-meta"><small>ID profilo</small><code>${escapeHtml(u.profileId||'Non disponibile')}</code><small>ID interno</small><code>${escapeHtml(u.id)}</code><small>IP alla registrazione</small><code>${escapeHtml(u.registrationIp||'Non disponibile')}</code><small>Registrato il</small><span>${escapeHtml(fmtAdminDate(u.createdAt))}</span><small>Ultimo IP rilevato</small><code>${escapeHtml(u.lastLoginIp||'Non disponibile')}</code><small>Dispositivo alla registrazione</small><span>${escapeHtml(adminDeviceLabel(u.registrationDevice))}</span><small>Ultimo dispositivo</small><span>${escapeHtml(adminDeviceLabel(u.lastDevice))}</span><small>Rilevato il</small><span>${escapeHtml(fmtAdminDate(u.lastDevice?.at))}</span><small>Origine dati</small><span>${u.lastDevice?.source==='android-app'?'App Android · dati del sistema dichiarati dall’app':'Browser · informazioni limitate'}</span><small>Ultimo accesso</small><span>${escapeHtml(fmtAdminDate(u.lastLoginAt))}</span></div>
  ${u.sameIpBannedAccounts?.length?`<p class="zyro-admin-ip-match">IP condiviso con ${u.sameIpBannedAccounts.length} account sospesi. Verifica gli account: una rete condivisa non dimostra la stessa identità.</p><small>ID: ${u.sameIpBannedAccounts.map(escapeHtml).join(', ')}</small>`:''}
- ${u.id===current.me.id?'<small>Account proprietario — non sospendibile.</small>':`<div class="zyro-admin-actions"><button type="button" data-admin-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button><button type="button" data-admin-gift="${escapeHtml(u.id)}">${u.premiumGiftLifetime?'Revoca regalo Premium':'Regala Premium a vita'}</button></div>`}
+ ${u.id===current.me.id?'<small>Account proprietario — non sospendibile.</small>':`<div class="zyro-admin-actions"><button type="button" data-admin-ban="${escapeHtml(u.id)}">${u.bannedAt?'Riattiva account':'Sospendi account'}</button><button type="button" data-admin-gift="${escapeHtml(u.id)}">${u.premiumGiftLifetime?'Revoca accesso gratuito':'Regala accesso a vita'}</button></div>`}
  <button type="button" class="zyro-admin-archive" data-archive-user="${escapeHtml(u.id)}">${adminArchivedView?'Riapri scheda':'Chiudi esaminazione'}</button>
  </article>`).join(''):'<p class="setting-description">Nessun account corrispondente alla ricerca.</p>';
  $('adminUsers').querySelectorAll('[data-archive-user]').forEach(b=>b.addEventListener('click',()=>action(()=>adminArchive('user',b.dataset.archiveUser))));
@@ -356,7 +356,7 @@ function renderAdminOverview(data){
   ['Account',data.registered],['Collegati',data.connected],['SOS attivi',data.activeSos],
   ['Cerchie',data.circles],['Gruppi chat',data.chatGroups],['Inviti pendenti',data.pendingInvites],
   ['Segnalazioni aperte',data.reportsToReview],['Account sospesi',data.suspended],
-  ['Premium a vita',data.lifetimeGifts]
+  ['Accesso a vita',data.lifetimeGifts]
  ];
  root.innerHTML='<h3>Centro di controllo</h3><div class="zyro-admin-overview-grid">'+
   metrics.map(([label,value])=>'<div class="zyro-admin-stat"><strong>'+escapeHtml(value)+'</strong><small>'+escapeHtml(label)+'</small></div>').join('')+
@@ -456,7 +456,7 @@ async function adminChangeBan(id){
 async function adminChangeGift(id){
  const u=adminUsersCache.find(x=>x.id===id);if(!u)return;
  const enabled=!u.premiumGiftLifetime;
- const confirmed=await zyroOwnerDialog({title:enabled?'Regala Premium a vita':'Revoca Premium a vita',description:`${enabled?'Assegnare Premium gratuito a vita a':'Revocare il regalo Premium a'} ${u.name}?`,submitLabel:enabled?'Regala Premium':'Revoca Premium'});
+ const confirmed=await zyroOwnerDialog({title:enabled?'Regala accesso a vita':'Revoca Premium a vita',description:`${enabled?'Assegnare Premium gratuito a vita a':'Revocare il regalo Premium a'} ${u.name}?`,submitLabel:enabled?'Regala Premium':'Revoca Premium'});
  if(!confirmed)return;
  const password=await zyroOwnerDialog({title:'Conferma amministratore',description:'Inserisci la password del tuo account creatore per autorizzare il cambiamento.',kind:'password',submitLabel:'Conferma'});
  if(!password)return;
@@ -1924,7 +1924,7 @@ function v15ContactsHtml(selected,tag){const contacts=uniqueContacts();
 function v15Time(time){return Number.isFinite(time)?new Date(time).toLocaleString('it-IT',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'2-digit'}):'—';}
 function renderV15(){if(!current)return;
  const me=current.me;
- $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di ZYRO 360.':me.premiumActive?(me.premiumGiftLifetime?'Accesso gratuito a vita: tutte le funzioni ZYRO 360 attive.':`ZYRO 360 attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):(current.billingReady?'Piano unico previsto: 2,99 €/mese. Verifica prezzo e disponibilità effettivi su Google Play prima dell’acquisto.':'Nessun piano attivo. Ti avviseremo qui quando gli abbonamenti saranno disponibili.');
+ $('premiumStatus').textContent=me.creatorPremium?'Il tuo account creatore include tutte le funzioni di ZYRO 360, compreso SOS rapido e navigazione SOS.':me.premiumActive?(me.premiumGiftLifetime?'Accesso gratuito a vita: tutte le funzioni ZYRO 360 attive.':`ZYRO 360 attivo fino al ${v15Time(me.premiumUntil)} · le notifiche richiedono anche i permessi dei destinatari.`):(current.billingReady?'Piano unico ZYRO 360 a 2,99 €/mese, con SOS rapido e navigazione. Verifica prezzo e disponibilità effettivi in Google Play prima dell’acquisto.':'Nessun piano attivo. Ti avviseremo qui quando gli abbonamenti saranno disponibili.');
  $('premiumStatus').classList.toggle('ok',!!me.premiumActive);
  renderBillingActions();
  for(const [container,selected,tag] of [['journeyRecipients',journeySelected,'journey-to'],['checkinRecipients',checkinSelected,'checkin-to']]){
@@ -2932,7 +2932,7 @@ async function init(){
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=23-group-code-home-clean').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=24-unico-299-sos-navigation').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);
@@ -3004,11 +3004,11 @@ function renderBillingActions(){
  const ready=!!current?.billingReady;
  document.querySelectorAll('[data-billing-open]').forEach(b=>{
   b.disabled=!(android&&ready);
-  b.textContent=!ready?'Abbonamenti non ancora disponibili':android?(current.me.premiumActive?'Gestisci abbonamento':'Scegli con Google Play'):'Acquista dall’app Android aggiornata';
+  b.textContent=!ready?'Abbonamenti non ancora disponibili':android?(current.me.premiumActive?'Gestisci abbonamento':'Abbonati a 2,99 €/mese'):'Acquista dall’app Android aggiornata';
  });
 }
 async function openPlayBilling(){
- if(!current?.billingReady)throw Error('Gli acquisti non sono ancora disponibili.');
+ if(!current?.billingReady)throw Error('Il prodotto ZYRO 360 2,99 €/mese non è ancora attivo su Google Play.');
  if(window.ZyroBillingSupported!==true)throw Error('Per gli acquisti installa la versione Android aggiornata.');
  await zyroNativeRequest('billing');
 }
@@ -3030,7 +3030,7 @@ async function zyroWelcomeBeforeStart(){
  }
  const screen=document.createElement('section');screen.className='zyro-welcome-screen';screen.setAttribute('aria-label','Benvenuto in ZYRO 360');
  screen.innerHTML=`<div class="zyro-welcome-wrap"><div class="zyro-welcome-content" tabindex="0" aria-label="Le funzioni di ZYRO 360"><header class="zyro-welcome-header"><div class="zyro-welcome-brand">ZYRO <span>360</span></div><p class="zyro-welcome-kicker">IL TUO SPAZIO DI SICUREZZA</p><h1>Più vicini.<br>Più consapevoli.</h1></header><p class="zyro-welcome-intro">Resta in contatto con le persone fidate e chiedi aiuto quando ne hai bisogno.</p>
- <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Avvisa i contatti scelti e condividi la posizione. Con Family puoi attivare l’audio in diretta, con il tuo consenso.</p></div></article>
+ <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Avvisa i contatti scelti e condividi la posizione. Con il piano unico ZYRO 360 da 2,99 €/mese puoi attivare l’audio SOS, soltanto con il tuo consenso e le autorizzazioni richieste.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">↗</span><div><h2>Pick Pocket</h2><p>Se attivo, un movimento sospetto può far partire la sirena e un SOS con posizione in tempo reale ai contatti scelti, quando abiliti gli avvisi.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">➤</span><div><h2>Segui il percorso SOS e possibile furto</h2><p>Con Premium puoi seguire sulla mappa un percorso indicativo verso il contatto che invia un SOS o una segnalazione Pick Pocket. Premi «Portami da» e autorizza l’uso del GPS e del servizio stradale esterno.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">◎</span><div><h2>Accompagnami e Check-in</h2><p>Condividi un percorso o conferma che stai bene entro un orario. I contatti possono ricevere un avviso se sei in ritardo.</p></div></article>

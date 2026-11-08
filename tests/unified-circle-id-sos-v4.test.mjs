@@ -49,7 +49,7 @@ test('glass status and single planned 2,99 subscription are visible but Play mig
  assert.match(css,/#connectionDot\.connected/);
  assert.match(html,/2,99 €/);
  assert.doesNotMatch(html,/ZYRO Family<\/h3>/);
- assert.match(html,/prodotto e il prezzo devono ancora essere attivati definitivamente in Google Play/);
+ assert.match(html,/prezzo effettivo e la disponibilità del prodotto unico devono essere confermati/);
  assert.match(server,/const familyActive = user => premiumActive\(user\)/);
  assert.match(server,/premiumGiftLifetime/);
 });
