@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 export const PACKAGE='com.zyro360.app';
-export const PRODUCTS={zyro360_premium:{plan:'personal',basePlanId:'premium-mensile'},zyro360_family:{plan:'family',basePlanId:'family-mensile'}};
+// Single new monthly product. Old IDs remain accepted ONLY to restore existing paid receipts.\nexport const PRODUCTS={zyro360_unico:{plan:'unico',basePlanId:'unico-mensile'},zyro360_premium:{plan:'personal',basePlanId:'premium-mensile'},zyro360_family:{plan:'family',basePlanId:'family-mensile'}};
 export const accountId=id=>crypto.createHash('sha256').update(`zyro360:${id}`).digest('hex');
 const digest=token=>crypto.createHash('sha256').update(token).digest('hex');
 const allowedStates=new Set(['SUBSCRIPTION_STATE_ACTIVE','SUBSCRIPTION_STATE_IN_GRACE_PERIOD','SUBSCRIPTION_STATE_CANCELED']);
@@ -10,7 +10,7 @@ export function evaluatePurchase(purchase,userId,time=Date.now()){
  const active=items.filter(x=>Date.parse(x.expiryTime)>time && !x.deferredItemReplacement);
  // A deferred replacement leaves the current item active until its expiry.
  const candidates=active.length?active:items.filter(x=>Date.parse(x.expiryTime)>time);
- candidates.sort((a,b)=>(PRODUCTS[b.productId].plan==='family')-(PRODUCTS[a.productId].plan==='family') || Date.parse(b.expiryTime)-Date.parse(a.expiryTime));
+ candidates.sort((a,b)=>(PRODUCTS[b.productId].plan==='unico')-(PRODUCTS[a.productId].plan==='unico') || Date.parse(b.expiryTime)-Date.parse(a.expiryTime));
  const item=candidates[0]||items[0];
  if(!item)throw new Error('Prodotto o piano base Google Play non riconosciuto.');
  return {productId:item.productId,plan:PRODUCTS[item.productId].plan,state:purchase.subscriptionState,expiresAt:Date.parse(item.expiryTime),active:allowedStates.has(purchase.subscriptionState)&&Date.parse(item.expiryTime)>time,autoRenew:item.autoRenewingPlan.autoRenewEnabled===true};
@@ -61,7 +61,7 @@ export class GooglePlayApi{
 export class PlayBilling{
  constructor({repo,google,cipher,clock=Date.now,onChange=()=>{}}){Object.assign(this,{repo,google,cipher,clock,onChange});this.cache=new Map();this.locks=new Map();this.retryAt=new Map();this.ready=true;}
  async init(){await this.repo.init();for(const r of await this.repo.all()){const list=this.cache.get(r.userId)||[];list.push(r);this.cache.set(r.userId,list);}}
- entitlement(userId){const time=this.clock();const rows=(this.cache.get(userId)||[]).filter(r=>r.active&&r.expiresAt>time&&r.checkedAt+900000>time);rows.sort((a,b)=>(b.plan==='family')-(a.plan==='family')||b.expiresAt-a.expiresAt);return rows[0]||null;}
+ entitlement(userId){const time=this.clock();const rows=(this.cache.get(userId)||[]).filter(r=>r.active&&r.expiresAt>time&&r.checkedAt+900000>time);rows.sort((a,b)=>(b.plan==='unico')-(a.plan==='unico')||b.expiresAt-a.expiresAt);return rows[0]||null;}
  async refreshUser(id){this.cache.set(id,await this.repo.user(id));this.onChange(id);}
  async deleteUser(id){
   this.deletedUsers ||= new Set();this.deletedUsers.add(id);
