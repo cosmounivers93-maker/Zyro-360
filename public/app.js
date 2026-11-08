@@ -86,6 +86,7 @@ function runRequestedQuickSOS(){
    toast('Serve l’abbonamento ZYRO 360 da 2,99 €/mese per inviare SOS.',true);return;
  }
  if(current.me.sos){showView('home');toast('SOS già attivo.');return;}
+ showView('home'); // Immediately expose the SOS status and stop control.
  void action(()=>startSOS({quick:true}));
 }
 window.ZyroQuickSOSHandlerReady=true;
