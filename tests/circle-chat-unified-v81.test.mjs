@@ -23,10 +23,12 @@ test('Chat creates no second group: Circles manages creation and Chat shows both
  assert.match(ui,/data-chatcircle/);
  assert.match(ui,/openChat\('direct',b\.dataset\.chatdirect\)/);
  assert.match(ui,/openChat\('circle',b\.dataset\.chatcircle\)/);
- assert.match(ui,/view==='chats'&&changed&&!chatRoom&&current/);
- assert.match(ui,/void refresh\(\)\.catch/);
+ assert.match(ui,/view==='chats'&&!chatRoom&&current/);
+ assert.match(ui,/chatSearch=''/);
+ assert.match(ui,/roomList\._zyroSig=''/);
+ assert.match(ui,/void refresh\(\)\.then/);
  assert.match(ui,/circle\?\.kind==='chat'&&circle\?\.mine/);
- assert.match(html,/app\.js\?v=80\.7/);
+ assert.match(html,/app\.js\?v=80\.8/);
  assert.match(server,/app\.post\('\/api\/circles', requireAuth/);
  assert.match(server,/function chatSummaryFor\(userId\)/);
 });
