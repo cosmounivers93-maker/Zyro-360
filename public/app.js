@@ -65,9 +65,10 @@ function zyroQuickSOSEnabled(){
 function renderQuickSOSSettings(){
  const toggle=$('zyroQuickSosEnabled'),status=$('zyroQuickSosStatus');
  if(!toggle||!status)return;
- const paid=!!current?.me?.premiumActive;
- toggle.checked=paid&&zyroQuickSOSEnabled();toggle.disabled=!current||!paid;
+ const paid=!!current?.me?.premiumActive, nativeReady=window.ZyroAndroidQuickSOSSupported===true;
+ toggle.checked=paid&&nativeReady&&zyroQuickSOSEnabled();toggle.disabled=!current||!paid||!nativeReady;
  status.textContent=!current?'Accedi per configurare SOS rapido.'
+   :!nativeReady?'Per questa funzione serve una versione Android aggiornata di ZYRO 360. Questo browser o APK non offre ancora la scorciatoia SOS.'
    :!paid?'Serve il piano unico ZYRO 360 da 2,99 €/mese, verificato da Google Play.'
    :toggle.checked?'Avvio da scorciatoia consentito per questo account. Configura il gesto nelle impostazioni Android e verifica il risultato.'
    :'Disattivato: autorizza qui l’avvio SOS prima di usare una scorciatoia Android.';
@@ -77,6 +78,7 @@ function runRequestedQuickSOS(){
  if(!requested||!current?.me?.id)return;
  zyroQuickSOSRequestedAt=0;
  if(Date.now()-requested>45000)return; // Never trigger a stale SOS on a later login.
+ if(window.ZyroAndroidQuickSOSSupported!==true)return;
  if(!zyroQuickSOSEnabled()){
    showView('settings');openProfileSettings('quickSos');
    toast('Abilita prima SOS rapido nelle impostazioni ZYRO 360.',true);return;
@@ -90,6 +92,7 @@ function runRequestedQuickSOS(){
  void action(()=>startSOS({quick:true}));
 }
 window.ZyroQuickSOSHandlerReady=true;
+window.addEventListener('zyro:android-ready',renderQuickSOSSettings);
 window.addEventListener('zyro:quick-sos-request',()=>{
  zyroQuickSOSRequestedAt=Date.now();
  runRequestedQuickSOS();
@@ -2970,7 +2973,7 @@ async function init(){
   $('premiumDetails').addEventListener('click',()=>{const panel=$('zyroPlanHelp'),button=$('premiumDetails');panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));button.querySelector('span').textContent=panel.hidden?'＋':'−';});
   $('zyroQuickSosEnabled')?.addEventListener('change',event=>{
     const toggle=event.currentTarget,key=zyroQuickSOSStorageKey();
-    if(!key||!current?.me?.premiumActive){toggle.checked=false;renderQuickSOSSettings();return;}
+    if(!key||!current?.me?.premiumActive||window.ZyroAndroidQuickSOSSupported!==true){toggle.checked=false;renderQuickSOSSettings();return;}
     try{if(toggle.checked)localStorage.setItem(key,'yes');else localStorage.removeItem(key);}
     catch{toggle.checked=false;toast('Impossibile salvare la preferenza SOS su questo dispositivo.',true);}
     renderQuickSOSSettings();
