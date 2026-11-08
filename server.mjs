@@ -1395,7 +1395,7 @@ function setChatView(userId,key,change) {
 }
 function chatSummaryFor(userId) {
   const seen=new Set(),rooms=[];
-  const selections=userCircles(userId).map(c=>({type:'circle',id:c.id}))
+  const selections=userCircles(userId).filter(c=>c.kind!=='direct').map(c=>({type:'circle',id:c.id}))
     .concat([...new Set(userCircles(userId).flatMap(c=>memberIds(c.id)))]
       .filter(id=>id!==userId&&!!db.users[id])
       .map(id=>({type:'direct',id})));
@@ -1405,7 +1405,13 @@ function chatSummaryFor(userId) {
     seen.add(chat.key);
     const all=db.messages?.[chat.key]||[];
     const view=chatView(userId,chat.key);
+    const circle=room.type==='circle'?db.circles[room.id]:null;
+    const person=room.type==='direct'?db.users[room.id]:null;
     rooms.push({type:room.type,id:room.id,key:chat.key,
+      title:circle?.name||person?.name||'Conversazione',
+      kind:circle?.kind||'direct',
+      memberCount:circle?memberIds(circle.id).length:2,
+      memberLimit:circle?circleCapacity(circle):2,
       ...summarizeChat(all,userId,view)});
   }
   return rooms;
