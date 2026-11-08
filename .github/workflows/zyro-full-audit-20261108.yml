@@ -1,0 +1,96 @@
+name: "ZYRO 360 - audit completo web e server - 08 novembre"
+on:
+  push:
+    branches:
+      - audit/zyro-360-verifica-completa-20261108
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  server-test-suite:
+    name: "Server: test automatici, static scan e dipendenze"
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: "Scarica sorgente versione corrente"
+        uses: actions/checkout@v4
+      - name: "Node.js 22"
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: "Installa dipendenze bloccate"
+        run: npm ci --ignore-scripts --no-fund
+      - name: "Verifica sintassi: server, client e Google Play verifier"
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+          node --check play-billing.mjs
+      - name: "Esegui tutti i test API e funzionali senza allertare contatti veri"
+        run: |
+          npm test > /tmp/zyro-audit-tests.log 2>&1 || {
+            tail -n 170 /tmp/zyro-audit-tests.log
+            exit 1
+          }
+          tail -n 55 /tmp/zyro-audit-tests.log
+      - name: "Analisi vulnerabilita dipendenze produzione"
+        run: |
+          set +e
+          npm audit --omit=dev --audit-level=high --json > /tmp/zyro-audit-npm.json 2>/tmp/zyro-audit-error.txt
+          rc=$?
+          set -e
+          echo "npm audit exit code: $rc"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            try {
+              const d=JSON.parse(fs.readFileSync("/tmp/zyro-audit-npm.json","utf8"));
+              const v=d.metadata?.vulnerabilities||{};
+              console.log("DEPENDENCY SCAN:",JSON.stringify({info:v.info||0,low:v.low||0,moderate:v.moderate||0,high:v.high||0,critical:v.critical||0,total:v.total||0}));
+              console.log("VULNERABLE DEPENDENCY NAMES:",Object.keys(d.vulnerabilities||{}).join(", ")||"none");
+            }catch(error){console.log("Audit result could not be parsed:",error.message)}
+          '
+          # report only; do not mutate dependency lock during the scan
+  live-transport:
+    name: "Sito pubblico: versione, salute, login e limiti API"
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: "Verifica HTTP, ultima versione e endpoint senza account"
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://zyro-360.onrender.com"
+          echo "LIVE TARGET: $BASE"
+          if ! curl -L --fail --silent --show-error --retry 3 --retry-delay 4 --max-time 35 -o /tmp/zyro-live.html "$BASE/"; then
+            echo "LIVE_SITE_UNREACHABLE"
+            exit 1
+          fi
+          echo "LIVE_ROOT_BYTES: $(wc -c </tmp/zyro-live.html)"
+          echo "LIVE_CLIENT_VERSION: $(grep -oE 'app.js\?v=[^"]+' /tmp/zyro-live.html | head -n 1 || true)"
+          for marker in 'zyroUnicoTitle' 'zyroGroupCodeJoinForm' 'SOS rapido' 'Navigazione SOS' '2,99 €'; do
+            if grep -Fq "$marker" /tmp/zyro-live.html; then
+              echo "LIVE_FEATURE_PRESENT: $marker"
+            else
+              echo "LIVE_FEATURE_MISSING: $marker"
+            fi
+          done
+          if grep -q 'app.js?v=80.6' /tmp/zyro-live.html; then
+            echo "LIVE_RELEASE_80_6_CONFIRMED"
+          else
+            echo "LIVE_RELEASE_80_6_NOT_CONFIRMED"
+          fi
+          for endpoint in /api/health /api/state /api/billing/bootstrap; do
+            code=$(curl -L --silent --show-error --max-time 20 --output /dev/null --write-out "%{http_code}" "$BASE$endpoint" || true)
+            echo "LIVE_HTTP $endpoint: $code"
+          done
+          for endpoint in /api/sos/start /api/circles/group-code/join; do
+            code=$(curl -L --silent --show-error --max-time 20 --output /dev/null --write-out "%{http_code}" -X POST -H 'Content-Type: application/json' --data '{}' "$BASE$endpoint" || true)
+            echo "LIVE_ANONYMOUS_POST $endpoint: $code (expect 401 or 403, never 2xx)"
+            if [[ "$code" == 2* ]]; then
+              echo "::error::Una chiamata senza autenticazione ha avuto esito positivo."
+              exit 1
+            fi
+          done
+          echo "NOTE: live HTTP cannot prove push delivery, location accuracy or phone permissions."
