@@ -583,8 +583,11 @@ function renderCircles(){
   '</small></div><span class="status-chip">Privata</span></div><div class="circle-members">'+
   c.members.map(m=>'<span class="member-pill">'+escapeHtml(m.name)+(m.id===current.me.id?' (tu)':'')+'</span>').join('')+
   '</div><div class="circle-actions">'+
-  (c.kind==='chat'?'<button type="button" data-chatcircle="'+escapeHtml(c.id)+'">💬 Apri gruppo</button>':
-    c.members.length >= (c.memberLimit||(c.kind==='direct'?2:20))
+  // Every accepted direct relationship has an immediate 1:1 chat; every group circle has the same group chat.
+  (c.kind==='direct'
+    ?(c.members.some(m=>m.id!==current.me.id)?'<button type="button" data-chatdirect="'+escapeHtml(c.members.find(m=>m.id!==current.me.id).id)+'">💬 Chat privata</button>':'')
+    :'<button type="button" data-chatcircle="'+escapeHtml(c.id)+'">💬 Chat di gruppo</button>')+
+  (c.kind==='chat'?'':c.members.length >= (c.memberLimit||(c.kind==='direct'?2:20))
       ?'<button type="button" disabled aria-disabled="true">Limite membri raggiunto</button>'
       :'<button type="button" data-profile-invite="'+escapeHtml(c.id)+'">✚ Invita tramite ID</button>')+
   (c.kind==='group'&&c.mine&&c.members.length<20?'<button type="button" class="zyro-circle-code-generate" data-group-code="'+escapeHtml(c.id)+'">🔑 Genera codice cerchia</button>':'')+
@@ -612,6 +615,7 @@ function renderCircles(){
    toast('Codice privato pronto: condividilo con i familiari. Valido 24 ore.');
  })));
  list.querySelectorAll('[data-chatcircle]').forEach(b=>b.addEventListener('click',()=>openChat('circle',b.dataset.chatcircle)));
+ list.querySelectorAll('[data-chatdirect]').forEach(b=>b.addEventListener('click',()=>openChat('direct',b.dataset.chatdirect)));
  list.querySelectorAll('[data-leave]').forEach(b=>b.addEventListener('click',()=>action(async()=>{
   if(!confirm('Vuoi davvero uscire da questa cerchia?'))return;
   await post('/api/circles/leave',{circleId:b.dataset.leave});await refresh();toast('Hai lasciato la cerchia.');
@@ -697,13 +701,6 @@ async function imageData(file,maxPx=520,maxBytes=105000){
 async function saveAvatar(file){const avatar=await imageData(file,400,100000);await post('/api/profile/avatar',{avatar});await refresh();toast('Foto profilo aggiornata.');}
 // Each chat group is a private circle with its own multi-use invitation code.
 // Joining does not opt anyone in to location, SOS, or microphone sharing.
-function showChatGroupEditor(type){
- const create=$('chatGroupCreatePanel'),join=$('chatGroupJoinPanel');
- const panel=type==='create'?create:join,other=type==='create'?join:create;
- const open=panel.hidden;
- panel.hidden=!open;other.hidden=true;
- if(open)panel.querySelector('input')?.focus();
-}
 function showChatGroupInviteCode(code){
  if(!/^G[A-F0-9]{18}$/.test(code))throw Error('Codice gruppo non valido.');
  $('chatGroupInviteCode').textContent=code;
@@ -762,7 +759,8 @@ function openChat(type,id){
   const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);
   $('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';
   $('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · accesso riservato':'Chat riservata ai partecipanti';
-  $('chatGroupInviteButton')?.classList.toggle('hidden',!(type==='circle'&&['chat','group'].includes(circle?.kind)&&circle?.mine));
+  // The current group-circle codes are managed exclusively from Cerchie. Keep legacy G-code invitations for existing chat-only groups.
+  $('chatGroupInviteButton')?.classList.toggle('hidden',!(type==='circle'&&circle?.kind==='chat'&&circle?.mine));
   $('chatMessages').innerHTML='<p class="chat-empty">Caricamento messaggi…</p>';
   loadChat().catch(e=>toast(e.message,true));
 }
@@ -844,6 +842,19 @@ function showView(view){
     );
   }
   if(view==='settings'&&current?.me?.isAdmin&&!adminLoaded)void action(adminLoad);
+  if(view==='chats'&&changed&&!chatRoom&&current){
+    // Show every private and group room on entry, not a stale group-only filter.
+    chatCategory='all';
+    document.querySelectorAll('[data-chat-filter]').forEach(t=>{
+      const on=t.dataset.chatFilter==='all';
+      t.classList.toggle('active',on);
+      t.setAttribute('aria-pressed',String(on));
+    });
+    renderChatRooms();
+    // Android may resume with stale WebSocket state: verify just-accepted members from the server.
+    void refresh().catch(error=>console.warn('Impossibile aggiornare le chat:',error.message));
+  }
+
   // Preserve the live map; avoid a redundant re-render on repeated Home taps.
   if(view==='home'&&(changed||!stableMap)){
     requestAnimationFrame(()=>{renderMap();stableMap?.resize();});
@@ -2872,21 +2883,7 @@ async function init(){
   $('avatarRemove').addEventListener('click',()=>action(async()=>{await post('/api/profile/avatar',{avatar:null});await refresh();toast('Foto profilo rimossa.');}));
   document.querySelectorAll('[data-chat-filter]').forEach(b=>b.addEventListener('click',()=>{chatCategory=b.dataset.chatFilter;document.querySelectorAll('[data-chat-filter]').forEach(t=>{const on=t===b;t.classList.toggle('active',on);t.setAttribute('aria-pressed',String(on));});renderChatRooms();}));
   $('chatSearch').addEventListener('input',e=>{chatSearch=e.target.value.trim();renderChatRooms();});
-  $('chatGroupCreateOpen').addEventListener('click',()=>showChatGroupEditor('create'));
-  $('chatGroupJoinOpen').addEventListener('click',()=>showChatGroupEditor('join'));
-  $('chatGroupCreateForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
-    const name=$('chatGroupName').value.trim();
-    const result=await post('/api/chat/groups',{name});
-    $('chatGroupName').value='';$('chatGroupCreatePanel').hidden=true;
-    await refresh();openChat('circle',result.groupId);
-    toast('Cerchia di gruppo creata: mappa e chat condivise. Il GPS dei partecipanti richiede consenso e autorizzazioni.');
-  });});
-  $('chatGroupJoinForm').addEventListener('submit',e=>{e.preventDefault();void action(async()=>{
-    const result=await post('/api/chat/groups/join',{code:$('chatGroupCode').value.trim()});
-    $('chatGroupCode').value='';$('chatGroupJoinPanel').hidden=true;
-    await refresh();openChat('circle',result.groupId);
-    toast('Sei nella cerchia di gruppo. Puoi chattare; la posizione GPS non viene attivata automaticamente.');
-  });});
+  $('chatManageCirclesButton').addEventListener('click',()=>showView('circles'));
   $('chatGroupInviteButton').addEventListener('click',()=>void action(makeChatGroupInvite));
   $('chatGroupCopy').addEventListener('click',()=>void action(async()=>{
     await copyInvite($('chatGroupInviteCode').textContent,'Codice del gruppo copiato.');
