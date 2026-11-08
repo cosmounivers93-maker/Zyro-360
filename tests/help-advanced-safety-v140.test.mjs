@@ -16,7 +16,7 @@ test('help panel remains accessible in Settings and includes contact-permission 
    'Può bloccare il mio telefono da remoto'
  ]) assert.ok(section.includes(phrase),phrase);
 });
-test('SOS microphone explanation requires per-contact consent and Family',()=>{
+test('SOS microphone explanation requires per-contact consent and unified subscription',()=>{
  assert.match(section,/Può ascoltare il mio microfono durante SOS/);
  assert.match(section,/piano unico ZYRO 360/);
  assert.match(section,/«Può ascoltare il mio microfono durante SOS»/);
