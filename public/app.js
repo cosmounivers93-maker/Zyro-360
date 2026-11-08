@@ -220,7 +220,10 @@ function connectSocket(){
     if(m.type==='admin-users-changed' && current?.me?.isAdmin)scheduleAdminUsersRefresh();
     if(m.type==='admin-new-report' && current?.me?.isAdmin){toast('Nuova segnalazione ricevuta nel Centro amministratore.');void action(adminLoad);}
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
-    if(m.type==='chat-new')window.dispatchEvent(new CustomEvent('zyro:chat-new',{detail:m}));
+    if(m.type==='chat-new'){
+      window.dispatchEvent(new CustomEvent('zyro:chat-new',{detail:m}));
+      if(activeView==='chats'&&!chatRoom)void refreshChatDirectory().catch(()=>{});
+    }
     if(m.type==='sos-ended') {if(m.userId===listeningTo)stopListening();if(m.userId===current?.me?.id)stopAudio();}
   };
   ws.onclose=()=>{
@@ -273,6 +276,8 @@ function setState(data){
   if(!data?.me)return;
   const prev = current;
   current=data;
+  // Never reuse the authenticated chat directory after a profile switch.
+  if(prev?.me?.id!==data.me.id){verifiedChatRooms=null;verifiedChatOwner='';chatDirectorySequence++;}
   if(data.billingReady&&window.ZyroBillingSupported&&prev?.me?.id!==data.me.id)void zyroNativeRequest('billing-sync').catch(()=>{});
   void syncDeviceInfo();
   // Revoking explicit opt-in stops ongoing live audio locally as well.
@@ -716,6 +721,22 @@ async function makeChatGroupInvite(){
 }
 let chatCategory='all';
 let chatSearch='';
+let verifiedChatRooms=null,verifiedChatOwner='',chatDirectorySequence=0;
+// Membership authorization comes from the backend summary; client state is a fallback.
+async function refreshChatDirectory(){
+  const owner=current?.me?.id;
+  if(!owner)return;
+  const sequence=++chatDirectorySequence;
+  const result=await api('/api/chat/summary');
+  if(sequence!==chatDirectorySequence||current?.me?.id!==owner)return;
+  if(!Array.isArray(result?.rooms))throw Error('Elenco chat non valido.');
+  verifiedChatOwner=owner;
+  verifiedChatRooms=result.rooms.filter(room=>
+    (room?.type==='direct'||room?.type==='circle')&&
+    typeof room.id==='string'&&room.id.length>0
+  );
+  renderChatRooms();
+}
 const roomArrow=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>`;
 const roomGroupIcon=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3"/><path d="M3.5 19v-2.1A4.9 4.9 0 0 1 8.4 12h1.2a4.9 4.9 0 0 1 4.9 4.9V19H3.5Z"/><path d="M16 5a3 3 0 0 1 0 6M18 13c2.1.5 3 1.9 3 4v2h-4"/></svg>`;
 const roomChatIcon=`<svg class="zyro-chat-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.4a8.7 8.7 0 0 1-9.2 8.5 9.5 9.5 0 0 1-3.3-.65L3 21l1.8-5.12a8.4 8.4 0 0 1-1.8-4.48A8.8 8.8 0 0 1 12 3a8.7 8.7 0 0 1 9 8.4Z"/><path d="M8 11.8h.01M12 11.8h.01M16 11.8h.01"/></svg>`;
@@ -723,16 +744,32 @@ function renderChatRooms(){
   if(!current)return;
   // A direct circle has a 1:1 chat only; group circles and dedicated chat groups share a multi-member room.
   const circles=current.circles||[], contacts=uniqueContacts();
+  const confirmed=verifiedChatOwner===current.me.id?(verifiedChatRooms||[]):[];
+  const groups=circles.filter(c=>c.kind!=='direct');
+  const directUsers=[...contacts];
+  const knownGroups=new Set(groups.map(c=>c.id)), knownContacts=new Set(contacts.map(u=>u.id));
+  // A stale /api/state response must not hide a room authorized by /api/chat/summary.
+  for(const room of confirmed){
+    if(room.type==='circle'&&!knownGroups.has(room.id)){
+      groups.push({id:room.id,name:room.title||'Cerchia di gruppo',kind:room.kind||'group',
+        members:Array(Math.max(1,Math.min(20,Number(room.memberCount)||1))),
+        memberLimit:Number(room.memberLimit)||20});
+      knownGroups.add(room.id);
+    }else if(room.type==='direct'&&!knownContacts.has(room.id)){
+      directUsers.push({id:room.id,name:room.title||'Contatto',avatar:null});
+      knownContacts.add(room.id);
+    }
+  }
   const list=$('chatRooms');
-  const sig=JSON.stringify([chatCategory,chatSearch,circles.map(c=>[c.id,c.name,c.kind,c.mine,c.members.length]),contacts.map(u=>[u.id,u.name,u.avatar||''])]);
+  const sig=JSON.stringify([chatCategory,chatSearch,groups.map(c=>[c.id,c.name,c.kind,c.mine,c.members.length]),directUsers.map(u=>[u.id,u.name,u.avatar||''])]);
   if(list._zyroSig===sig&&list.children.length)return;
   list._zyroSig=sig;
   const matching=(name)=>String(name).toLocaleLowerCase('it').includes(chatSearch.toLocaleLowerCase('it'));
   const rooms=[];
   const showCircle=(group)=>group.kind!=='direct'&&(chatCategory==='all'||chatCategory==='group'||chatCategory==='circle');
-  if(chatCategory!=='direct')for(const group of circles.filter(group=>showCircle(group)&&matching(group.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(group.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(group.name)}</b><small>${group.kind==='chat'?'Chat di gruppo':'Cerchia di gruppo'} · ${group.members.length}/${group.memberLimit||20} partecipanti</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
-  if(chatCategory==='all'||chatCategory==='direct')for(const u of contacts.filter(u=>matching(u.name)))rooms.push(`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon person-room-icon">${avatarHTML(u)}</span><span class="chat-room-text"><b>${escapeHtml(u.name)}</b><small>Chat singola · solo voi due</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
-  const hasAny = circles.length||contacts.length;
+  if(chatCategory!=='direct')for(const group of groups.filter(group=>showCircle(group)&&matching(group.name)))rooms.push(`<button type="button" class="chat-room" data-typ="circle" data-id="${escapeHtml(group.id)}"><span class="chat-room-icon family-room-icon">${roomGroupIcon}</span><span class="chat-room-text"><b>${escapeHtml(group.name)}</b><small>${group.kind==='chat'?'Chat di gruppo':'Cerchia di gruppo'} · ${group.members.length}/${group.memberLimit||20} partecipanti</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  if(chatCategory==='all'||chatCategory==='direct')for(const u of directUsers.filter(u=>matching(u.name)))rooms.push(`<button type="button" class="chat-room" data-typ="direct" data-id="${escapeHtml(u.id)}"><span class="chat-room-icon person-room-icon">${avatarHTML(u)}</span><span class="chat-room-text"><b>${escapeHtml(u.name)}</b><small>Chat singola · solo voi due</small></span><span class="chat-room-chevron">${roomArrow}</span></button>`);
+  const hasAny = groups.length||directUsers.length;
   $('chatRooms').innerHTML=rooms.length?rooms.join(''):chatSearch?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Nessun risultato</h3><p>Prova a cercare un altro nome.</p></div>`:hasAny?`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Non ci sono chat qui</h3><p>Seleziona un'altra categoria.</p></div>`:`<div class="chat-empty-view"><span class="chat-empty-symbol">${roomChatIcon}</span><h3>Ogni legame inizia da qui</h3><p>Crea una cerchia o invita una persona fidata per iniziare una conversazione.</p><button type="button" class="btn btn-primary" id="chatInviteNow">Vai alle Cerchie <span aria-hidden="true">→</span></button></div>`;
   $('chatRooms').querySelectorAll('.chat-room').forEach(b=>b.addEventListener('click',()=>openChat(b.dataset.typ,b.dataset.id)));
   $('chatInviteNow')?.addEventListener('click',()=>showView('circles'));
@@ -757,7 +794,8 @@ function openChat(type,id){
   $('chatConversation').classList.remove('hidden');
   document.body.classList.add('zyro-chat-full');
   const circle=current.circles.find(c=>c.id===id),user=uniqueContacts().find(u=>u.id===id);
-  $('chatTitle').textContent=type==='circle' ? circle?.name||'Gruppo':user?.name||'Amico';
+  const fallbackTitle=verifiedChatOwner===current.me.id?verifiedChatRooms?.find(room=>room.type===type&&room.id===id)?.title:'';
+  $('chatTitle').textContent=type==='circle' ? circle?.name||fallbackTitle||'Gruppo':user?.name||fallbackTitle||'Amico';
   $('chatSubtitle').textContent=type==='circle'?'Chat di gruppo · accesso riservato':'Chat riservata ai partecipanti';
   // The current group-circle codes are managed exclusively from Cerchie. Keep legacy G-code invitations for existing chat-only groups.
   $('chatGroupInviteButton')?.classList.toggle('hidden',!(type==='circle'&&circle?.kind==='chat'&&circle?.mine));
@@ -860,12 +898,13 @@ function showView(view){
     renderChatRooms();
     // Also recheck server membership when the tab is tapped again, not only
     // after switching tabs. This repairs stale WebView/WS state without logout.
-    void refresh().then(()=>{
+    void refresh().catch(error=>console.warn('Impossibile aggiornare le chat:',error.message)).finally(()=>{
       if(activeView==='chats'&&!chatRoom){
         renderChatRooms();
+        void refreshChatDirectory().catch(error=>console.warn('Elenco chat temporaneamente non disponibile:',error.message));
         window.ZyroChatRefreshBadges?.();
       }
-    }).catch(error=>console.warn('Impossibile aggiornare le chat:',error.message));
+    });
   }
 
   // Preserve the live map; avoid a redundant re-render on repeated Home taps.
@@ -2942,7 +2981,7 @@ async function init(){
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=25-cerchie-chat-sincronizzate').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=26-chat-directory-autorevole').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);
