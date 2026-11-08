@@ -842,17 +842,30 @@ function showView(view){
     );
   }
   if(view==='settings'&&current?.me?.isAdmin&&!adminLoaded)void action(adminLoad);
-  if(view==='chats'&&changed&&!chatRoom&&current){
-    // Show every private and group room on entry, not a stale group-only filter.
-    chatCategory='all';
-    document.querySelectorAll('[data-chat-filter]').forEach(t=>{
-      const on=t.dataset.chatFilter==='all';
-      t.classList.toggle('active',on);
-      t.setAttribute('aria-pressed',String(on));
-    });
+  if(view==='chats'&&!chatRoom&&current){
+    // Always rebuild from accepted circle memberships. Android can resume with a
+    // previous search, category or cached DOM that hides otherwise valid chats.
+    if(changed){
+      chatCategory='all';
+      chatSearch='';
+      if($('chatSearch'))$('chatSearch').value='';
+      document.querySelectorAll('[data-chat-filter]').forEach(t=>{
+        const on=t.dataset.chatFilter==='all';
+        t.classList.toggle('active',on);
+        t.setAttribute('aria-pressed',String(on));
+      });
+    }
+    const roomList=$('chatRooms');
+    if(roomList)roomList._zyroSig='';
     renderChatRooms();
-    // Android may resume with stale WebSocket state: verify just-accepted members from the server.
-    void refresh().catch(error=>console.warn('Impossibile aggiornare le chat:',error.message));
+    // Also recheck server membership when the tab is tapped again, not only
+    // after switching tabs. This repairs stale WebView/WS state without logout.
+    void refresh().then(()=>{
+      if(activeView==='chats'&&!chatRoom){
+        renderChatRooms();
+        window.ZyroChatRefreshBadges?.();
+      }
+    }).catch(error=>console.warn('Impossibile aggiornare le chat:',error.message));
   }
 
   // Preserve the live map; avoid a redundant re-render on repeated Home taps.
