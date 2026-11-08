@@ -23,5 +23,7 @@ jobs:
         run: |
           node --check server.mjs
           node --check public/app.js
-      - name: Run test suite
+      - name: Install dependencies for real chat integration tests
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Run test suite including authenticated 1:1 and group messages
         run: node --test
