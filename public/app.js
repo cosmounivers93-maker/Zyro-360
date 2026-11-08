@@ -55,6 +55,48 @@ let lastAlertKey = '';
 const inviteCodes = new Map();
 let chatRoom=null, chatPhotoData=null;
 let sosPending=null;
+// Android shortcut requests are short-lived and consumed once after authentication.
+let zyroQuickSOSRequestedAt=0;
+function zyroQuickSOSStorageKey(){return current?.me?.id?'zyro-quick-sos-optin-v1:'+current.me.id:'';}
+function zyroQuickSOSEnabled(){
+ const key=zyroQuickSOSStorageKey();
+ try{return !!key&&localStorage.getItem(key)==='yes';}catch{return false;}
+}
+function renderQuickSOSSettings(){
+ const toggle=$('zyroQuickSosEnabled'),status=$('zyroQuickSosStatus');
+ if(!toggle||!status)return;
+ const paid=!!current?.me?.premiumActive, nativeReady=window.ZyroAndroidQuickSOSSupported===true;
+ toggle.checked=paid&&nativeReady&&zyroQuickSOSEnabled();toggle.disabled=!current||!paid||!nativeReady;
+ status.textContent=!current?'Accedi per configurare SOS rapido.'
+   :!nativeReady?'Per questa funzione serve una versione Android aggiornata di ZYRO 360. Questo browser o APK non offre ancora la scorciatoia SOS.'
+   :!paid?'Serve il piano unico ZYRO 360 da 2,99 €/mese, verificato da Google Play.'
+   :toggle.checked?'Avvio da scorciatoia consentito per questo account. Configura il gesto nelle impostazioni Android e verifica il risultato.'
+   :'Disattivato: autorizza qui l’avvio SOS prima di usare una scorciatoia Android.';
+}
+function runRequestedQuickSOS(){
+ const requested=zyroQuickSOSRequestedAt;
+ if(!requested||!current?.me?.id)return;
+ zyroQuickSOSRequestedAt=0;
+ if(Date.now()-requested>45000)return; // Never trigger a stale SOS on a later login.
+ if(window.ZyroAndroidQuickSOSSupported!==true)return;
+ if(!zyroQuickSOSEnabled()){
+   showView('settings');openProfileSettings('quickSos');
+   toast('Abilita prima SOS rapido nelle impostazioni ZYRO 360.',true);return;
+ }
+ if(!current.me.premiumActive){
+   showView('settings');openProfileSettings('premium');
+   toast('Serve l’abbonamento ZYRO 360 da 2,99 €/mese per inviare SOS.',true);return;
+ }
+ if(current.me.sos){showView('home');toast('SOS già attivo.');return;}
+ showView('home'); // Immediately expose the SOS status and stop control.
+ void action(()=>startSOS({quick:true}));
+}
+window.ZyroQuickSOSHandlerReady=true;
+window.addEventListener('zyro:android-ready',renderQuickSOSSettings);
+window.addEventListener('zyro:quick-sos-request',()=>{
+ zyroQuickSOSRequestedAt=Date.now();
+ runRequestedQuickSOS();
+});
 const journeySelected=new Set(),checkinSelected=new Set();
 let journeyTarget=null;
 let journeyAddressResults=[],journeyAddressChoice=null,journeyMapCandidate=null;
@@ -296,13 +338,14 @@ function setState(data){
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderProfileInvites();renderSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
+  renderHome();renderCircles();renderProfileInvites();renderSettings();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
 
   const key = data.alerts.filter(a=>a.userId!==data.me.id).map(a=>a.id).sort().join(',');
   if(prev && key && key !== lastAlertKey) toast('🆘 Nuovo SOS nella tua cerchia.',true);
   lastAlertKey=key;
+  if(zyroQuickSOSRequestedAt)runRequestedQuickSOS();
 }
 // Admin UI is only an interface. Every admin endpoint separately verifies the owner's server-side user ID.
 function renderAdminAccess(){
@@ -1090,11 +1133,12 @@ async function openZyroMicrophone(){
 function acquireSOSEmergencyAudio(){
  return openZyroMicrophone().then(stream=>({stream}),error=>({error}));
 }
-async function startSOS(){
+async function startSOS({quick=false}={}){
  if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS non disponibile: occorre un abbonamento ZYRO 360 attivo e almeno un destinatario autorizzato. In emergenza chiama il 112.',true);return;}
  const optedIn=hasFamilyPlan()&&current.me.sosAudioConsent===true;
  sosAudioError='';
- const preparedAudio=optedIn?acquireSOSEmergencyAudio():null;
+ // Quick SOS never automatically captures the microphone from a background shortcut.
+ const preparedAudio=optedIn&&!quick?acquireSOSEmergencyAudio():null;
  let serverStarted=false;
  try{
    // Request a fresh GPS fix, but never delay an SOS indefinitely.
@@ -2177,6 +2221,7 @@ function setupProfileSettings(){
  <p class="zyro-permission-footer">Le autorizzazioni sono gestite da Android. Se hai negato un permesso, puoi riattivarlo dalle impostazioni del telefono. Zyro 360 non sostituisce i servizi di emergenza.</p>`;
  const candidates={
   permissions:permissionPanel,
+  quickSos:$('zyroQuickSosSettings'),
   appearance:document.querySelector('#settingsView .zyro-appearance-panel'),
   help:$('zyroHelp'), premium:$('premiumPanel'),
   emergency:[...document.querySelectorAll('#settingsView .panel')].find(x=>x.querySelector('h2')?.textContent.trim()==='Numeri di emergenza'),
@@ -2187,7 +2232,7 @@ function setupProfileSettings(){
   deletion:$('deleteAccountPanel'),
   logout:$('logoutButton')?.closest('.panel')
  };
- const titles={appearance:"Aspetto dell'app",help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',permissions:'Abilita permessi',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',admin:'Centro amministratore',deletion:'Elimina account',logout:'Esci dall’account'};
+ const titles={appearance:"Aspetto dell'app",quickSos:'SOS rapido',help:'Come funziona ZYRO 360',premium:'Abbonamenti',emergency:'Numeri di emergenza',invitees:'Persone invitate',permissions:'Abilita permessi',notifications:'Notifiche SOS',privacy:'Privacy',reports:'Segnala un utente',admin:'Centro amministratore',deletion:'Elimina account',logout:'Esci dall’account'};
  for(const [key,title] of Object.entries(titles)){
    const pane=document.createElement('section');pane.className='zyro-settings-pane';pane.dataset.pane=key;pane.hidden=true;
    if(key==='invitees'){
@@ -2926,6 +2971,17 @@ async function init(){
   $('checkinConfirm').addEventListener('click',()=>action(()=>v15CheckinEnd(true)));
   $('checkinCancel').addEventListener('click',()=>action(()=>v15CheckinEnd(false)));
   $('premiumDetails').addEventListener('click',()=>{const panel=$('zyroPlanHelp'),button=$('premiumDetails');panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));button.querySelector('span').textContent=panel.hidden?'＋':'−';});
+  $('zyroQuickSosEnabled')?.addEventListener('change',event=>{
+    const toggle=event.currentTarget,key=zyroQuickSOSStorageKey();
+    if(!key||!current?.me?.premiumActive||window.ZyroAndroidQuickSOSSupported!==true){toggle.checked=false;renderQuickSOSSettings();return;}
+    try{if(toggle.checked)localStorage.setItem(key,'yes');else localStorage.removeItem(key);}
+    catch{toggle.checked=false;toast('Impossibile salvare la preferenza SOS su questo dispositivo.',true);}
+    renderQuickSOSSettings();
+  });
+  $('zyroQuickSosReadGuide')?.addEventListener('click',()=>{
+    openProfileSettings('help');
+    const help=$('zyroHelpQuickSOS');if(help)help.open=true;
+  });
   $('sosButton').addEventListener('click',()=>action(startSOS));
   $('stopSOS').addEventListener('click',()=>action(stopSOS));
 
@@ -2981,7 +3037,7 @@ async function init(){
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=26-chat-directory-autorevole').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=27-sos-shortcut-guide').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);

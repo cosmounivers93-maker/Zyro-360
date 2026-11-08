@@ -701,6 +701,16 @@ html,body{overscroll-behavior-x:none}
         <p><a href="/elimina-account.html" target="_blank" rel="noopener noreferrer">Eliminazione dal web e assistenza</a></p>
       </div>
       <div class="panel"><button id="logoutButton" class="btn btn-logout btn-wide">Esci dal mio account</button></div>
+      <section id="zyroQuickSosSettings" class="panel" aria-labelledby="zyroQuickSosTitle">
+        <div class="panel-title"><span class="panel-icon">🆘</span><div><h2 id="zyroQuickSosTitle">SOS rapido Android</h2><p>Piano unico 2,99 €/mese per gli account personali</p></div></div>
+        <label style="display:flex;align-items:flex-start;gap:12px;line-height:1.55">
+          <input type="checkbox" id="zyroQuickSosEnabled" style="margin-top:5px">
+          <span><strong>Consenti avvio SOS da scorciatoia</strong><small style="display:block;margin-top:4px">Autorizza il comando nativo quando sei autenticato. Non abilita automaticamente il gesto del tuo telefono.</small></span>
+        </label>
+        <p id="zyroQuickSosStatus" class="setting-description" role="status" aria-live="polite">Verifica abbonamento e supporto Android…</p>
+        <p class="setting-description">Per il triplo tocco posteriore apri le impostazioni gestuali del telefono e verifica se puoi associare un'app o una scorciatoia. Se non è disponibile, aggiungi il pulsante ZYRO SOS alle Impostazioni rapide Android. Può essere necessario sbloccare il telefono; il tasto accensione non viene intercettato.</p>
+        <button type="button" id="zyroQuickSosReadGuide" class="btn btn-outline">Leggi come funziona</button>
+      </section>
       <section class="how-it-works" id="zyroHelp" aria-labelledby="howTitle">
         <div class="how-heading zyro-heading-v55"><span class="how-icon" aria-hidden="true">?</span><div class="zyro-heading-copy"><p class="eyebrow muted">LA TUA GUIDA</p><h2 id="howTitle">Scopri ZYRO 360</h2></div><p class="zyro-heading-description">Ogni funzione, spiegata passo dopo passo.</p></div>
         <details><summary>Inizia da qui <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Crea il tuo account, scegli nome e foto dal Profilo e apri «Abilita permessi». Autorizza soltanto le funzioni che vuoi usare: posizione per il GPS, notifiche per gli avvisi, microfono per l’audio SOS e sensori per Pick Pocket. I permessi da soli non avviano la condivisione né il microfono.</p></div></details>
@@ -718,6 +728,15 @@ html,body{overscroll-behavior-x:none}
         </div></details>
         <details><summary>Chat riservata <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Apri Chat e scegli una conversazione con un amico o con la famiglia. Puoi inviare messaggi, fotografie e risposte rapide, per esempio «Sono arrivato/a» o «Puoi chiamarmi?». Le conversazioni sono riservate ai partecipanti autorizzati.</p></div></details>
         <details><summary>SOS rapido: invia un avviso ai tuoi contatti <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Dalla Home premi «Invia SOS» per attivare rapidamente l’allarme sul server. <strong>SOS rapido è compreso nel piano unico ZYRO 360 da 2,99 €/mese.</strong> Per attivarlo servono abbonamento verificato, accesso al tuo account e almeno un destinatario SOS autorizzato nella sezione Modalità. L’app prova ad allegare la posizione GPS, ma invia l’avviso anche se non riesce a ottenere subito una nuova posizione. I contatti selezionati possono vedere l’SOS nella loro app e, se i servizi di notifica sono configurati, ricevere un avviso push. <strong>L’arrivo effettivo della notifica non è garantito</strong> e dipende da rete, server, notifiche e dispositivo. La chiamata al 112 resta la soluzione per un pericolo reale.</p></div></details>
+        <details id="zyroHelpQuickSOS"><summary>SOS rapido: triplo tocco posteriore e pulsante Android <span aria-hidden="true">＋</span></summary><div class="how-content">
+          <p><strong>Funzione del piano unico ZYRO 360 da 2,99 € al mese:</strong> per gli account personali serve l'abbonamento verificato da Google Play, una sessione attiva e almeno un destinatario SOS autorizzato. La verifica avviene anche sul server. Non è un servizio ufficiale di emergenza.</p>
+          <p><strong>Passaggio 1:</strong> apri Profilo → Impostazioni aggiuntive → SOS rapido, leggi i limiti e attiva «Consenti avvio SOS da scorciatoia». Configura prima i destinatari in Modalità → SOS.</p>
+          <p><strong>Passaggio 2 - triplo tocco posteriore (solo telefoni compatibili):</strong> su Redmi/Xiaomi vai in Impostazioni Android → Impostazioni aggiuntive → Scorciatoie gestuali → Tocco posteriore → Triplo tocco. <strong>Soltanto se il telefono consente di scegliere una <strong>scorciatoia specifica</strong> di ZYRO 360, seleziona «SOS rapido». Se consente soltanto «Apri app», il gesto potrà aprire ZYRO 360, ma <strong>non avvierà automaticamente l'allarme</strong>. Alcune versioni HyperOS offrono solo azioni di sistema: in quel caso non è possibile associare il triplo tocco a Zyro 360. Tre tocchi sul retro non equivalgono a tre pressioni del tasto di accensione.</p>
+          <p><strong>Passaggio 3 - alternativa disponibile:</strong> aggiungi «ZYRO SOS» dalle Impostazioni rapide Android e tocca il pulsante quando serve. Puoi anche usare la scorciatoia «SOS rapido» dal menu dell'icona app, se supportata dal launcher.</p>
+          <p><strong>Quando si attiva:</strong> il comando apre la procedura SOS della tua app. Se sei autenticato e hai abilitato l'avvio rapido, Zyro 360 tenta di registrare un SOS sul server e di notificare i contatti selezionati. Non serve premere prima il SOS normale. GPS e notifiche possono non essere disponibili; l'invio non garantisce la ricezione.</p>
+          <p><strong>Telefono bloccato / background:</strong> il sistema può richiedere lo sblocco e può impedire l'uso del gesto a schermo spento. Non è una funzione garantita su tutti i modelli e non intercetta direttamente i tre tocchi dal background. Il microfono non parte automaticamente dal comando rapido.</p>
+          <p><strong>Importante:</strong> non usare le tre pressioni del pulsante di accensione per ZYRO 360: l'app non le rileva. La funzione SOS ufficiale di Android resta separata. Prima di affidarti alla scorciatoia, provala con i contatti e verifica il risultato. In pericolo reale chiama il <strong>112</strong>.</p>
+        </div></details>
         <details><summary>Navigazione SOS: raggiungi un contatto in difficoltà <span aria-hidden="true">＋</span></summary><div class="how-content">
           <p><strong>1. Ricevi l’allarme:</strong> il tuo contatto deve averti autorizzato a ricevere i suoi SOS e devi avere accesso all’app. Quando arriva un SOS, apri l’avviso dalla Home o dalla mappa; se il dispositivo ha inviato coordinate valide, viene mostrato il punto SOS. La via e il civico non sono sempre disponibili.</p>
           <p><strong>2. Premi «Naviga», «Portami da» o «Segui percorso»:</strong> autorizza la tua posizione se richiesta e conferma l’apertura del tragitto. La posizione di partenza e le coordinate del contatto possono essere inviate a un servizio di routing esterno basato su OpenStreetMap/FOSSGIS per stimare il percorso. La navigazione necessita di Internet, GPS e dati cartografici disponibili.</p>
@@ -765,6 +784,7 @@ html,body{overscroll-behavior-x:none}
     <nav id="zyroSettingsMenu" class="zyro-drawer-menu" aria-label="Sezioni impostazioni">
       <button type="button" data-settings-target="appearance"><span class="zyro-settings-glyph">◐</span><span>Aspetto dell'app<small>Tema chiaro o scuro</small></span><b>›</b></button>
       <button type="button" data-settings-target="help"><span class="zyro-settings-glyph">?</span><span>Come funziona l'app<small>Guida a cerchie, SOS e protezioni remote</small></span><b>›</b></button>
+      <button type="button" data-settings-target="quickSos"><span class="zyro-settings-glyph">🆘</span><span>SOS rapido<small>Scorciatoia Android e triplo tocco, se supportato</small></span><b>›</b></button>
       <button type="button" data-settings-target="premium"><span class="zyro-settings-glyph">✦</span><span>Abbonamenti<small>Piano unico · 2,99 €/mese</small></span><b>›</b></button>
       <button type="button" data-settings-target="emergency"><span class="zyro-settings-glyph">✚</span><span>Numeri di emergenza<small>Chiama il 112</small></span><b>›</b></button>
       <button type="button" data-settings-target="invitees"><span class="zyro-settings-glyph">♧</span><span>Persone invitate<small>GPS, SOS, microfono e controllo remoto</small></span><b>›</b></button>
@@ -841,7 +861,7 @@ html,body{overscroll-behavior-x:none}
    <div class="zyro-due-actions"><button type="button" id="zyroDueClear">Cancella</button><button type="button" id="zyroDueCancel">Annulla</button><button type="button" id="zyroDueConfirm">Imposta</button></div>
  </section>
 </div>
-<script src="/app.js?v=80.9" defer></script>
+<script src="/app.js?v=81.0" defer></script>
 <script src="/zyro-circle-picker-v3.js?v=3" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
