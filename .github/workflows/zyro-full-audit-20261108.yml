@@ -36,7 +36,8 @@ jobs:
           tail -n 55 /tmp/zyro-audit-tests.log
       - name: "Analisi vulnerabilita dipendenze produzione"
         run: |
-          npm install --package-lock-only --ignore-scripts --no-save --no-fund
+          npm install --package-lock-only --ignore-scripts --no-fund
+          test -s package-lock.json
           set +e
           npm audit --omit=dev --audit-level=high --json > /tmp/zyro-audit-npm.json 2>/tmp/zyro-audit-error.txt
           rc=$?
