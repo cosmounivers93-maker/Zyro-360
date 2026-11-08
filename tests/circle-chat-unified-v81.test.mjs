@@ -81,7 +81,10 @@ test('Joining a circle creates both authorized direct and shared group chat endp
   assert.deepEqual(memberState.me.gpsRecipients,[]);
   const ownerId=ownerState.me.id,memberId=memberState.me.id;
   const myRooms=(await req('GET','/api/chat/summary',null,owner)).body.rooms;
-  const theirRooms=(await req('GET','/api/chat/summary',null,member)).body.rooms;\n  assert.equal(myRooms.find(r=>r.type==='circle'&&r.id===circle.id)?.title,'La famiglia');\n  assert.equal(myRooms.find(r=>r.type==='circle'&&r.id===circle.id)?.memberCount,2);\n  assert.equal(myRooms.find(r=>r.type==='direct'&&r.id===memberId)?.title,'Bruno');
+  const theirRooms=(await req('GET','/api/chat/summary',null,member)).body.rooms;
+  assert.equal(myRooms.find(r=>r.type==='circle'&&r.id===circle.id)?.title,'La famiglia');
+  assert.equal(myRooms.find(r=>r.type==='circle'&&r.id===circle.id)?.memberCount,2);
+  assert.equal(myRooms.find(r=>r.type==='direct'&&r.id===memberId)?.title,'Bruno');
   for(const [rooms,otherId] of [[myRooms,memberId],[theirRooms,ownerId]]){
    assert.ok(rooms.some(r=>r.type==='circle'&&r.id===circle.id),'Group chat not available after join');
    assert.ok(rooms.some(r=>r.type==='direct'&&r.id===otherId),'1:1 chat not available after join');
@@ -102,6 +105,18 @@ test('Joining a circle creates both authorized direct and shared group chat endp
   assert.equal(revoked.status,403,'Leaving all shared circles revokes access to private chat');
   const revokedGroup=await req('GET','/api/chat/circle/'+circle.id,null,member);
   assert.equal(revokedGroup.status,403,'Leaving group revokes access to group messages');
+  // Joining an explicit two-person circle restores only the 1:1 conversation.
+  const invite=await req('POST','/api/profile-invites',{profileId:memberState.me.profileId,mode:'direct'},owner);
+  assert.equal(invite.status,200,JSON.stringify(invite.body));
+  const accepted=await req('POST','/api/profile-invites/respond',{inviteId:invite.body.inviteId,decision:'accept'},member);
+  assert.equal(accepted.status,200,JSON.stringify(accepted.body));
+  const afterPrivate=(await req('GET','/api/state',null,owner)).body;
+  const privateCircle=afterPrivate.circles.find(c=>c.kind==='direct'&&c.members.some(m=>m.id===memberId));
+  assert.ok(privateCircle,'Accepted two-person circle should exist');
+  const privateRooms=(await req('GET','/api/chat/summary',null,owner)).body.rooms;
+  assert.ok(privateRooms.some(r=>r.type==='direct'&&r.id===memberId),'Private chat should appear');
+  assert.ok(!privateRooms.some(r=>r.type==='circle'&&r.id===privateCircle.id),
+    'Do not create duplicate group room for a direct circle');
  }finally{
   child.kill('SIGTERM');
   await new Promise(resolve=>{if(child.exitCode!==null)return resolve();child.once('exit',resolve);setTimeout(resolve,1000)});
