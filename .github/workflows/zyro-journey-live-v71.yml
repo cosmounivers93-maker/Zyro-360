@@ -1,7 +1,7 @@
-name: ZYRO 360 - Verifica live Accompagnami e chat private v79
+name: ZYRO 360 - Verifica Render e funzioni online correnti
 on:
   push:
-    branches: [main]
+    branches: [main, fix/render-live-check-current-release-20261108]
     paths:
       - 'public/app.js'
       - 'public/index.html'
@@ -18,50 +18,49 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - name: Controlla UI online realmente aggiornata
+      - name: Ottieni versione prevista dal repository corrente
+        uses: actions/checkout@v4
+      - name: Controlla Render e la versione pubblicata senza controlli v79 obsoleti
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in $(seq 1 18); do
-            if curl --fail --silent --show-error --location --max-time 28 'https://zyro-360.onrender.com/' -o /tmp/zyro-live-index.html &&
-               curl --fail --silent --show-error --location --max-time 28 'https://zyro-360.onrender.com/app.js?v=79.0' -o /tmp/zyro-live-app.js &&
-               grep -q 'id="journeyViewMap"' /tmp/zyro-live-index.html &&
-               grep -q 'id="journeyPreviewSet"' /tmp/zyro-live-index.html &&
-               grep -q 'id="journeyDueAt"' /tmp/zyro-live-index.html &&
-               ! grep -q 'id="journeyAuto"' /tmp/zyro-live-index.html &&
-               grep -q 'Orario previsto di arrivo' /tmp/zyro-live-index.html &&
-               grep -q 'id="journeyArrived"' /tmp/zyro-live-index.html &&
-               grep -q 'Sono arrivato a destinazione' /tmp/zyro-live-index.html &&
-               grep -q 'id="journeyCancel"' /tmp/zyro-live-index.html &&
-               grep -q 'id="journeyPendingActions"' /tmp/zyro-live-index.html &&
-               grep -q 'disponibile quando il percorso è attivo' /tmp/zyro-live-index.html &&
-               grep -q 'Annulla percorso' /tmp/zyro-live-index.html &&
-               ! grep -q 'id="journeyPreviewPin"' /tmp/zyro-live-index.html &&
-               grep -q '/app.js?v=79.0' /tmp/zyro-live-index.html &&
-               ! grep -q 'id="journeyMinutes"' /tmp/zyro-live-index.html &&
-               grep -q 'id="journeyMapHint"' /tmp/zyro-live-index.html &&
-               grep -q "const etaInput=\$('journeyDueAt')" /tmp/zyro-live-app.js &&
-               grep -q "new Date(etaInput.value).getTime()" /tmp/zyro-live-app.js &&
-               grep -q 'journeyPreviewPositionLocked' /tmp/zyro-live-app.js &&
-               grep -q 'drawPreviewDestination(w,h,center)' /tmp/zyro-live-app.js &&
-               grep -q 'journeyPreviewMapFocused' /tmp/zyro-live-app.js &&
-               grep -q 'journeyDestinationSvgPin' /tmp/zyro-live-app.js &&
-               grep -q 'this.previewSvg.append(this.previewGroup)' /tmp/zyro-live-app.js &&
-               grep -q 'this.previewPin=pin' /tmp/zyro-live-app.js &&
-               grep -q 'this.previewPin.style.display=visible' /tmp/zyro-live-app.js &&
-               grep -q 'function positionJourneyPreviewDialog()' /tmp/zyro-live-app.js &&
-               grep -q "document.querySelector('#homeView .zyro-command-row')" /tmp/zyro-live-app.js &&
-               grep -q 'journeyOptions.hidden=onJ' /tmp/zyro-live-app.js &&
-               grep -q 'journeyAddressChoice=journeyAddressResults\[0\]' /tmp/zyro-live-app.js &&
-               grep -q 'data-journey-answer' /tmp/zyro-live-app.js &&
-               grep -q 'title:enabled.*Autorizza tutte le funzioni' /tmp/zyro-live-app.js &&
-               grep -q "filter(c=>c.kind==='chat')" /tmp/zyro-live-app.js &&
-               [ "$(curl --silent --show-error --location --max-time 28 --output /dev/null --write-out '%{http_code}' --request POST --header 'Content-Type: application/json' --data '{}' 'https://zyro-360.onrender.com/api/journey/respond')" = "401" ]; then
-              echo "SUCCESS: Accompagnami v79, pulsanti visibili prima della partenza e operativi dopo."
-              exit 0
+          base='https://zyro-360.onrender.com'
+          expected_js="$(grep -oE '/app\.js\?v=[0-9.]+' public/index.html | head -n 1)"
+          if [[ -z "$expected_js" ]]; then
+            echo "::error::Versione app.js non specificata nel repository."
+            exit 1
+          fi
+          echo "Versione JS attesa: $expected_js"
+          for attempt in $(seq 1 40); do
+            if curl --fail --silent --show-error --location --retry 2 --retry-delay 3 --max-time 28 "$base/" -o /tmp/zyro-live-index.html &&
+               curl --fail --silent --show-error --location --retry 2 --retry-delay 3 --max-time 28 "$base$expected_js" -o /tmp/zyro-live-app.js &&
+               curl --fail --silent --show-error --location --retry 2 --retry-delay 3 --max-time 28 "$base/api/health" -o /tmp/zyro-health.json; then
+              if grep -Fq "$expected_js" /tmp/zyro-live-index.html &&
+                 grep -Fq 'id="journeyDueAt"' /tmp/zyro-live-index.html &&
+                 grep -Fq 'id="journeyArrived"' /tmp/zyro-live-index.html &&
+                 grep -Fq 'id="journeyCancel"' /tmp/zyro-live-index.html &&
+                 grep -Fq 'id="zyroGroupCodeJoinForm"' /tmp/zyro-live-index.html &&
+                 grep -Fq 'id="zyroUnicoTitle"' /tmp/zyro-live-index.html &&
+                 grep -Fq 'SOS rapido' /tmp/zyro-live-index.html &&
+                 grep -Fq 'Navigazione SOS' /tmp/zyro-live-index.html &&
+                 grep -Fq 'journeyPreviewPositionLocked' /tmp/zyro-live-app.js &&
+                 grep -Fq 'function positionJourneyPreviewDialog()' /tmp/zyro-live-app.js &&
+                 grep -Fq "post('/api/circles/group-code/join'" /tmp/zyro-live-app.js &&
+                 node -e "const h=require('/tmp/zyro-health.json');if(!h.ok||!h.persistentStorage)process.exit(1)"; then
+                # Requests without login must not access sensitive data or send an SOS.
+                state_code="$(curl --silent --show-error --location --max-time 20 --output /dev/null --write-out '%{http_code}' "$base/api/state")"
+                sos_code="$(curl --silent --show-error --location --max-time 20 --output /dev/null --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "$base/api/sos/start")"
+                code_join_code="$(curl --silent --show-error --location --max-time 20 --output /dev/null --write-out '%{http_code}' -X POST -H 'Content-Type: application/json' --data '{}' "$base/api/circles/group-code/join")"
+                if [[ "$state_code" == 401 && "$sos_code" == 401 && "$code_join_code" == 401 ]]; then
+                  echo "SUCCESS: Render attivo, database persistente, $expected_js pubblicata, Accompagnami/SOS/Gruppi/Abbonamento e accessi protetti."
+                  echo "NOTE: il test HTTP non certifica la consegna push, il GPS o le autorizzazioni Android."
+                  exit 0
+                fi
+                echo "Sicurezza HTTP non confermata: state=$state_code sos=$sos_code group=$code_join_code"
+              fi
             fi
-            echo "La versione v79 non risulta ancora online; verifica $attempt/18"
+            echo "Render non espone ancora le caratteristiche attese (tentativo $attempt/40)."
             sleep 8
           done
-          echo "::error::Le correzioni v79 non sono pubblicate sul sito Zyro 360."
+          echo "::error::Versione Render o funzionalità richieste non confermate: verificare il deploy e i log."
           exit 1
