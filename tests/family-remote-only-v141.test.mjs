@@ -42,7 +42,7 @@ test('client disables remote contact switches for non-Family without blocking GP
 test('single 2,99 store plan lists remote and local Pick Pocket, not old tiers',()=>{
  assert.match(html,/id="zyroUnicoTitle">ZYRO 360/);
  assert.match(html,/2,99 €/);
- assert.match(html,/Pick Pocket e protezione dello schermo/);
+ assert.match(html,/Pick Pocket avanzata e blocco schermo locale/);
  assert.match(html,/Squillo e blocco da remoto/);
  assert.doesNotMatch(html,/id="zyroFamilyTitle"/);
 });
