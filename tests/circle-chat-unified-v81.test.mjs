@@ -81,7 +81,7 @@ test('Joining a circle creates both authorized direct and shared group chat endp
   assert.deepEqual(memberState.me.gpsRecipients,[]);
   const ownerId=ownerState.me.id,memberId=memberState.me.id;
   const myRooms=(await req('GET','/api/chat/summary',null,owner)).body.rooms;
-  const theirRooms=(await req('GET','/api/chat/summary',null,member)).body.rooms;
+  const theirRooms=(await req('GET','/api/chat/summary',null,member)).body.rooms;\n  assert.equal(myRooms.find(r=>r.type==='circle'&&r.id===circle.id)?.title,'La famiglia');\n  assert.equal(myRooms.find(r=>r.type==='circle'&&r.id===circle.id)?.memberCount,2);\n  assert.equal(myRooms.find(r=>r.type==='direct'&&r.id===memberId)?.title,'Bruno');
   for(const [rooms,otherId] of [[myRooms,memberId],[theirRooms,ownerId]]){
    assert.ok(rooms.some(r=>r.type==='circle'&&r.id===circle.id),'Group chat not available after join');
    assert.ok(rooms.some(r=>r.type==='direct'&&r.id===otherId),'1:1 chat not available after join');
