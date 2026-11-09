@@ -8,6 +8,12 @@ const server=readFileSync(new URL('../server.mjs',import.meta.url),'utf8');
 
 test('SOS rapido: opt-in, pulsante tendina, nessun triplo tocco in guida',()=>{
   assert.match(html,/id="zyroQuickSosEnabled"/);
+  assert.match(html,/id="zyroQuickSosEnabledMode"/);
+  assert.match(html,/Attiva SOS rapido/);
+  assert.match(html,/id="zyroQuickSosAddTileMode"/);
+  assert.match(html,/data-zyro-add-tile/);
+  assert.match(ui,/quick-sos-add-tile/);
+  assert.match(ui,/requestZyroQuickSosTile/);
   assert.match(html,/data-settings-target="quickSos"/);
   assert.match(html,/id="zyroHelpQuickSOS"/);
   assert.match(html,/tendina Android/i);
