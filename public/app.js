@@ -68,10 +68,12 @@ function renderQuickSOSSettings(){
  const paid=!!current?.me?.premiumActive, nativeReady=window.ZyroAndroidQuickSOSSupported===true;
  toggle.checked=paid&&nativeReady&&zyroQuickSOSEnabled();toggle.disabled=!current||!paid||!nativeReady;
  status.textContent=!current?'Accedi per configurare SOS rapido.'
-   :!nativeReady?'Per questa funzione serve una versione Android aggiornata di ZYRO 360. Questo browser o APK non offre ancora la scorciatoia SOS.'
+   :!nativeReady?'Per questa funzione serve la versione Android aggiornata di ZYRO 360. Questo browser o APK non offre ancora il pulsante ZYRO SOS nelle Impostazioni rapide.'
    :!paid?'Serve il piano unico ZYRO 360 da 2,99 €/mese, verificato da Google Play.'
-   :toggle.checked?'Avvio da scorciatoia consentito per questo account. Configura il gesto nelle impostazioni Android e verifica il risultato.'
-   :'Disattivato: autorizza qui l’avvio SOS prima di usare una scorciatoia Android.';
+   :toggle.checked?(current.me.creatorPremium
+      ?'Account creatore: SOS rapido gratuito attivo. Aggiungi «ZYRO SOS» dalla tendina Android → Modifica e verifica l’invio con i tuoi contatti.'
+      :'Piano ZYRO 360 attivo: aggiungi «ZYRO SOS» dalla tendina Android → Modifica e verifica l’invio con i tuoi contatti.')
+   :'Disattivato: attiva questa opzione, poi apri la tendina Android → Modifica e aggiungi «ZYRO SOS». L’account creatore autorizzato non paga il piano.';
 }
 function runRequestedQuickSOS(){
  const requested=zyroQuickSOSRequestedAt;
@@ -81,7 +83,7 @@ function runRequestedQuickSOS(){
  if(window.ZyroAndroidQuickSOSSupported!==true)return;
  if(!zyroQuickSOSEnabled()){
    showView('settings');openProfileSettings('quickSos');
-   toast('Abilita prima SOS rapido nelle impostazioni ZYRO 360.',true);return;
+   toast('Abilita prima SOS rapido in Profilo → Impostazioni aggiuntive → SOS rapido.',true);return;
  }
  if(!current.me.premiumActive){
    showView('settings');openProfileSettings('premium');
@@ -3037,7 +3039,7 @@ async function init(){
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=27-sos-shortcut-guide').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=28-quick-settings-only').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);
