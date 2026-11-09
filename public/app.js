@@ -69,21 +69,31 @@ function renderQuickSOSSettings(){
  const nativeReady=window.ZyroAndroidQuickSOSSupported===true;
  const checked=entitled&&nativeReady&&zyroQuickSOSEnabled();
  for(const control of controls){control.checked=checked;control.disabled=!current||!entitled||!nativeReady;}
- for(const button of document.querySelectorAll('[data-zyro-add-tile]'))button.disabled=!current||!entitled||!nativeReady;
+ for(const button of document.querySelectorAll('[data-zyro-add-tile]')){
+  button.disabled=!current||!entitled||!nativeReady;
+  button.textContent=checked?'Aggiungi ZYRO SOS alla tendina':'Attiva e aggiungi ZYRO SOS alla tendina';
+ }
  const message=!current?'Accedi al tuo account per attivare SOS rapido.'
    :!nativeReady?'Installa la nuova versione Android di ZYRO 360 per attivare il comando nelle Impostazioni rapide.'
    :!entitled?'Serve un piano ZYRO 360 attivo da 2,99 €/mese. Il creatore autorizzato accede gratis.'
    :checked?(current.me.creatorPremium
        ?'Attivo per il creatore, senza abbonamento. Aggiungi ZYRO SOS alla tendina e verifica l’invio con un contatto.'
        :'Attivo: il piano è verificato. Aggiungi ZYRO SOS alla tendina e prova l’invio.')
-   :'Disattivato. Seleziona «Attiva SOS rapido», poi aggiungi il pulsante ZYRO SOS alla tendina Android.';
+   :'SOS rapido non ancora autorizzato nell’app. Attiva l’interruttore oppure premi «Attiva e aggiungi ZYRO SOS alla tendina». Avere il pulsante Android non basta da solo.';
  for(const status of statuses)status.textContent=message;
 }
 async function requestZyroQuickSosTile(){
  if(!current?.me?.id)throw Error('Accedi prima al tuo account.');
- if(!current.me.premiumActive && !current.me.creatorPremium)throw Error('Per attivare SOS rapido serve il piano unico da 2,99 €/mese.');
+ if(!current.me.premiumActive && !current.me.creatorPremium)throw Error('Per attivare SOS rapido serve un piano attivo o un account creatore autorizzato.');
  if(window.ZyroAndroidQuickSOSSupported!==true)throw Error('Serve l’APK Android aggiornato con il pulsante ZYRO SOS.');
- if(!zyroQuickSOSEnabled())throw Error('Attiva prima SOS rapido con l’interruttore.');
+ if(!zyroQuickSOSEnabled()){
+  // This button explicitly activates the shortcut; never triggers an emergency.
+  const key=zyroQuickSOSStorageKey();
+  try{localStorage.setItem(key,'yes');}
+  catch{throw Error('Impossibile salvare il consenso SOS su questo telefono.');}
+  if(!zyroQuickSOSEnabled())throw Error('Attivazione SOS non salvata.');
+  renderQuickSOSSettings();
+ }
  if(typeof window.ZyroNative?.postMessage!=='function'){
     toast('Apri il Centro di controllo Android → Modifica → aggiungi ZYRO SOS.',true);
     return;
@@ -108,7 +118,7 @@ function runRequestedQuickSOS(){
    showView('settings');openProfileSettings('quickSos');
    toast('Abilita prima SOS rapido in Profilo → Impostazioni aggiuntive → SOS rapido.',true);return;
  }
- if(!current.me.premiumActive){
+ if(!current.me.premiumActive && !current.me.creatorPremium){
    showView('settings');openProfileSettings('premium');
    toast('Serve l’abbonamento ZYRO 360 da 2,99 €/mese per inviare SOS.',true);return;
  }
@@ -1159,7 +1169,7 @@ function acquireSOSEmergencyAudio(){
  return openZyroMicrophone().then(stream=>({stream}),error=>({error}));
 }
 async function startSOS({quick=false}={}){
- if(!current?.me?.premiumActive){showView('settings');openProfileSettings('premium');toast('SOS non disponibile: occorre un abbonamento ZYRO 360 attivo e almeno un destinatario autorizzato. In emergenza chiama il 112.',true);return;}
+ if(!(current?.me?.premiumActive || current?.me?.creatorPremium)){showView('settings');openProfileSettings('premium');toast('SOS non disponibile: occorre un piano ZYRO 360 attivo o un account creatore autorizzato, e almeno un destinatario autorizzato. In emergenza chiama il 112.',true);return;}
  const optedIn=hasFamilyPlan()&&current.me.sosAudioConsent===true;
  sosAudioError='';
  // Quick SOS never automatically captures the microphone from a background shortcut.
