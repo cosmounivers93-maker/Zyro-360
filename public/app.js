@@ -63,18 +63,41 @@ function zyroQuickSOSEnabled(){
  try{return !!key&&localStorage.getItem(key)==='yes';}catch{return false;}
 }
 function renderQuickSOSSettings(){
- const toggle=$('zyroQuickSosEnabled'),status=$('zyroQuickSosStatus');
- if(!toggle||!status)return;
- const paid=!!current?.me?.premiumActive, nativeReady=window.ZyroAndroidQuickSOSSupported===true;
- toggle.checked=paid&&nativeReady&&zyroQuickSOSEnabled();toggle.disabled=!current||!paid||!nativeReady;
- status.textContent=!current?'Accedi per configurare SOS rapido.'
-   :!nativeReady?'Per questa funzione serve la versione Android aggiornata di ZYRO 360. Questo browser o APK non offre ancora il pulsante ZYRO SOS nelle Impostazioni rapide.'
-   :!paid?'Serve il piano unico ZYRO 360 da 2,99 €/mese, verificato da Google Play.'
-   :toggle.checked?(current.me.creatorPremium
-      ?'Account creatore: SOS rapido gratuito attivo. Aggiungi «ZYRO SOS» dalla tendina Android → Modifica e verifica l’invio con i tuoi contatti.'
-      :'Piano ZYRO 360 attivo: aggiungi «ZYRO SOS» dalla tendina Android → Modifica e verifica l’invio con i tuoi contatti.')
-   :'Disattivato: attiva questa opzione, poi apri la tendina Android → Modifica e aggiungi «ZYRO SOS». L’account creatore autorizzato non paga il piano.';
+ const controls=[...document.querySelectorAll('.zyro-quick-sos-optin')];
+ const statuses=[$('zyroQuickSosStatus'),$('zyroQuickSosStatusMode')].filter(Boolean);
+ const entitled=!!(current?.me?.premiumActive || current?.me?.creatorPremium);
+ const nativeReady=window.ZyroAndroidQuickSOSSupported===true;
+ const checked=entitled&&nativeReady&&zyroQuickSOSEnabled();
+ for(const control of controls){control.checked=checked;control.disabled=!current||!entitled||!nativeReady;}
+ for(const button of document.querySelectorAll('[data-zyro-add-tile]'))button.disabled=!current||!entitled||!nativeReady;
+ const message=!current?'Accedi al tuo account per attivare SOS rapido.'
+   :!nativeReady?'Installa la nuova versione Android di ZYRO 360 per attivare il comando nelle Impostazioni rapide.'
+   :!entitled?'Serve un piano ZYRO 360 attivo da 2,99 €/mese. Il creatore autorizzato accede gratis.'
+   :checked?(current.me.creatorPremium
+       ?'Attivo per il creatore, senza abbonamento. Aggiungi ZYRO SOS alla tendina e verifica l’invio con un contatto.'
+       :'Attivo: il piano è verificato. Aggiungi ZYRO SOS alla tendina e prova l’invio.')
+   :'Disattivato. Seleziona «Attiva SOS rapido», poi aggiungi il pulsante ZYRO SOS alla tendina Android.';
+ for(const status of statuses)status.textContent=message;
 }
+async function requestZyroQuickSosTile(){
+ if(!current?.me?.id)throw Error('Accedi prima al tuo account.');
+ if(!current.me.premiumActive && !current.me.creatorPremium)throw Error('Per attivare SOS rapido serve il piano unico da 2,99 €/mese.');
+ if(window.ZyroAndroidQuickSOSSupported!==true)throw Error('Serve l’APK Android aggiornato con il pulsante ZYRO SOS.');
+ if(!zyroQuickSOSEnabled())throw Error('Attiva prima SOS rapido con l’interruttore.');
+ if(typeof window.ZyroNative?.postMessage!=='function'){
+    toast('Apri il Centro di controllo Android → Modifica → aggiungi ZYRO SOS.',true);
+    return;
+ }
+ const result=await zyroNativeRequest('quick-sos-add-tile');
+ if(result.result==='manual')toast('Apri la tendina Android → Modifica e trascina ZYRO SOS tra i pulsanti.');
+ else toast('Conferma la richiesta di Android per aggiungere ZYRO SOS alla tendina.');
+}
+window.addEventListener('zyro:quick-sos-tile-result',event=>{
+ const code=event.detail?.code;
+ if(code===2 || code===1)toast('ZYRO SOS è disponibile nella tendina Android. Prova il pulsante con un contatto.');
+ else if(code===0)toast('Aggiunta annullata. Puoi riprovare da «Aggiungi ZYRO SOS alla tendina».',true);
+ else toast('Android non ha aggiunto il pulsante. Apri la tendina → Modifica e cerca ZYRO SOS.',true);
+});
 function runRequestedQuickSOS(){
  const requested=zyroQuickSOSRequestedAt;
  if(!requested||!current?.me?.id)return;
@@ -2973,13 +2996,19 @@ async function init(){
   $('checkinConfirm').addEventListener('click',()=>action(()=>v15CheckinEnd(true)));
   $('checkinCancel').addEventListener('click',()=>action(()=>v15CheckinEnd(false)));
   $('premiumDetails').addEventListener('click',()=>{const panel=$('zyroPlanHelp'),button=$('premiumDetails');panel.hidden=!panel.hidden;button.setAttribute('aria-expanded',String(!panel.hidden));button.querySelector('span').textContent=panel.hidden?'＋':'−';});
-  $('zyroQuickSosEnabled')?.addEventListener('change',event=>{
-    const toggle=event.currentTarget,key=zyroQuickSOSStorageKey();
-    if(!key||!current?.me?.premiumActive||window.ZyroAndroidQuickSOSSupported!==true){toggle.checked=false;renderQuickSOSSettings();return;}
-    try{if(toggle.checked)localStorage.setItem(key,'yes');else localStorage.removeItem(key);}
-    catch{toggle.checked=false;toast('Impossibile salvare la preferenza SOS su questo dispositivo.',true);}
+  for(const toggle of document.querySelectorAll('.zyro-quick-sos-optin'))toggle.addEventListener('change',event=>{
+    const control=event.currentTarget,key=zyroQuickSOSStorageKey();
+    if(!key||!(current?.me?.premiumActive || current?.me?.creatorPremium)||
+       window.ZyroAndroidQuickSOSSupported!==true){
+      control.checked=false;renderQuickSOSSettings();return;
+    }
+    try{if(control.checked)localStorage.setItem(key,'yes');else localStorage.removeItem(key);}
+    catch{control.checked=false;toast('Impossibile salvare la preferenza SOS su questo dispositivo.',true);}
     renderQuickSOSSettings();
+    if(control.checked)void action(requestZyroQuickSosTile);
   });
+  for(const button of document.querySelectorAll('[data-zyro-add-tile]'))
+    button.addEventListener('click',()=>void action(requestZyroQuickSosTile));
   $('zyroQuickSosReadGuide')?.addEventListener('click',()=>{
     openProfileSettings('help');
     const help=$('zyroHelpQuickSOS');if(help)help.open=true;
@@ -3039,7 +3068,7 @@ async function init(){
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=28-quick-settings-only').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=29-sos-activation-visible').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);

@@ -472,6 +472,17 @@ html,body{overscroll-behavior-x:none}
         <p class="setting-description sos-push-note">Quando premi SOS, il server può usare un fornitore di geocodifica per convertire le coordinate GPS in via, eventuale numero civico e città, soltanto se il servizio è attivato. Il civico potrebbe non essere disponibile o esatto. L’indirizzo e la posizione dell’allarme sono comunicati ai destinatari SOS scelti.</p>
         <p id="sosPushNote" class="setting-description sos-push-note" role="status"></p>
         </details>
+        <div id="zyroQuickSosModeCard" class="zyro-quick-sos-setup" style="margin-top:16px;padding:16px;border:1px solid #b8cbf0;border-radius:16px;background:rgba(234,241,255,.83)">
+          <h3 style="margin:0 0 6px;color:#292f67">SOS rapido · tendina Android</h3>
+          <p style="margin:0 0 14px;color:#34466c">Invia l'allarme ai contatti SOS autorizzati dalla tendina del tuo Redmi, senza cercare il pulsante nell'app.</p>
+          <label style="display:flex;align-items:center;gap:12px;color:#242e5a;font-weight:700">
+            <input id="zyroQuickSosEnabledMode" class="zyro-quick-sos-optin" type="checkbox" style="width:22px;height:22px;flex-shrink:0">
+            <span>Attiva SOS rapido</span>
+          </label>
+          <p id="zyroQuickSosStatusMode" role="status" aria-live="polite" style="color:#34466c;line-height:1.5"></p>
+          <button type="button" class="btn btn-dark btn-wide" id="zyroQuickSosAddTileMode" data-zyro-add-tile>Aggiungi ZYRO SOS alla tendina</button>
+          <p style="margin:10px 0 0;color:#44567c;font-size:.91rem">Utenti: piano da 2,99 €/mese. Account creatore autorizzato: accesso gratuito. Prima seleziona i destinatari SOS.</p>
+        </div>
       </section>
       <div class="emergency-card"><span>✚</span><div><b>Emergenza immediata?</b><p>Per un pericolo reale contatta sempre i soccorsi.</p></div><a href="tel:112" class="call-button">Chiama 112</a></div>
       <section class="pick-panel" id="pickPanel">
@@ -704,10 +715,11 @@ html,body{overscroll-behavior-x:none}
       <section id="zyroQuickSosSettings" class="panel" aria-labelledby="zyroQuickSosTitle">
         <div class="panel-title"><span class="panel-icon">🆘</span><div><h2 id="zyroQuickSosTitle">SOS rapido Android</h2><p>Piano unico 2,99 €/mese per gli account personali</p></div></div>
         <label style="display:flex;align-items:flex-start;gap:12px;line-height:1.55">
-          <input type="checkbox" id="zyroQuickSosEnabled" style="margin-top:5px">
+          <input type="checkbox" id="zyroQuickSosEnabled" class="zyro-quick-sos-optin" style="margin-top:5px">
           <span><strong>Consenti SOS rapido dalla tendina Android</strong><small style="display:block;margin-top:4px">Autorizza il comando nativo quando sei autenticato. L’allarme viene avviato solo dopo che tocchi ZYRO SOS nelle Impostazioni rapide Android.</small></span>
         </label>
         <p id="zyroQuickSosStatus" class="setting-description" role="status" aria-live="polite">Verifica abbonamento e supporto Android…</p>
+        <button type="button" id="zyroQuickSosAddTile" data-zyro-add-tile class="btn btn-dark btn-wide">Aggiungi ZYRO SOS alla tendina</button>
         <p class="setting-description">Per aggiungere il comando: abbassa la tendina delle Impostazioni rapide (sul Redmi scorri dall’angolo superiore destro), tocca «Modifica», cerca «ZYRO SOS», aggiungilo fra i primi pulsanti e salva. In caso di emergenza abbassa la tendina e tocca «ZYRO SOS». Su alcuni dispositivi occorre sbloccare lo schermo; Android può limitare le azioni dalla schermata bloccata.</p>
         <button type="button" id="zyroQuickSosReadGuide" class="btn btn-outline">Leggi come funziona</button>
       </section>
@@ -730,8 +742,8 @@ html,body{overscroll-behavior-x:none}
         <details><summary>SOS rapido: invia un avviso ai tuoi contatti <span aria-hidden="true">＋</span></summary><div class="how-content"><p>Dalla Home premi «Invia SOS» per attivare rapidamente l’allarme sul server. <strong>SOS rapido è compreso nel piano unico ZYRO 360 da 2,99 €/mese.</strong> Per attivarlo servono abbonamento verificato, accesso al tuo account e almeno un destinatario SOS autorizzato nella sezione Modalità. L’app prova ad allegare la posizione GPS, ma invia l’avviso anche se non riesce a ottenere subito una nuova posizione. I contatti selezionati possono vedere l’SOS nella loro app e, se i servizi di notifica sono configurati, ricevere un avviso push. <strong>L’arrivo effettivo della notifica non è garantito</strong> e dipende da rete, server, notifiche e dispositivo. La chiamata al 112 resta la soluzione per un pericolo reale.</p></div></details>
         <details id="zyroHelpQuickSOS"><summary>SOS rapido: come aggiungere il pulsante alla tendina Android <span aria-hidden="true">＋</span></summary><div class="how-content">
           <p><strong>Chi può usarlo:</strong> SOS rapido fa parte dell'abbonamento unico ZYRO 360 da <strong>2,99 € al mese</strong> per gli utenti normali (prezzo e disponibilità da verificare in Google Play). <strong>L'account creatore autorizzato lo usa gratuitamente</strong>; il server riconosce l'account e verifica i permessi. È necessario avere effettuato l'accesso e selezionato almeno un destinatario SOS autorizzato nella cerchia.</p>
-          <p><strong>1. Prepara ZYRO 360:</strong> apri Modalità → SOS e scegli i contatti che riceveranno l'allarme. Apri Profilo → Impostazioni aggiuntive → SOS rapido e attiva «Consenti SOS rapido dalla tendina Android». Fallo una sola volta su ciascun telefono.</p>
-          <p><strong>2. Aggiungi il pulsante Android:</strong> su Redmi/Xiaomi abbassa la tendina dall'angolo superiore destro per aprire il Centro di controllo, poi tocca «Modifica» (icona matita, se presente). Cerca <strong>«ZYRO SOS»</strong> tra gli interruttori disponibili, aggiungilo fra i primi pulsanti e conferma con «Fine» o la spunta. Sugli altri Android di solito bisogna abbassare la tendina due volte, toccare «Modifica» e trascinare «ZYRO SOS» tra i comandi visibili. I menu variano secondo produttore e versione Android. Se «ZYRO SOS» non compare, verifica di aver installato l'APK aggiornato; alcuni produttori possono nascondere le scorciatoie di app esterne.</p>
+          <p><strong>1. Prepara ZYRO 360:</strong> apri Modalità → SOS e scegli i contatti che riceveranno l'allarme. Apri Modalità → SOS e usa l'interruttore «Attiva SOS rapido», oppure Profilo → Impostazioni aggiuntive → SOS rapido. Premi «Aggiungi ZYRO SOS alla tendina» e conferma la richiesta di Android. Fallo una sola volta per ogni telefono.</p>
+          <p><strong>2. Aggiungi il pulsante Android:</strong> se Android non mostra la richiesta di aggiunta automatica, su Redmi/Xiaomi abbassa la tendina dall'angolo superiore destro per aprire il Centro di controllo, poi tocca «Modifica» (icona matita, se presente). Cerca <strong>«ZYRO SOS»</strong> tra gli interruttori disponibili, aggiungilo fra i primi pulsanti e conferma con «Fine» o la spunta. Sugli altri Android di solito bisogna abbassare la tendina due volte, toccare «Modifica» e trascinare «ZYRO SOS» tra i comandi visibili. I menu variano secondo produttore e versione Android. Se «ZYRO SOS» non compare, verifica di aver installato l'APK aggiornato; alcuni produttori possono nascondere le scorciatoie di app esterne.</p>
           <p><strong>3. In caso di emergenza:</strong> abbassa la tendina, tocca una sola volta <strong>«ZYRO SOS»</strong> e osserva l'esito nell'app. Non devi prima premere «Invia SOS» dalla Home. La scorciatoia avvia la stessa richiesta SOS autenticata al server e tenta di notificare i destinatari autorizzati.</p>
           <p><strong>4. Verifica l'invio:</strong> controlla che l'app confermi la registrazione dell'SOS; la consegna effettiva delle notifiche ai contatti non è garantita e va testata con un secondo telefono. L'ultima posizione disponibile può essere allegata; GPS e rete potrebbero non essere disponibili.</p>
           <p><strong>Limiti e sicurezza:</strong> il telefono può richiedere lo sblocco prima di usare il comando; la tendina potrebbe non essere disponibile a schermo bloccato. La modalità rapida non accende automaticamente il microfono. Non si usano più tocchi posteriori né pressioni ripetute del tasto accensione per avviare ZYRO SOS. Il SOS nativo Android resta separato. In pericolo reale chiama il <strong>112</strong>.</p>
@@ -860,7 +872,7 @@ html,body{overscroll-behavior-x:none}
    <div class="zyro-due-actions"><button type="button" id="zyroDueClear">Cancella</button><button type="button" id="zyroDueCancel">Annulla</button><button type="button" id="zyroDueConfirm">Imposta</button></div>
  </section>
 </div>
-<script src="/app.js?v=81.1" defer></script>
+<script src="/app.js?v=82.0" defer></script>
 <script src="/zyro-circle-picker-v3.js?v=3" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
