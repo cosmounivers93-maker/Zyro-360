@@ -572,7 +572,7 @@ function renderHome(){
   $('myLocationText').textContent= sos?'SOS attivo. Posizione condivisa solo se già autorizzata.':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
   $('sosCard').classList.toggle('is-active',!!me.sos);
   $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS attivo · allarme registrato':'Hai bisogno di aiuto?';
-  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'Allarme SOS registrato e inoltrato attraverso il sistema di avvisi ai destinatari autorizzati. Verifica la ricezione: rete e impostazioni del telefono possono influire.':'Nessun destinatario SOS autorizzato: l’avviso non raggiunge altri telefoni. Chiama il 112 in emergenza.'):'SOS rapido disponibile con l’abbonamento unico ZYRO 360 da 2,99 €/mese; accesso gratuito per l’account creatore autorizzato. In emergenza chiama il 112.';
+  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'Allarme SOS registrato. L’app attiva l’invio degli avvisi ai destinatari autorizzati; controlla la ricezione sui loro dispositivi, perché rete e permessi possono influire.':'Nessun destinatario SOS autorizzato: l’avviso non raggiunge altri telefoni. Chiama il 112 in emergenza.'):'SOS rapido disponibile con l’abbonamento unico ZYRO 360 da 2,99 €/mese; accesso gratuito per l’account creatore autorizzato. In emergenza chiama il 112.';
   $('sosButton').disabled=!!me.sos;
   $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Invia SOS rapido ai contatti autorizzati');
   $('sosActiveActions').classList.toggle('hidden',!sos);
@@ -3195,6 +3195,29 @@ async function zyroWelcomeBeforeStart(){
   resolve();
  },{once:true}));
 }
+
+
+// Copy compatibility for already-installed Android releases: the advanced
+// Pick Pocket panel is inserted asynchronously by its native WebView asset.
+(function zyroUnifiedPickPocketCopy(){
+ const updated="Blocco automatico, squillo e blocco remoto inclusi nell’abbonamento unico ZYRO 360 da 2,99 €/mese, con autorizzazione del proprietario e permessi Android. Le protezioni sono facoltative.";
+ function patch(){
+   const panel=document.getElementById('zyroPickAdvancedV137');
+   if(!panel)return false;
+   const desc=panel.querySelector('p');
+   if(desc && desc.textContent.includes('Premium e Family'))desc.textContent=updated;
+   return true;
+ }
+ function watch(){
+   if(patch())return;
+   const host=document.getElementById('pickPanel');
+   if(!host)return;
+   const observer=new MutationObserver(()=>{if(patch())observer.disconnect();});
+   observer.observe(host,{childList:true,subtree:true});
+ }
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',watch,{once:true});
+ else watch();
+})();
 
 init();
 
