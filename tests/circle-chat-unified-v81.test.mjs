@@ -29,7 +29,7 @@ test('Chat creates no second group: Circles manages creation and Chat shows both
  assert.match(ui,/void refresh\(\)\.catch/);
  assert.match(ui,/refreshChatDirectory\(\)/);
  assert.match(ui,/circle\?\.kind==='chat'&&circle\?\.mine/);
- assert.match(html,/app\.js\?v=81\.0/);
+ assert.match(html,/app\.js\?v=81\.1/);
  assert.match(server,/app\.post\('\/api\/circles', requireAuth/);
  assert.match(server,/function chatSummaryFor\(userId\)/);
 });
