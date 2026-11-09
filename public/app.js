@@ -571,8 +571,8 @@ function renderHome(){
   const liveGPS=me.sharing||(pick&&me.theftShare);
   $('myLocationText').textContent= sos?'SOS attivo. Posizione condivisa solo se già autorizzata.':(liveGPS ? (geolocationError || (lastCoords?`GPS attivo · ${lastCoords.lat.toFixed(4)}, ${lastCoords.lon.toFixed(4)}`:'Ricerca posizione GPS...')):'Condivisione disattivata');
   $('sosCard').classList.toggle('is-active',!!me.sos);
-  $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS attivo sul server (consegna non garantita)':'Hai bisogno di aiuto?';
-  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'SOS registrato. I destinatari selezionati possono visualizzare l’allarme; la consegna non è garantita.':'Nessun contatto nella tua cerchia: il SOS non raggiunge nessuno. Chiama il 112 in emergenza.'):'SOS rapido: serve un abbonamento ZYRO 360 attivo. Per un pericolo reale chiama il 112.';
+  $('sosTitle').textContent=pick?'Protezione antifurto attiva':sos?'SOS attivo · allarme registrato':'Hai bisogno di aiuto?';
+  $('sosDescription').textContent=pick?'La modalità Pick Pocket è scattata. Puoi interromperla con la password nella schermata antifurto.':sos?(contacts.length?'Allarme SOS registrato e inoltrato attraverso il sistema di avvisi ai destinatari autorizzati. Verifica la ricezione: rete e impostazioni del telefono possono influire.':'Nessun destinatario SOS autorizzato: l’avviso non raggiunge altri telefoni. Chiama il 112 in emergenza.'):'SOS rapido disponibile con l’abbonamento unico ZYRO 360 da 2,99 €/mese; accesso gratuito per l’account creatore autorizzato. In emergenza chiama il 112.';
   $('sosButton').disabled=!!me.sos;
   $('sosButton').setAttribute('aria-label',me.sos?'Allarme già attivo':'Invia SOS rapido ai contatti autorizzati');
   $('sosActiveActions').classList.toggle('hidden',!sos);
@@ -766,7 +766,7 @@ function renderSOSRecipients(){
   if(node._zyroSig===sig&&node.children.length)return;
   node._zyroSig=sig;
   node.innerHTML=contacts.length?contacts.map(u=>`<label class="recipient-line"><input type="checkbox" data-sos-to="${escapeHtml(u.id)}" ${selected.has(u.id)?'checked':''}><span>${avatarHTML(u)} ${escapeHtml(u.name)}</span></label>`).join(''):'<p class="setting-description">Invita prima una persona nella cerchia.</p>';
-  $('sosPushNote').textContent=(current.me.premiumActive?'Premium attivo. ':'Premium non attivo: SOS non inviabile. ')+(current.pushEnabled?'Push configurate; consegna non garantita.':'Push non configurate su Render.');
+  $('sosPushNote').textContent=(current.me.premiumActive||current.me.creatorPremium?'Piano unico ZYRO 360 attivo. ':'Piano unico ZYRO 360 non attivo: SOS non inviabile. ')+(current.pushEnabled?'Notifiche SOS configurate e verificate nei test. La ricezione richiede rete, permessi e un dispositivo raggiungibile.':'Notifiche SOS non configurate sul server.');
 }
 async function imageData(file,maxPx=520,maxBytes=105000){
   if(!file?.type?.startsWith('image/'))throw Error('Seleziona una fotografia.');
@@ -3178,7 +3178,7 @@ async function zyroWelcomeBeforeStart(){
  screen.innerHTML=`<div class="zyro-welcome-wrap"><div class="zyro-welcome-content" tabindex="0" aria-label="Le funzioni di ZYRO 360"><header class="zyro-welcome-header"><div class="zyro-welcome-brand">ZYRO <span>360</span></div><p class="zyro-welcome-kicker">IL TUO SPAZIO DI SICUREZZA</p><h1>Più vicini.<br>Più consapevoli.</h1></header><p class="zyro-welcome-intro">Resta in contatto con le persone fidate e chiedi aiuto quando ne hai bisogno.</p>
  <article class="zyro-welcome-card"><span aria-hidden="true">⌖</span><div><h2>SOS e posizione</h2><p>Avvisa i contatti scelti e condividi la posizione. Con il piano unico ZYRO 360 da 2,99 €/mese puoi attivare l’audio SOS, soltanto con il tuo consenso e le autorizzazioni richieste.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">↗</span><div><h2>Pick Pocket</h2><p>Se attivo, un movimento sospetto può far partire la sirena e un SOS con posizione in tempo reale ai contatti scelti, quando abiliti gli avvisi.</p></div></article>
- <article class="zyro-welcome-card"><span aria-hidden="true">➤</span><div><h2>Segui il percorso SOS e possibile furto</h2><p>Con Premium puoi seguire sulla mappa un percorso indicativo verso il contatto che invia un SOS o una segnalazione Pick Pocket. Premi «Portami da» e autorizza l’uso del GPS e del servizio stradale esterno.</p></div></article>
+ <article class="zyro-welcome-card"><span aria-hidden="true">➤</span><div><h2>Segui il percorso SOS e possibile furto</h2><p>Con l’abbonamento unico ZYRO 360 puoi seguire sulla mappa un percorso indicativo verso un contatto che invia un SOS o una segnalazione Pick Pocket. Premi «Portami da» e autorizza l’uso del GPS e del servizio stradale esterno.</p></div></article>
  <article class="zyro-welcome-card"><span aria-hidden="true">◎</span><div><h2>Accompagnami e Check-in</h2><p>Condividi un percorso o conferma che stai bene entro un orario. I contatti possono ricevere un avviso se sei in ritardo.</p></div></article>
  <p class="zyro-welcome-note">Gli aggiornamenti richiedono servizio attivo, permessi e connessione. L’app non riconosce ogni emergenza: in caso di pericolo chiama il <a href="tel:112">112</a>.</p></div>
  <footer class="zyro-welcome-actions"><button id="zyroWelcomeProceed" type="button">Prosegui <span aria-hidden="true">→</span></button></footer></div>`;
