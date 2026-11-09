@@ -1298,11 +1298,11 @@ app.post('/api/settings/contact-access',requireAuth,limit,(req,res)=>{
     return res.status(400).json({error:'Consenso audio non valido.'});
   if(req.body.consentSosAudio===true &&
       !(req.body.listenSosAudio===true && req.body.receiveSos===true && familyActive(req.user)))
-    return res.status(400).json({error:'Autorizza prima l’ascoltatore SOS e verifica il piano Family.'});
+    return res.status(400).json({error:'Autorizza prima l’ascoltatore SOS e verifica l’abbonamento unico ZYRO 360.'});
   if((req.body.remoteRing===true||req.body.remoteLock===true)&&!familyActive(req.user))
-    return res.status(402).json({error:'Squillo e blocco da remoto sono inclusi soltanto in ZYRO Family.'});
+    return res.status(402).json({error:'Squillo e blocco da remoto richiedono l’abbonamento unico ZYRO 360 e l’autorizzazione del proprietario.'});
   if(req.body.listenSosAudio===true&&!familyActive(req.user))
-    return res.status(402).json({error:'Ascolto audio SOS incluso soltanto in Family.'});
+    return res.status(402).json({error:'L’ascolto audio SOS è incluso nell’abbonamento unico ZYRO 360 e richiede consenso.'});
   req.body.shareGps?gps.add(otherId):gps.delete(otherId);
   req.body.receiveSos?sos.add(otherId):sos.delete(otherId);
   if(!req.body.receiveSos)audio.delete(otherId);
@@ -1528,7 +1528,7 @@ app.get('/api/pickpocket/remote/settings',requireAuth,(req,res)=>{
 });
 app.post('/api/pickpocket/remote/settings',requireAuth,limit,(req,res)=>{
   if(req.body?.enabled===true&&!familyActive(req.user))
-    return res.status(402).json({error:'Il controllo remoto Pick Pocket richiede ZYRO Family.'});
+    return res.status(402).json({error:'Il controllo remoto Pick Pocket richiede l’abbonamento unico ZYRO 360 e autorizzazioni esplicite.'});
   const enabled=req.body?.enabled;
   const contacts=req.body?.contacts;
   if(typeof enabled!=='boolean'||!Array.isArray(contacts)||contacts.length>60 ||
@@ -1601,7 +1601,7 @@ app.post('/api/pickpocket/remote/consume',requireAuth,(req,res)=>{
   res.json(valid?{ok:true,action:command.action}:{ok:false});
 });
 app.post('/api/pickpocket/start', requireAuth, limit, (req,res) => {
- if(!premiumActive(req.user))return res.status(402).json({error:'Pick Pocket richiede ZYRO Premium o Family.'});
+ if(!premiumActive(req.user))return res.status(402).json({error:'Pick Pocket richiede l’abbonamento unico ZYRO 360 attivo.'});
   const existing = currentAlert(req.user.id);
   if (existing) return res.status(409).json({error:'Un altro allarme è già attivo.'});
   const ids = req.body.recipients;
