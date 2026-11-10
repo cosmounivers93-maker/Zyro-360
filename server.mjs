@@ -1551,7 +1551,7 @@ app.post('/api/sos/start', requireAuth, async (req,res) => {
  db.alerts[alert.id]=alert;save();refreshRelated(req.user.id);
  if(adminEmergencyConsent)notifyAdminUsers();
  // An address is attempted only with explicit geocoder configuration; GPS works without it.
- const street=await sosAddressFor(pos);if(street){alert.address=street;if(adminEmergencyConsent)alert.adminLastAddress=street;save();refreshRelated(req.user.id);if(adminEmergencyConsent)notifyAdminUsers();}
+ const street=await sosAddressFor(pos);if(street){alert.address=street;if(adminEmergencyConsent && alert.adminEmergencyConsent===true && emergencyCenterEnabled(req.user))alert.adminLastAddress=street;save();refreshRelated(req.user.id);if(adminEmergencyConsent)notifyAdminUsers();}
  const where=street || (pos
    ?`Indirizzo non disponibile; GPS ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`
    :'Posizione GPS non ancora disponibile');
