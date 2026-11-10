@@ -28,6 +28,8 @@ let zyroGroupCodeLastCircleId='';
 let adminUsersCache = [];
 let adminArchivedView=false;
 let adminLoaded = false;
+let adminLoadPending = false;
+let adminLastAttemptAt = 0;
 let socket = null;
 let wsRetry = null;
 let wsConnectedAt = 0;
@@ -391,6 +393,8 @@ function renderAdminAccess(){
  if(adminMenu){adminMenu.classList.remove('hidden');adminMenu.dataset.settingsTarget=admin?'admin':'reports';adminMenu.querySelector('span:nth-child(2)').innerHTML=admin?'Centro amministratore<small>Segnalazioni e utenti registrati</small>':'Segnala un utente<small>Invia una segnalazione privata</small>';}
 
  $('premiumPanel')?.classList.toggle('zyro-premium-owner',admin);
+ // Load account diagnostics even when the WebSocket is slow or unavailable.
+ if(admin && !adminLoaded && !adminLoadPending && Date.now()-adminLastAttemptAt>10000)scheduleAdminUsersRefresh();
  if(!admin){adminArchivedView=false;if($('adminArchiveToggle')){$('adminArchiveToggle').textContent='Mostra archiviate';$('adminArchiveToggle').setAttribute('aria-pressed','false');}adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
 }
 function renderReportContacts(){
@@ -479,18 +483,23 @@ function renderAdminOverview(data){
   '<small>La diagnostica non garantisce la consegna di SOS o notifiche e non legge chat, posizioni o microfoni privati.</small></div>';
 }
 async function adminLoad(){
- if(!current?.me?.isAdmin)return;
- $('adminStatus').textContent='Caricamento account e segnalazioni…';
+ if(!current?.me?.isAdmin || adminLoadPending)return;
+ adminLoadPending=true;
+ adminLastAttemptAt=Date.now();
  const expectedAdminId=current.me.id;
- const data=await api('/api/admin/users');
+ const controller=new AbortController();
+ const timeout=setTimeout(()=>controller.abort(),15000);
+ $('adminStatus').textContent='Caricamento account e segnalazioni…';
+ try{
+ const data=await api('/api/admin/users',{signal:controller.signal});
  if(!current?.me?.isAdmin || current.me.id!==expectedAdminId)return;
  adminUsersCache=data.users||[];adminLoaded=true;renderAdminUsers();
  try {
-   const summary=await api('/api/admin/overview');
+   const summary=await api('/api/admin/overview',{signal:controller.signal});
    if(current?.me?.isAdmin&&current.me.id===expectedAdminId)renderAdminOverview(summary);
  }catch(error){if($('zyroAdminOverview'))$('zyroAdminOverview').textContent='Diagnostica non disponibile: '+error.message;}
  try{
-   const feed=await api('/api/admin/emergencies');
+   const feed=await api('/api/admin/emergencies',{signal:controller.signal});
    if(current?.me?.isAdmin&&current.me.id===expectedAdminId)renderAdminEmergencies(feed.emergencies||[]);
  }catch(error){if($('adminEmergencies'))$('adminEmergencies').textContent='Emergenze non disponibili: '+error.message;}
  const allReports=data.reports||[];
@@ -510,6 +519,15 @@ async function adminLoad(){
  $('adminReports').querySelectorAll('[data-report-ban]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeBan(b.dataset.reportBan))));
  $('adminAudit').innerHTML=(data.audit||[]).map(a=>`<p><b>${escapeHtml(a.kind)}</b> · ${escapeHtml(a.for||'')} · ${escapeHtml(fmtAdminDate(a.at))}</p>`).join('')||'<p>Nessuna azione registrata.</p>';
  $('adminStatus').textContent=`${adminUsersCache.length} account registrati. Aggiornamento in tempo reale · dati riservati al proprietario.`;
+ }catch(error){
+   if(current?.me?.isAdmin && current.me.id===expectedAdminId){
+     const reason=controller.signal.aborted?'Il server non ha risposto entro 15 secondi':error.message;
+     $('adminStatus').textContent='Caricamento non riuscito: '+reason+'. Premi «Aggiorna elenco» per riprovare.';
+   }
+ }finally{
+   clearTimeout(timeout);
+   adminLoadPending=false;
+ }
 }
 /* V17.1: native browser confirm()/prompt() may be cancelled by Android WebView.
    Use accessible DOM dialogs; all privileged actions still require server-side
