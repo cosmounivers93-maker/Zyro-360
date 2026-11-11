@@ -395,7 +395,7 @@ function renderAdminAccess(){
  $('premiumPanel')?.classList.toggle('zyro-premium-owner',admin);
  // The owner's diagnostics should load even if the WebSocket never connects.
  if(admin && !adminLoaded && !adminLoadPending && Date.now()-adminLastAttemptAt>10000)scheduleAdminUsersRefresh();
- if(!admin){adminArchivedView=false;if($('adminArchiveToggle')){$('adminArchiveToggle').textContent='Mostra archiviate';$('adminArchiveToggle').setAttribute('aria-pressed','false');}adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
+ if(!admin){closeAdminEmergenciesDialog();adminArchivedView=false;if($('adminArchiveToggle')){$('adminArchiveToggle').textContent='Mostra archiviate';$('adminArchiveToggle').setAttribute('aria-pressed','false');}adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
 }
 function renderReportContacts(){
  const select=$('reportUser');if(!select)return;
@@ -442,6 +442,42 @@ function renderAdminEmergencies(emergencies=[]){
      (mapUrl?'<p><a href="'+escapeHtml(mapUrl)+'" target="_blank" rel="noopener noreferrer">Apri l’ultima posizione su OpenStreetMap</a></p>':'')+
      '<small>Visibile soltanto per SOS con condivisione autorizzata, fino a 24 ore dalla chiusura.</small></article>';
  }).join(''):'<p class="setting-description">Nessun SOS con condivisione autorizzata. Nessuna posizione di altri utenti è disponibile.</p>';
+}
+// I dettagli sensibili SOS vengono richiesti esclusivamente all'apertura della finestra.
+let adminEmergenciesRequestSeq=0;
+function closeAdminEmergenciesDialog(){
+ const dialog=$('adminEmergenciesDialog');
+ if(!dialog)return;
+ adminEmergenciesRequestSeq++;
+ if(dialog.open){
+  if(typeof dialog.close==='function')dialog.close();
+  else dialog.removeAttribute('open');
+ }
+ $('adminEmergencies')?.replaceChildren();
+}
+async function loadAdminEmergenciesDialog(){
+ const dialog=$('adminEmergenciesDialog'),root=$('adminEmergencies');
+ if(!dialog?.open||!root||!current?.me?.isAdmin)return;
+ const ownerId=current.me.id,requestId=++adminEmergenciesRequestSeq;
+ root.textContent='Caricamento delle sole posizioni SOS autorizzate…';
+ try{
+  const feed=await api('/api/admin/emergencies');
+  if(!dialog.open||!current?.me?.isAdmin||current.me.id!==ownerId||requestId!==adminEmergenciesRequestSeq)return;
+  renderAdminEmergencies(feed.emergencies||[]);
+ }catch(error){
+  if(dialog.open&&current?.me?.isAdmin&&current.me.id===ownerId&&requestId===adminEmergenciesRequestSeq)
+   root.textContent='Impossibile caricare le posizioni SOS: '+error.message;
+ }
+}
+function openAdminEmergenciesDialog(){
+ if(!current?.me?.isAdmin)return;
+ const dialog=$('adminEmergenciesDialog');
+ if(!dialog)return;
+ if(!dialog.open){
+  if(typeof dialog.showModal==='function')dialog.showModal();
+  else dialog.setAttribute('open','');
+ }
+ void loadAdminEmergenciesDialog();
 }
 function renderAdminUsers(){
  const term=$('adminFilter').value.trim().toLowerCase();
@@ -498,10 +534,6 @@ async function adminLoad(){
    const summary=await api('/api/admin/overview',{signal:controller.signal});
    if(current?.me?.isAdmin&&current.me.id===expectedAdminId)renderAdminOverview(summary);
  }catch(error){if($('zyroAdminOverview'))$('zyroAdminOverview').textContent='Diagnostica non disponibile: '+error.message;}
- try{
-   const feed=await api('/api/admin/emergencies',{signal:controller.signal});
-   if(current?.me?.isAdmin&&current.me.id===expectedAdminId)renderAdminEmergencies(feed.emergencies||[]);
- }catch(error){if($('adminEmergencies'))$('adminEmergencies').textContent='Emergenze non disponibili: '+error.message;}
  const allReports=data.reports||[];
  const reports=allReports.filter(r=>Boolean(r.adminArchivedAt)===adminArchivedView);
  $('adminReportCount').textContent=String(allReports.filter(r=>!r.adminArchivedAt&&r.status==='open').length);
@@ -991,7 +1023,7 @@ function showView(view){
   if(!order.includes(view))return;
   const previousView=activeView;
   const changed=previousView!==view;
-  if(view!=='settings')closeProfileSettings();
+  if(view!=='settings'){closeAdminEmergenciesDialog();closeProfileSettings();}
   if(view!=='chats'&&chatRoom)closeChat();
   activeView=view;
   document.body.classList.toggle('zyro-home-no-brand',view==='home');
@@ -3111,6 +3143,18 @@ async function init(){
     });
   });
   $('reportSubmit').addEventListener('click',()=>action(submitReport));
+  $('adminEmergenciesOpen').addEventListener('click',openAdminEmergenciesDialog);
+  $('adminEmergenciesClose').addEventListener('click',closeAdminEmergenciesDialog);
+  $('adminEmergenciesDone').addEventListener('click',closeAdminEmergenciesDialog);
+  $('adminEmergenciesRefresh').addEventListener('click',()=>void loadAdminEmergenciesDialog());
+  $('adminEmergenciesDialog').addEventListener('close',()=>{
+    adminEmergenciesRequestSeq++;
+    $('adminEmergencies').replaceChildren();
+    if(current?.me?.isAdmin&&activeView==='settings')$('adminEmergenciesOpen').focus();
+  });
+  $('adminEmergenciesDialog').addEventListener('click',event=>{
+    if(event.target===event.currentTarget)closeAdminEmergenciesDialog();
+  });
   $('adminLoad').addEventListener('click',()=>action(adminLoad));
   $('adminArchiveToggle').addEventListener('click',()=>{adminArchivedView=!adminArchivedView;$('adminArchiveToggle').setAttribute('aria-pressed',String(adminArchivedView));$('adminArchiveToggle').textContent=adminArchivedView?'Torna all’elenco principale':'Mostra archiviate';void action(adminLoad);});
   document.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>showAdminTab(b.dataset.adminTab)));
