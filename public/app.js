@@ -375,7 +375,7 @@ function setState(data){
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderProfileInvites();renderSettings();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
+  renderHome();renderCircles();renderProfileInvites();renderSettings();renderEmergencyCenterSetting();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
 
@@ -415,6 +415,34 @@ async function submitReport(){
  $('reportReason').value='';toast(result.message||'Segnalazione inviata.');
 }
 function fmtAdminDate(n){return n?new Date(n).toLocaleString('it-IT'):'Non disponibile';}
+function renderEmergencyCenterSetting(){
+ const toggle=$('emergencyCenterToggle');
+ if(!toggle||!current)return;
+ toggle.checked=current.me.emergencyCenterConsent===true;
+ $('emergencyCenterStatus').textContent=toggle.checked
+  ?'Condivisione con il Centro Emergenze autorizzata solo durante un SOS. Puoi disattivarla in qualsiasi momento.'
+  :'Centro Emergenze non autorizzato. La tua posizione non è accessibile all’amministratore tramite questa funzione.';
+}
+function renderAdminEmergencies(emergencies=[]){
+ const root=$('adminEmergencies');
+ if(!root||!current?.me?.isAdmin)return;
+ root.innerHTML=emergencies.length?emergencies.map(e=>{
+   const p=e.lastPosition;
+   const lat=p&&Number.isFinite(Number(p.lat))?Number(p.lat):null;
+   const lon=p&&Number.isFinite(Number(p.lon))?Number(p.lon):null;
+   const hasFix=lat!==null&&lon!==null;
+   const mapUrl=hasFix?'https://www.openstreetmap.org/?mlat='+encodeURIComponent(lat)+'&mlon='+encodeURIComponent(lon)+'#map=17/'+encodeURIComponent(lat)+'/'+encodeURIComponent(lon):null;
+   const locationLine=hasFix
+    ?'<span>Coordinate: '+escapeHtml(lat.toFixed(5))+', '+escapeHtml(lon.toFixed(5))+' · Precisione dichiarata: '+escapeHtml(Math.round(Number(p.accuracy)||0))+' m</span><br><span>Ultimo rilevamento GPS: '+escapeHtml(fmtAdminDate(p.updatedAt))+'</span>'
+    :'<span>Posizione GPS non ancora disponibile</span>';
+   return '<article class="zyro-admin-report"><div class="zyro-admin-report-top"><b>'+escapeHtml(e.name||'Utente')+'</b><span>'+(e.active?'SOS attivo':'SOS concluso')+'</span></div>'+
+     '<p>Attivato il '+escapeHtml(fmtAdminDate(e.startedAt))+(e.endedAt?' · Terminato il '+escapeHtml(fmtAdminDate(e.endedAt)):'')+'</p>'+
+     (e.lastAddress?'<p>Via rilevata all’attivazione del SOS: <b>'+escapeHtml(e.lastAddress)+'</b></p>':'<p>Indirizzo non disponibile (GPS o geocodifica assente).</p>')+
+     '<p>'+locationLine+'</p>'+
+     (mapUrl?'<p><a href="'+escapeHtml(mapUrl)+'" target="_blank" rel="noopener noreferrer">Apri l’ultima posizione su OpenStreetMap</a></p>':'')+
+     '<small>Visibile soltanto per SOS con condivisione autorizzata, fino a 24 ore dalla chiusura.</small></article>';
+ }).join(''):'<p class="setting-description">Nessun SOS con condivisione autorizzata. Nessuna posizione di altri utenti è disponibile.</p>';
+}
 function renderAdminUsers(){
  const term=$('adminFilter').value.trim().toLowerCase();
  const users=adminUsersCache.filter(u=>Boolean(u.adminArchivedAt)===adminArchivedView).filter(u=>[u.name,u.email,u.id,u.profileId,u.lastLoginIp,u.registrationIp,u.lastDevice?.manufacturer,u.lastDevice?.model].some(v=>String(v||'').toLowerCase().includes(term)));
@@ -470,6 +498,10 @@ async function adminLoad(){
    const summary=await api('/api/admin/overview',{signal:controller.signal});
    if(current?.me?.isAdmin&&current.me.id===expectedAdminId)renderAdminOverview(summary);
  }catch(error){if($('zyroAdminOverview'))$('zyroAdminOverview').textContent='Diagnostica non disponibile: '+error.message;}
+ try{
+   const feed=await api('/api/admin/emergencies',{signal:controller.signal});
+   if(current?.me?.isAdmin&&current.me.id===expectedAdminId)renderAdminEmergencies(feed.emergencies||[]);
+ }catch(error){if($('adminEmergencies'))$('adminEmergencies').textContent='Emergenze non disponibili: '+error.message;}
  const allReports=data.reports||[];
  const reports=allReports.filter(r=>Boolean(r.adminArchivedAt)===adminArchivedView);
  $('adminReportCount').textContent=String(allReports.filter(r=>!r.adminArchivedAt&&r.status==='open').length);
@@ -1542,7 +1574,7 @@ async function enablePush(){
   $('pushStatus').textContent='Notifiche abilitate su questo dispositivo (compatibilità e consegna non garantite).';toast('Notifiche SOS abilitate.');
 }
 function base64ToBytes(base64){const padding='='.repeat((4-base64.length%4)%4);const binary=atob((base64+padding).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(binary,x=>x.charCodeAt(0));}
-function setMode(m){authMode=m;document.querySelectorAll('.auth-tab').forEach(b=>{const yes=b.dataset.mode===m;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));});$('nameField').classList.toggle('hidden',m==='login');$('name').required=m==='register';$('password').autocomplete=m==='register'?'new-password':'current-password';$('authSubmit').innerHTML=m==='login'?'Entra nella tua cerchia <span>→</span>':'Crea il mio account <span>→</span>';}
+function setMode(m){authMode=m;document.querySelectorAll('.auth-tab').forEach(b=>{const yes=b.dataset.mode===m;b.classList.toggle('active',yes);b.setAttribute('aria-selected',String(yes));});$('nameField').classList.toggle('hidden',m==='login');$('emergencyConsentField').classList.toggle('hidden',m==='login');$('name').required=m==='register';$('password').autocomplete=m==='register'?'new-password':'current-password';$('authSubmit').innerHTML=m==='login'?'Entra nella tua cerchia <span>→</span>':'Crea il mio account <span>→</span>';}
 // ZYRO 360 V14.2 — simple 2D cartography for browsers without WebGL or external JS libraries.
 // Real raster tiles, requested via the existing authenticated /api/map-tile route.
 // Map location is read from GPS; it is only sent to the server when the user opts into sharing.
@@ -2790,7 +2822,7 @@ async function init(){
   inviteFromLink=null;
   document.querySelectorAll('.auth-tab').forEach(b=>b.addEventListener('click',()=>setMode(b.dataset.mode)));
   $('authForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{
-    const payload={email:$('email').value.trim(),password:$('password').value,device:currentDeviceInfo()};if(authMode==='register')payload.name=$('name').value.trim();
+    const payload={email:$('email').value.trim(),password:$('password').value,device:currentDeviceInfo()};if(authMode==='register'){payload.name=$('name').value.trim();payload.emergencyCenterConsent=$('emergencyConsentRegister').checked===true;}
     $('authSubmit').disabled=true;try{await post(authMode==='login'?'/api/login':'/api/register',payload);const data=await api('/api/state');setState(data);connectSocket();closeProfileSettings();showView('home');toast('Benvenuto in Zyro 360!');}finally{$('authSubmit').disabled=false;}
   });});
   document.querySelectorAll('.nav-item').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));
@@ -3066,6 +3098,18 @@ async function init(){
   $('chatForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const text=$('chatText').value.trim();if(!text&&!chatPhotoData)return;await sendChat(text,chatPhotoData);});});
   $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
+  $('emergencyCenterToggle').addEventListener('change',()=>{
+    const toggle=$('emergencyCenterToggle'),enabled=toggle.checked;
+    toggle.disabled=true;
+    void action(async()=>{
+      try{
+        await post('/api/settings/emergency-center',{enabled});
+        await refresh();
+        toast(enabled?'Condivisione con il Centro Emergenze autorizzata durante SOS.':'Consenso al Centro Emergenze revocato.');
+      }catch(error){toggle.checked=!enabled;throw error;}
+      finally{toggle.disabled=false;}
+    });
+  });
   $('reportSubmit').addEventListener('click',()=>action(submitReport));
   $('adminLoad').addEventListener('click',()=>action(adminLoad));
   $('adminArchiveToggle').addEventListener('click',()=>{adminArchivedView=!adminArchivedView;$('adminArchiveToggle').setAttribute('aria-pressed',String(adminArchivedView));$('adminArchiveToggle').textContent=adminArchivedView?'Torna all’elenco principale':'Mostra archiviate';void action(adminLoad);});
