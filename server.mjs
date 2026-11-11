@@ -84,6 +84,29 @@ async function initializeStorage() {
 }
 // Admin identity is pinned by a server-side user ID, never by a browser flag or email address.
 const ADMIN_ID = String(process.env.ZYRO_ADMIN_USER_ID || '').trim();
+// Only explicit SOS opt-in permits the owner to view an emergency outside a circle.
+const ADMIN_SOS_RETENTION_MS = 24 * 60 * 60 * 1000;
+const emergencyCenterEnabled = user => Boolean(user && user.id !== ADMIN_ID &&
+  user.emergencyCenterConsent === true && ADMIN_ID && db.users[ADMIN_ID]);
+function clearAdminEmergencyData(alert) {
+  delete alert.adminLastPosition;
+  delete alert.adminLastAddress;
+  delete alert.adminLastPositionSavedAt;
+  delete alert.adminEmergencyConsent;
+}
+function purgeExpiredAdminEmergencies() {
+  let changed = false;
+  for (const alert of Object.values(db.alerts)) {
+    if (alert.adminEmergencyConsent !== true) continue;
+    const user = db.users[alert.userId];
+    if (!user?.emergencyCenterConsent || (!alert.active &&
+      (!alert.endedAt || now() - alert.endedAt >= ADMIN_SOS_RETENTION_MS))) {
+      clearAdminEmergencyData(alert); changed = true;
+    }
+  }
+  if (changed) save();
+}
+setInterval(purgeExpiredAdminEmergencies, 60 * 60 * 1000).unref?.();
 // Browser microphone tracks cannot survive a backend restart; do not claim audio is live.
 for (const alert of Object.values(db.alerts)) alert.hasAudio = false;
 let locations = new Map();
@@ -288,7 +311,7 @@ function stateFor(id) {
   pickRemoteContacts:familyActive(me)?(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteRingContacts:familyActive(me)?(me.pickRemoteRingContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteLockContacts:familyActive(me)?(me.pickRemoteLockContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
-  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, profileInvites:myInvites, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,emergencyCenterConsent:me.emergencyCenterConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, profileInvites:myInvites, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -450,7 +473,7 @@ app.post('/api/register', limit, (req, res) => {
   if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || password.length < 10 || password.length > 128) return res.status(400).json({error:'Inserisci nome, email valida e una password di almeno 10 caratteri.'});
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({error:'Email già registrata.'});
   const id = token(12), salt = token(16);
-  db.users[id] = { id, name, profileNamePrefix:profileSlug(name), email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], sosAudioConsent: false, avatar: null };
+  db.users[id] = { id, name, profileNamePrefix:profileSlug(name), email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], sosAudioConsent: false, emergencyCenterConsent: req.body.emergencyCenterConsent === true, avatar: null };
   auditLogin(req, db.users[id]);db.users[id].registrationIp=db.users[id].lastLoginIp;db.users[id].registrationDevice=db.users[id].lastDevice; loginUser(res, id);notifyAdminUsers(); res.json({ ok:true });
 });
 app.post('/api/login', limit, (req, res) => {
@@ -515,11 +538,40 @@ app.post('/api/legal/accept',requireAuth,(req,res)=>{
 app.get('/api/state', requireAuth, (req,res) => res.json(stateFor(req.user.id)));
 // ZYRO 360 V15.4 — private moderation; never include IPs in public account/state data.
 const adminUser = u => ({id:u.id,profileId:publicProfileId(u),name:u.name,email:u.email,createdAt:u.createdAt||null,lastDevice:u.lastDevice?.at>now()-30*86400e3?u.lastDevice:null,registrationDevice:u.createdAt>now()-30*86400e3?u.registrationDevice||null:null,registrationIp:(u.createdAt && now()-u.createdAt<30*86400e3)?publicClientIp(u.registrationIp):null,lastLoginAt:u.lastLoginAt||null,lastLoginIp:(u.lastLoginAt && now()-u.lastLoginAt<30*86400e3)?publicClientIp(u.lastLoginIp):null,adminArchivedAt:u.adminArchivedAt||null,bannedAt:u.bannedAt||null,premiumGiftLifetime:u.premiumGiftLifetime===true,premiumActive:premiumActive(u),premiumUntil:premiumExpiry(u)});
+app.post('/api/settings/emergency-center',requireAuth,limit,(req,res)=>{
+ if(typeof req.body?.enabled !== 'boolean')return res.status(400).json({error:'Scegli se autorizzare la condivisione SOS.'});
+ req.user.emergencyCenterConsent=req.body.enabled;
+ if(!req.body.enabled) {
+   for(const alert of Object.values(db.alerts))if(alert.userId===req.user.id)clearAdminEmergencyData(alert);
+ }
+ save();refreshRelated(req.user.id);notifyAdminUsers();
+ res.set('Cache-Control','no-store').json({ok:true,enabled:req.user.emergencyCenterConsent});
+});
 app.post('/api/settings/device',requireAuth,limit,(req,res)=>{
  const device=deviceForRequest(req);
  req.user.lastDevice=device;save();notifyAdminUsers();res.json({ok:true});
 });
 app.get('/api/admin/connection-ip',requireAuth,requireAdmin,(req,res)=>{res.set('Cache-Control','no-store');res.json({ip:visitorIp(req),source:process.env.RENDER==='true'?'render-cloudflare':'direct',checkedAt:now()});});
+app.get('/api/admin/emergencies',requireAuth,requireAdmin,(req,res)=>{
+ purgeExpiredAdminEmergencies();
+ const items=Object.values(db.alerts).filter(a=>a.kind==='sos' &&
+   a.adminEmergencyConsent===true && db.users[a.userId]?.emergencyCenterConsent===true &&
+   (a.active || (a.endedAt && now()-a.endedAt<ADMIN_SOS_RETENTION_MS)))
+ .map(a=>({
+   id:a.id,userId:a.userId,name:db.users[a.userId]?.name||'Utente',
+   active:Boolean(a.active),startedAt:a.startedAt,endedAt:a.endedAt||null,
+   lastPosition:a.adminLastPosition||null,
+   lastAddress:a.adminLastAddress||null
+ })).sort((a,b)=>b.startedAt-a.startedAt).slice(0,100);
+ // Aggregate access log, capped to one entry per minute per administrator.
+ const t=now();
+ if(items.length && (!req.user.adminEmergencyLastAuditAt || t-req.user.adminEmergencyLastAuditAt>=60000)) {
+   req.user.adminEmergencyLastAuditAt=t;
+   recordAction('sos-emergency-location-view',req.user.id,'emergencies','Accesso alla lista delle emergenze autorizzate');
+   save();
+ }
+ res.set('Cache-Control','no-store').json({emergencies:items,retentionHours:24});
+});
 app.get('/api/admin/users',requireAuth,requireAdmin,(req,res)=>{
  res.set('Cache-Control','no-store');
  res.json({users:Object.values(db.users).map(adminUser).map(u=>{const ips=[u.registrationIp,u.lastLoginIp].filter(Boolean);const matches=Object.values(db.users).filter(v=>v.id!==u.id && v.bannedAt && [v.createdAt>now()-30*86400e3?v.registrationIp:null,v.lastLoginAt>now()-30*86400e3?v.lastLoginIp:null].some(ip=>ip&&ips.includes(ip)));return {...u,sameIpBannedAccounts:matches.map(v=>v.id)};}).sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)),reports:db.userReports.slice(-100).reverse().map(r=>({...r,user:db.users[r.userId]?adminUser(db.users[r.userId]):null,reporter:db.users[r.reporterId]?adminUser(db.users[r.reporterId]):null})),audit:db.adminAudit.slice(-50).reverse()});
@@ -830,11 +882,17 @@ app.post('/api/sharing', requireAuth, (req,res) => {
 const lastPos = new Map();
 app.post('/api/position', requireAuth, (req,res) => {
   const alert=currentAlert(req.user.id);
-  if (!req.user.sharing && !(alert?.recipients?.length)) return res.status(403).json({error:'Condivisione non attiva.'});
+  if (!req.user.sharing && !(alert?.recipients?.length) && !(alert?.kind==='sos' && alert.adminEmergencyConsent===true && emergencyCenterEnabled(req.user))) return res.status(403).json({error:'Condivisione non attiva.'});
   const lat = Number(req.body.lat), lon = Number(req.body.lon), accuracy = Number(req.body.accuracy);
   if (![lat,lon,accuracy].every(Number.isFinite) || Math.abs(lat)>90 || Math.abs(lon)>180 || accuracy < 0 || accuracy>100000) return res.status(400).json({error:'Coordinate non valide.'});
   const t=now(); if (t-(lastPos.get(req.user.id)||0)<2400) return res.json({ok:true}); lastPos.set(req.user.id,t);
   locations.set(req.user.id,{lat,lon,accuracy,updatedAt:t});
+  if(alert?.kind==='sos' && alert.adminEmergencyConsent===true && emergencyCenterEnabled(req.user) &&
+     (t-(alert.adminLastPositionSavedAt||0)>=10000 || !alert.adminLastPosition)) {
+    alert.adminLastPosition={lat,lon,accuracy,updatedAt:t};
+    alert.adminLastPositionSavedAt=t;
+    save();notifyAdminUsers();
+  }
   const j=db.journeys[req.user.id];
   if(j?.status==='active' && j.autoArrival===true && j.destinationPoint && accuracy<=100){
     j.nearCount = metersBetween({lat,lon},j.destinationPoint) <= 120 ? (j.nearCount||0)+1 : 0;
@@ -1477,7 +1535,8 @@ app.post('/api/sos/start', requireAuth, async (req,res) => {
  if (!premiumActive(req.user)) return res.status(402).json({error:'SOS non disponibile: serve un abbonamento ZYRO 360 attivo. Nessun avviso inviato. Per un pericolo reale chiama il 112.'});
  let alert=currentAlert(req.user.id);
  const recipients=[...new Set((req.user.sosRecipients||[]).filter(id=>id!==req.user.id && sharedCircle(id,req.user.id)))];
- if(!recipients.length&&!alert)return res.status(400).json({error:'Seleziona prima almeno un destinatario SOS nella sezione Modalità.'});
+ const adminEmergencyConsent=emergencyCenterEnabled(req.user);
+ if(!recipients.length&&!alert&&!adminEmergencyConsent)return res.status(400).json({error:'Seleziona prima almeno un destinatario SOS nella sezione Modalità.'});
  if(alert?.kind==='pickpocket')return res.status(409).json({error:'Termina prima l’allarme Pick Pocket.'});
  if(alert)return res.json({ok:true,id:alert.id,alreadyActive:true,pushConfigured:configuredPush||fcmReady,serverRecorded:true});
  // Prefer a fresh fix sent with SOS, otherwise a recent GPS already received
@@ -1486,19 +1545,24 @@ app.post('/api/sos/start', requireAuth, async (req,res) => {
  const pos=validCoords(req.body.location) ||
    (cached && now()-cached.updatedAt<120000 ? cached : null);
  if(pos)locations.set(req.user.id,pos);
- alert={id:token(12),userId:req.user.id,recipients,startedAt:now(),active:true,hasAudio:false,kind:'sos',address:null};db.alerts[alert.id]=alert;save();refreshRelated(req.user.id);
+ alert={id:token(12),userId:req.user.id,recipients,startedAt:now(),active:true,hasAudio:false,kind:'sos',address:null,
+   adminEmergencyConsent:Boolean(adminEmergencyConsent),
+   adminLastPosition:adminEmergencyConsent&&pos?{lat:pos.lat,lon:pos.lon,accuracy:pos.accuracy,updatedAt:pos.updatedAt||now()}:null};
+ db.alerts[alert.id]=alert;save();refreshRelated(req.user.id);
+ if(adminEmergencyConsent)notifyAdminUsers();
  // An address is attempted only with explicit geocoder configuration; GPS works without it.
- const street=await sosAddressFor(pos);if(street){alert.address=street;save();refreshRelated(req.user.id);}
+ const street=await sosAddressFor(pos);if(street){alert.address=street;if(adminEmergencyConsent && alert.adminEmergencyConsent===true && emergencyCenterEnabled(req.user))alert.adminLastAddress=street;save();refreshRelated(req.user.id);if(adminEmergencyConsent)notifyAdminUsers();}
  const where=street || (pos
    ?`Indirizzo non disponibile; GPS ${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`
    :'Posizione GPS non ancora disponibile');
- const push=await sendEventPush(recipients,`🆘 SOS: ${cleanText(req.user.name,36)} chiede aiuto`,
+ const pushTargets=adminEmergencyConsent?[...new Set([...recipients,ADMIN_ID])]:recipients;
+ const push=await sendEventPush(pushTargets,`🆘 SOS: ${cleanText(req.user.name,36)} chiede aiuto`,
    `${cleanText(req.user.name,36)} chiede aiuto! ${where}. Apri Zyro 360 per visualizzare la mappa.`, 'sos');
  console.info('[ZYRO SOS] Notifiche provider', {recipients:recipients.length,
    attempted:push.attempted,accepted:push.accepted,geocoded:Boolean(street)});
  // An SOS visible on the map does not guarantee a push arrived.
  // The client can distinguish no devices from provider rejection.
- res.json({ok:true,id:alert.id,serverRecorded:true,pushConfigured:push.configured,pushAccepted:push.accepted,pushAttempted:push.attempted,recipientCount:recipients.length,address:street});
+ res.json({ok:true,id:alert.id,serverRecorded:true,pushConfigured:push.configured,pushAccepted:push.accepted,pushAttempted:push.attempted,recipientCount:pushTargets.length,address:street});
 });
 app.post('/api/sos/stop', requireAuth, (req,res) => {
   const a=currentAlert(req.user.id);
@@ -1508,6 +1572,7 @@ app.post('/api/sos/stop', requireAuth, (req,res) => {
   sosAudioRelaySubscribers.delete(req.user.id);
   if (!req.user.sharing) locations.delete(req.user.id);
   save(); refreshRelated(req.user.id);
+  if(a.adminEmergencyConsent===true)notifyAdminUsers();
   for (const id of alertAudience(a)) for (const ws of connections(id)) sendSocket(ws,{type:'sos-ended',userId:req.user.id});
   res.json({ok:true});
 });

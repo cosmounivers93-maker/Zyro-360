@@ -38,7 +38,7 @@ test('SOS rapido: server checks subscription and recipients, never grants on cli
   assert.match(ui,/!current\.me\.premiumActive/);
   assert.match(server,/app\.post\('\/api\/sos\/start', requireAuth/);
   assert.match(server,/if \(!premiumActive\(req\.user\)\) return res\.status\(402\)/);
-  assert.match(server,/if\(!recipients\.length&&!alert\)return res\.status\(400\)/);
-  assert.match(html,/app\.js\?v=82\.1/);
+  assert.match(server,/if\(!recipients\.length&&!alert&&!adminEmergencyConsent\)return res\.status\(400\)/);
+  assert.match(html,/app\.js\?v=82\.2/);
   assert.match(ui,/sw\.js\?v=29-sos-activation-visible/);
 });

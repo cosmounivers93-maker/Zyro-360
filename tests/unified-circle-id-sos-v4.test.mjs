@@ -21,8 +21,8 @@ test('SOS rapido runs the real authenticated SOS endpoint; provider acceptance i
  assert.match(ui,/GPS non disponibile/);
  assert.match(server,/app\.post\('\/api\/sos\/start', requireAuth/);
  assert.match(server,/if \(!premiumActive\(req\.user\)\)/);
- assert.match(server,/if\(!recipients\.length&&!alert\)/);
- assert.match(server,/const push=await sendEventPush\(recipients/);
+ assert.match(server,/if\(!recipients\.length&&!alert&&!adminEmergencyConsent\)/);
+ assert.match(server,/const push=await sendEventPush\(pushTargets/);
  assert.match(ui,/ricezione non garantita/);
  assert.match(html,/SOS rapido: invia un avviso/);
  assert.match(html,/Chiama 112/);
