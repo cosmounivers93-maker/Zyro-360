@@ -322,6 +322,26 @@ html,body{overscroll-behavior-x:none}
   }
 }
 </style>
+
+<style>
+/* Finestra posizioni SOS riservata: elenco chiuso di default, apribile soltanto dall'amministratore. */
+#zyroAdminPanel .zyro-admin-emergency-shortcut{margin:14px 0 18px;padding:12px;border:1px solid #abd7e6;border-radius:16px;background:linear-gradient(115deg,#eff9ff,#f5f2ff)}
+#zyroAdminPanel .zyro-admin-emergency-shortcut button{width:100%;min-height:46px;padding:10px 13px;border:1px solid #79b8d7;border-radius:12px;background:linear-gradient(100deg,#226eaa,#5b55bf);color:#fff;font:inherit;font-size:13px;font-weight:750;cursor:pointer}
+#zyroAdminPanel .zyro-admin-emergency-shortcut small{display:block;margin-top:8px;font-size:11px;line-height:1.5;color:#3c6176}
+#zyroAdminPanel .zyro-admin-emergency-dialog{box-sizing:border-box;width:min(540px,calc(100vw - 26px));max-width:540px;max-height:min(82dvh,760px);margin:auto;padding:18px 16px;overflow-y:auto;overscroll-behavior:contain;border:1px solid #a4c4dc;border-radius:23px;background:linear-gradient(145deg,#f3fcff,#eff0ff);color:#254259;box-shadow:0 18px 58px #11294750}
+#zyroAdminPanel .zyro-admin-emergency-dialog::backdrop{background:#15274494;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)}
+#zyroAdminPanel .zyro-admin-emergency-dialog-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding-bottom:11px;border-bottom:1px solid #bbd8e6}
+#zyroAdminPanel .zyro-admin-emergency-dialog-head h2{margin:0 0 5px;color:#234767;font-size:20px}
+#zyroAdminPanel .zyro-admin-emergency-dialog-head p{margin:0;font-size:12px;line-height:1.5;color:#58778b}
+#zyroAdminPanel #adminEmergenciesClose{flex:none;min-width:40px;min-height:40px;border:1px solid #bad2e4;border-radius:12px;background:#fff;color:#244a69;font-size:19px;cursor:pointer}
+#zyroAdminPanel #adminEmergencies{padding:6px 0}
+#zyroAdminPanel #adminEmergencies .zyro-admin-report{background:#ffffffa8;border:1px solid #c4dfe5;padding:14px;margin:12px 0;border-radius:15px;box-shadow:none}
+#zyroAdminPanel #adminEmergencies .zyro-admin-report p{font-size:13px;line-height:1.55;overflow-wrap:anywhere}
+#zyroAdminPanel #adminEmergencies .zyro-admin-report small{display:block;color:#526d7d;line-height:1.5}
+#zyroAdminPanel #adminEmergencies a{overflow-wrap:anywhere}
+#zyroAdminPanel .zyro-admin-emergency-dialog-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+#zyroAdminPanel .zyro-admin-emergency-dialog-actions button{flex:1;min-width:110px}
+</style>
 </head>
 <body class="zyro-await-intro">
 <div id="authScreen" class="auth-shell">
@@ -701,10 +721,21 @@ html,body{overscroll-behavior-x:none}
       <section id="zyroAdminPanel" class="zyro-admin-panel hidden" aria-label="Gestione riservata amministratore">
         <div class="zyro-admin-head"><span class="zyro-admin-lock">🔐</span><div><span class="mini-overline">ACCESSO ESCLUSIVO</span><h2>Gestione riservata</h2><p>Nuove iscrizioni, accessi e gestione account. Visibile soltanto al proprietario.</p></div></div>
         <div id="zyroAdminOverview" class="zyro-admin-overview" aria-label="Riepilogo servizi e utenti"></div>
-        <section class="panel" id="adminEmergenciesSection" aria-label="Posizioni SOS autorizzate">
-          <div class="panel-title"><span class="panel-icon">🆘</span><div><h2>Posizioni di emergenza</h2><p>Solo SOS con autorizzazione esplicita dell'utente. Ultima posizione disponibile per massimo 24 ore dopo la fine dell'evento.</p></div></div>
-          <div id="adminEmergencies" aria-live="polite"><p class="setting-description">Nessun SOS autorizzato da visualizzare.</p></div>
-        </section>
+        <div class="zyro-admin-emergency-shortcut">
+          <button id="adminEmergenciesOpen" type="button" aria-haspopup="dialog" aria-controls="adminEmergenciesDialog">🆘 Apri posizioni SOS autorizzate</button>
+          <small>Elenco nascosto finché non lo apri. Accesso solo al proprietario con consenso SOS.</small>
+        </div>
+        <dialog id="adminEmergenciesDialog" class="zyro-admin-emergency-dialog" aria-labelledby="adminEmergenciesTitle" aria-describedby="adminEmergenciesDescription">
+          <div class="zyro-admin-emergency-dialog-head">
+            <div><h2 id="adminEmergenciesTitle">Posizioni di emergenza</h2><p id="adminEmergenciesDescription">Solo SOS con consenso esplicito. L'ultima posizione resta disponibile per massimo 24 ore dopo la chiusura dell'evento.</p></div>
+            <button id="adminEmergenciesClose" type="button" aria-label="Chiudi posizioni SOS">✕</button>
+          </div>
+          <div id="adminEmergencies" aria-live="polite"></div>
+          <div class="zyro-admin-emergency-dialog-actions">
+            <button id="adminEmergenciesRefresh" class="btn btn-outline" type="button">Aggiorna posizioni</button>
+            <button id="adminEmergenciesDone" class="btn btn-dark" type="button">Chiudi</button>
+          </div>
+        </dialog>
         <div class="zyro-admin-tabs" aria-label="Aree amministrazione"><button type="button" data-admin-tab="reports" aria-pressed="true" aria-controls="adminReportsSection">Segnalazioni <b id="adminReportCount">0</b></button><button type="button" data-admin-tab="users" aria-pressed="false" aria-controls="adminUsersSection">Utenti registrati <b id="adminUserCount">0</b></button></div>
         <div class="zyro-admin-toolbar"><button id="adminLoad" class="btn btn-dark" type="button">Aggiorna elenco</button><button id="adminArchiveToggle" class="btn btn-outline" type="button" aria-pressed="false">Mostra archiviate</button></div>
         <p id="adminStatus" class="setting-description" role="status">Caricamento gestione riservata…</p>
