@@ -336,6 +336,10 @@ html,body{overscroll-behavior-x:none}
       <label id="nameField" class="field hidden"><span>Il tuo nome</span><input id="name" name="name" type="text" autocomplete="name" maxlength="36" placeholder="Come vuoi essere chiamato"></label>
       <label class="field"><span>Email</span><input id="email" name="email" type="email" autocomplete="email" required placeholder="nome@email.it"></label>
       <label class="field"><span>Password</span><input id="password" name="password" type="password" autocomplete="current-password" required minlength="10" placeholder="Almeno 10 caratteri"></label>
+      <label id="emergencyConsentField" class="field hidden" style="display:flex;align-items:flex-start;gap:12px;line-height:1.5">
+        <input id="emergencyConsentRegister" type="checkbox" style="margin-top:4px;flex:none" aria-describedby="emergencyConsentRegisterInfo">
+        <span id="emergencyConsentRegisterInfo"><strong>Facoltativo: condividi la posizione con il Centro Emergenze durante un SOS</strong><small style="display:block;margin-top:5px">Il solo account proprietario può vedere la posizione inviata durante un SOS, anche fuori dalla tua cerchia, e l'ultima posizione fino a 24 ore dopo la chiusura. Puoi revocare il consenso nelle impostazioni.</small></span>
+      </label>
       <button id="authSubmit" class="btn btn-primary btn-wide" type="submit">Entra nella tua cerchia <span>→</span></button>
     </form>
     <p class="auth-note">🔒 Solo le persone autorizzate possono vedere la tua posizione.</p>
@@ -678,7 +682,15 @@ html,body{overscroll-behavior-x:none}
           <p id="pushTestStatus" class="setting-description" role="status" aria-live="polite">Richiede due account collegati in una cerchia e le notifiche abilitate sul telefono destinatario.</p>
         </div>
       </div>
-      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Il solo SOS non avvia il GPS. Durante un SOS, i destinatari che hai selezionato possono ricevere la posizione. Se il servizio di indirizzi SOS è attivo, le coordinate vengono inviate al fornitore di geocodifica per ricavare via, eventuale numero civico e città; l'indirizzo può essere approssimativo o mancante. In assenza di indirizzo viene indicata la posizione GPS quando disponibile. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento. Per la sicurezza degli account, al login ZYRO 360 registra l’indirizzo IP e i dati essenziali del dispositivo (sistema, marca e modello quando disponibili) alla registrazione e all’accesso per un massimo di 30 giorni; soltanto l’amministratore può consultare questi dati per verificare segnalazioni e abusi.</p></div>
+      <section class="panel" aria-labelledby="emergencyCenterSettingTitle">
+        <div class="panel-title"><span class="panel-icon">🆘</span><div><h2 id="emergencyCenterSettingTitle">Centro Emergenze Zyro 360</h2><p>Protezione SOS facoltativa, indipendente dalle cerchie</p></div></div>
+        <label style="display:flex;align-items:flex-start;gap:12px;line-height:1.5">
+          <input type="checkbox" id="emergencyCenterToggle" style="margin-top:5px;flex:none">
+          <span><strong>Consenti al Centro Emergenze di vedere la posizione durante un SOS</strong><small style="display:block;margin-top:5px">Solo l'amministratore proprietario, solo per gli SOS attivati dopo questa autorizzazione. Ultima posizione disponibile fino a 24 ore dalla fine dell'emergenza. Revocabile in qualsiasi momento.</small></span>
+        </label>
+        <p id="emergencyCenterStatus" class="setting-description" role="status">Condivisione di emergenza non autorizzata.</p>
+      </section>
+      <div class="panel"><div class="panel-title"><span class="panel-icon lavender">♙</span><div><h2>La tua privacy</h2><p>Posizione e audio sono controllati da te.</p></div></div><p class="setting-description">La posizione è visibile ai membri delle tue cerchie quando attivi «Attiva posizione», anche senza SOS. Durante un SOS l'app può avviare il GPS. Se abiliti separatamente «Centro Emergenze», l'amministratore proprietario può vedere la tua posizione anche se non è nella tua cerchia, solo durante l'emergenza, e l'ultima posizione fino a 24 ore dopo la chiusura. Puoi revocare questa autorizzazione in qualunque momento. Durante un SOS, i destinatari che hai selezionato possono ricevere la posizione. Se il servizio di indirizzi SOS è attivo, le coordinate vengono inviate al fornitore di geocodifica per ricavare via, eventuale numero civico e città; l'indirizzo può essere approssimativo o mancante. In assenza di indirizzo viene indicata la posizione GPS quando disponibile. L'audio parte esclusivamente quando autorizzi il microfono durante un SOS. Nessun audio viene registrato sul server.</p><p class="setting-description">Puoi interrompere il GPS, disattivare il microfono e uscire dalle cerchie in ogni momento. Per la sicurezza degli account, al login ZYRO 360 registra l’indirizzo IP e i dati essenziali del dispositivo (sistema, marca e modello quando disponibili) alla registrazione e all’accesso per un massimo di 30 giorni; soltanto l’amministratore può consultare questi dati per verificare segnalazioni e abusi.</p></div>
       <div class="panel"><div class="panel-title"><span class="panel-icon warm">☏</span><div><h2>Numeri di emergenza</h2><p>In Italia e nell'UE il numero unico è 112</p></div></div><a href="tel:112" class="btn btn-outline btn-wide">Chiama il 112</a></div>
       <section class="panel zyro-report-panel" aria-label="Segnala un uso scorretto">
         <div class="panel-title"><span class="panel-icon">🛡</span><div><h2>Segnala un abuso</h2><p>Puoi segnalare un membro della tua cerchia per un comportamento scorretto. La segnalazione è riservata all’amministratore.</p></div></div>
@@ -689,6 +701,10 @@ html,body{overscroll-behavior-x:none}
       <section id="zyroAdminPanel" class="zyro-admin-panel hidden" aria-label="Gestione riservata amministratore">
         <div class="zyro-admin-head"><span class="zyro-admin-lock">🔐</span><div><span class="mini-overline">ACCESSO ESCLUSIVO</span><h2>Gestione riservata</h2><p>Nuove iscrizioni, accessi e gestione account. Visibile soltanto al proprietario.</p></div></div>
         <div id="zyroAdminOverview" class="zyro-admin-overview" aria-label="Riepilogo servizi e utenti"></div>
+        <section class="panel" id="adminEmergenciesSection" aria-label="Posizioni SOS autorizzate">
+          <div class="panel-title"><span class="panel-icon">🆘</span><div><h2>Posizioni di emergenza</h2><p>Solo SOS con autorizzazione esplicita dell'utente. Ultima posizione disponibile per massimo 24 ore dopo la fine dell'evento.</p></div></div>
+          <div id="adminEmergencies" aria-live="polite"><p class="setting-description">Nessun SOS autorizzato da visualizzare.</p></div>
+        </section>
         <div class="zyro-admin-tabs" aria-label="Aree amministrazione"><button type="button" data-admin-tab="reports" aria-pressed="true" aria-controls="adminReportsSection">Segnalazioni <b id="adminReportCount">0</b></button><button type="button" data-admin-tab="users" aria-pressed="false" aria-controls="adminUsersSection">Utenti registrati <b id="adminUserCount">0</b></button></div>
         <div class="zyro-admin-toolbar"><button id="adminLoad" class="btn btn-dark" type="button">Aggiorna elenco</button><button id="adminArchiveToggle" class="btn btn-outline" type="button" aria-pressed="false">Mostra archiviate</button></div>
         <p id="adminStatus" class="setting-description" role="status">Caricamento gestione riservata…</p>
@@ -872,7 +888,7 @@ html,body{overscroll-behavior-x:none}
    <div class="zyro-due-actions"><button type="button" id="zyroDueClear">Cancella</button><button type="button" id="zyroDueCancel">Annulla</button><button type="button" id="zyroDueConfirm">Imposta</button></div>
  </section>
 </div>
-<script src="/app.js?v=82.1" defer></script>
+<script src="/app.js?v=82.2" defer></script>
 <script src="/zyro-circle-picker-v3.js?v=3" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
