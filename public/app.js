@@ -377,7 +377,10 @@ function setState(data){
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
   renderHome();renderCircles();renderProfileInvites();renderSettings();renderEmergencyCenterSetting();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
-  if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) { theftTriggered=false; hideTheftOverlay(); stopSiren(); }
+  if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) {
+    theftTriggered=false; hideTheftOverlay(); stopSiren();
+    if(hasZyroNativeBridge())void zyroNativeRequest('theft-alarm-stop').catch(error=>console.warn('Android alarm stop:',error.message));
+  }
 
   const key = data.alerts.filter(a=>a.userId!==data.me.id).map(a=>a.id).sort().join(',');
   if(prev && key && key !== lastAlertKey) toast('🆘 Nuovo SOS nella tua cerchia.',true);
@@ -1123,7 +1126,7 @@ async function nativeBackgroundSync(options={}){
    const response=await zyroNativeRequest('sync',payload);
    result=response.result;
    window.ZyroAndroidSafetySupported=true;
-   window.ZyroAndroidSafetyBuild=24;
+   window.ZyroAndroidSafetyBuild=Math.max(24,Number(window.ZyroAndroidSafetyBuild||0));
  }else result=window.prompt('ZYRO360_BG_SYNC',JSON.stringify(payload));
  if(result==='zyro-native')return true;
  throw Error(nativeSyncError(result));
@@ -1140,7 +1143,7 @@ function zyroNativeAge(ms){
 function nativeDiagnosticText(state){
  if(!isZyroNativeAvailable())
    return '⚠ Collegamento Android assente. Potresti aver aperto il sito o un collegamento del browser. Controlla in Impostazioni Android → App → Zyro 360 la versione 1.0.0-rc3, poi apri l’app dalla sua icona.';
- if(!state || !['v23-android','v24-android'].includes(state.build))
+ if(!state || !['v23-android','v24-android','v25-android'].includes(state.build))
    return '⚠ Collegamento non ancora verificato. Premi «Verifica servizio Android»: controlliamo la risposta diretta del telefono.';
  if(!state.running)
    return '○ Servizio Android non attivo. Attiva GPS LIVE oppure Pick Pocket, poi verifica di nuovo.';
@@ -1176,9 +1179,9 @@ async function readNativeSafetyStatus(){
  if(hasZyroNativeBridge()){
    const response=await zyroNativeRequest('status');
    status=response.status;
-   if(status?.build!=='v24-android')throw Error('APK Android non aggiornata alla V24.');
+   if(!['v24-android','v25-android'].includes(status?.build))throw Error('APK Android non aggiornata alla V24.');
    window.ZyroAndroidSafetySupported=true;
-   window.ZyroAndroidSafetyBuild=24;
+   window.ZyroAndroidSafetyBuild=Math.max(24,Number(window.ZyroAndroidSafetyBuild||0));
  }else if(window.ZyroAndroidSafetyBuild===23){
    const answer=window.prompt('ZYRO360_BG_STATUS','');
    try{status=JSON.parse(answer||'null');}
@@ -2131,6 +2134,13 @@ async function stopTheft(){
   $('theftStop').disabled=true;
   try{
     await post('/api/pickpocket/stop',{password});
+    // Server password verification must succeed BEFORE asking Android to stop the siren.
+    if(hasZyroNativeBridge()){
+      try{await zyroNativeRequest('theft-alarm-stop');}
+      catch(error){console.warn('Impossibile fermare subito la sirena Android:',error.message);}
+    }else if(window.ZyroAndroidSafetyBuild>=25){
+      window.prompt('ZYRO360_THEFT_ALARM_STOP','');
+    }
     theftTriggered=false;theftIsPending=false;stopSiren();hideTheftOverlay();
     await refresh();
     if(isZyroNativeAvailable())await nativeBackgroundSync({pick:false});
