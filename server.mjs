@@ -650,7 +650,9 @@ app.post('/api/admin/archive',requireAuth,requireAdmin,limit,(req,res)=>{
  const item=kind==='user'?db.users[id]:db.userReports.find(r=>r.id===id);
  if(!item)return res.status(404).json({error:'Elemento non trovato.'});
  if(archived)item.adminArchivedAt=now();else delete item.adminArchivedAt;
- if(kind==='report'&&archived&&item.status==='open'){item.status='reviewed';item.reviewedAt=now();item.reviewedBy=req.user.id;}
+ if(kind==='report'&&archived&&['open','in_review'].includes(item.status)){
+   item.status='reviewed';item.reviewedAt=now();item.reviewedBy=req.user.id;reportMessaging.onStatusChanged(item);
+ }
  recordAction(archived?'archive-'+kind:'reopen-'+kind,req.user.id,kind==='user'?id:item.userId,kind==='report'?id:'');
  save();notifyAdminUsers();res.json({ok:true});
 });
