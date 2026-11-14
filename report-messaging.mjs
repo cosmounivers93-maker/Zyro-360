@@ -24,7 +24,7 @@ export function installReportMessaging({
   const inform = (r, kind) => {
     const body=templates[kind];
     if (!body) return;
-    append(r,'admin','reporter',body,'automatic');
+    if(!append(r,'admin','reporter',body,'automatic'))return;
     notify(r.reporterId,'report-message',r.id,'Aggiornamento segnalazione • Zyro 360');
   };
   function onCreated(r) { inform(r,'receipt'); }
