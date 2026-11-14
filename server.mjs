@@ -1,4 +1,5 @@
 import express from 'express';
+import {installReportMessaging} from './report-messaging.mjs';
 import {eraseAccount} from './account-deletion.mjs';
 import {normalizeChatView,summarizeChat,chatPage} from './chat-view-core.mjs';
 import {PlayBilling,PlayRepository,GooglePlayApi,createTokenCipher,accountId,PACKAGE} from './play-billing.mjs';
@@ -599,7 +600,9 @@ app.post('/api/report',requireAuth,limit,(req,res)=>{
  if(isAdmin(req.user))return res.status(403).json({error:'Il proprietario riceve e gestisce le segnalazioni nel Centro amministratore.'});
  if(target===req.user.id||!db.users[target]||!sharedCircle(req.user.id,target))return res.status(403).json({error:'Puoi segnalare soltanto un altro membro della tua cerchia.'});
  if(reason.length<12)return res.status(400).json({error:'Descrivi brevemente il motivo della segnalazione (almeno 12 caratteri).'});
- db.userReports.push({id:token(9),reporterId:req.user.id,userId:target,reason,at:now(),status:'open'});
+ const report={id:token(9),reporterId:req.user.id,userId:target,reason,at:now(),status:'open'};
+ db.userReports.push(report);
+ reportMessaging.onCreated(report);
  if(db.userReports.length>300)db.userReports.splice(0,db.userReports.length-300);
  save();
  if (ADMIN_ID && db.users[ADMIN_ID]) {
@@ -607,6 +610,15 @@ app.post('/api/report',requireAuth,limit,(req,res)=>{
    void sendEventPush([ADMIN_ID],'Nuova segnalazione • ZYRO 360','Un utente ha inviato una segnalazione da esaminare.');
  }
  res.json({ok:true,message:'Segnalazione ricevuta. Sarà esaminata dall’amministratore.'});
+});
+const reportMessaging=installReportMessaging({
+ app,getDb:()=>db,requireAuth,requireAdmin,limit,now,token,cleanText,save,recordAction,isAdmin,
+ notify:(id,type,reportId,title)=>{
+   const recipient=id||ADMIN_ID;
+   if(!recipient||!db.users[recipient])return;
+   for(const ws of connections(recipient))sendSocket(ws,{type,reportId});
+   void sendEventPush([recipient],title,'Apri Zyro 360 per leggere il messaggio nel Centro segnalazioni.');
+ }
 });
 app.post('/api/admin/ban',requireAuth,requireAdmin,limit,(req,res)=>{
  if(!adminPassword(req,res))return;
@@ -646,7 +658,9 @@ app.post('/api/admin/report-resolve',requireAuth,requireAdmin,limit,(req,res)=>{
  if(!adminPassword(req,res))return;
  const report=db.userReports.find(x=>x.id===String(req.body.reportId||''));
  if(!report)return res.status(404).json({error:'Segnalazione non trovata.'});
- report.status=req.body.status==='dismissed'?'dismissed':'reviewed';report.reviewedAt=now();
+ const nextStatus=req.body.status==='dismissed'?'dismissed':'reviewed';
+ if(report.status!==nextStatus){report.status=nextStatus;reportMessaging.onStatusChanged(report);}
+ report.reviewedAt=now();report.reviewedBy=req.user.id;
  recordAction('report-'+report.status,req.user.id,report.userId,report.id);save();res.json({ok:true});
 });
 
