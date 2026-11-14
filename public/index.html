@@ -36,6 +36,7 @@
   <link rel="stylesheet" href="/zyro-circle-picker-v3.css?v=3">
   <link rel="stylesheet" href="/zyro-final-circle-status-v4.css?v=4">
   <link rel="stylesheet" href="/zyro-group-circle-code-v5.css?v=5">
+  <link rel="stylesheet" href="/zyro-moderation-v1.css?v=1">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
 .zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult,[data-zyro-permission="testpush"]{display:none!important}
@@ -718,8 +719,14 @@ html,body{overscroll-behavior-x:none}
         <label class="field"><span>Motivo della segnalazione</span><textarea id="reportReason" rows="3" maxlength="400" placeholder="Spiega cosa è successo (senza condividere dati non necessari)"></textarea></label>
         <button class="btn btn-outline btn-wide" id="reportSubmit" type="button">Invia segnalazione</button>
       </section>
+      <section id="zyroMyReports" class="panel zyro-my-reports" aria-label="Comunicazioni sulle mie segnalazioni" hidden>
+        <div class="panel-title"><span class="panel-icon lavender">✉</span><div><h2>Le mie segnalazioni</h2><p>Conferme, aggiornamenti e risposte private dall'Amministrazione Zyro 360.</p></div></div>
+        <button type="button" id="zyroMyReportsRefresh" class="btn btn-outline">Aggiorna messaggi</button>
+        <div id="zyroMyReportsList" aria-live="polite"><p>Caricamento messaggi…</p></div>
+        <small>Le comunicazioni sono private. Non viene mostrato al segnalato chi ha inviato la segnalazione.</small>
+      </section>
       <section id="zyroAdminPanel" class="zyro-admin-panel hidden" aria-label="Gestione riservata amministratore">
-        <div class="zyro-admin-head"><span class="zyro-admin-lock">🔐</span><div><span class="mini-overline">ACCESSO ESCLUSIVO</span><h2>Gestione riservata</h2><p>Nuove iscrizioni, accessi e gestione account. Visibile soltanto al proprietario.</p></div></div>
+        <div class="zyro-admin-head"><span class="zyro-admin-lock">🔐</span><div><span class="mini-overline">ACCESSO ESCLUSIVO</span><h2>Centro amministratore</h2><p>Segnalazioni, messaggi ufficiali e gestione account. Accesso esclusivo del proprietario.</p></div></div>
         <div id="zyroAdminOverview" class="zyro-admin-overview" aria-label="Riepilogo servizi e utenti"></div>
         <div class="zyro-admin-emergency-shortcut">
           <button id="adminEmergenciesOpen" type="button" aria-haspopup="dialog" aria-controls="adminEmergenciesDialog">🆘 Apri posizioni SOS autorizzate</button>
@@ -920,6 +927,7 @@ html,body{overscroll-behavior-x:none}
  </section>
 </div>
 <script src="/app.js?v=82.4" defer></script>
+<script src="/zyro-moderation-v1.js?v=1" defer></script>
 <script src="/zyro-circle-picker-v3.js?v=3" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
