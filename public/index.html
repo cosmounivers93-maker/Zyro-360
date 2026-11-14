@@ -36,7 +36,7 @@
   <link rel="stylesheet" href="/zyro-circle-picker-v3.css?v=3">
   <link rel="stylesheet" href="/zyro-final-circle-status-v4.css?v=4">
   <link rel="stylesheet" href="/zyro-group-circle-code-v5.css?v=5">
-  <link rel="stylesheet" href="/zyro-moderation-v1.css?v=1">
+  <link rel="stylesheet" href="/zyro-moderation-v1.css?v=2">
   <title>Zyro 360 — la tua cerchia</title>
 <style>/* Interfaccia clienti: strumenti interni esclusi dalla navigazione. */
 .zyro-push-test,#zyroNativeMonitor,#zyroMicNativeCheck,#zyroTestMic,#zyroMicDiagnosticResult,[data-zyro-permission="testpush"]{display:none!important}
@@ -910,6 +910,26 @@ html,body{overscroll-behavior-x:none}
     </div>
   </div>
 </div>
+<!-- Private moderation messages appear on login and when a new message arrives. -->
+<dialog id="zyroOfficialNotice" class="zyro-official-notice" aria-labelledby="zyroOfficialNoticeTitle" aria-describedby="zyroOfficialNoticeText">
+  <div class="zyro-official-notice-head">
+    <span class="zyro-official-notice-seal" aria-hidden="true">✦</span>
+    <div><small>COMUNICAZIONE UFFICIALE</small>
+      <strong>Amministrazione Zyro 360</strong></div>
+  </div>
+  <div class="zyro-official-notice-main">
+    <small id="zyroOfficialNoticeKind"></small>
+    <h2 id="zyroOfficialNoticeTitle">Hai un nuovo messaggio</h2>
+    <p id="zyroOfficialNoticeText"></p>
+    <div class="zyro-official-notice-meta"><span id="zyroOfficialNoticeCount"></span><time id="zyroOfficialNoticeDate"></time></div>
+    <p class="zyro-official-notice-privacy">Questo messaggio è personale. Puoi rispondere in «Le mie segnalazioni».</p>
+  </div>
+  <div class="zyro-official-notice-actions">
+    <button type="button" id="zyroOfficialNoticeReply">Apri e rispondi</button>
+    <button type="button" id="zyroOfficialNoticeRead">Ho letto</button>
+    <button type="button" id="zyroOfficialNoticeLater">Più tardi</button>
+  </div>
+</dialog>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 <div id="audioDock" class="audio-dock hidden"><span>🎧 Audio SOS in diretta</span><audio id="remoteAudio" controls autoplay playsinline></audio><button id="closeListen" type="button" aria-label="Interrompi ascolto">✕</button></div>
 <div id="zyroJourneyDueDialog" class="zyro-due-overlay" hidden>
@@ -927,7 +947,7 @@ html,body{overscroll-behavior-x:none}
  </section>
 </div>
 <script src="/app.js?v=82.4" defer></script>
-<script src="/zyro-moderation-v1.js?v=1" defer></script>
+<script src="/zyro-moderation-v1.js?v=2" defer></script>
 <script src="/zyro-circle-picker-v3.js?v=3" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
 </body>
