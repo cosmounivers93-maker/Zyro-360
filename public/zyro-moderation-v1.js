@@ -61,7 +61,7 @@
    $('zyroOfficialNoticeText').textContent=m.body;
    $('zyroOfficialNoticeDate').textContent=date(m.at);
    $('zyroOfficialNoticeCount').textContent=queue.length>1
-     ?\`Hai \${queue.length} comunicazioni da leggere\`
+     ?`Hai ${queue.length} comunicazioni da leggere`
      :'Comunicazione privata';
    $('zyroOfficialNoticeKind').textContent=m.role==='reporter'
      ?'Aggiornamento sulla tua segnalazione'
