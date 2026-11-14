@@ -298,6 +298,7 @@ function connectSocket(){
     if(m.type==='account-banned'){alert(m.notice||'Account sospeso.');location.reload();return;}
     if(m.type==='admin-users-changed' && current?.me?.isAdmin)scheduleAdminUsersRefresh();
     if(m.type==='admin-new-report' && current?.me?.isAdmin){toast('Nuova segnalazione ricevuta nel Centro amministratore.');void action(adminLoad);}
+    if(m.type==='admin-report-reply' && current?.me?.isAdmin){toast('Nuova risposta a una segnalazione.');void action(adminLoad);}
     if(m.type==='report-message') { if(current?.me?.isAdmin)void action(adminLoad); else void window.ZyroModeration?.loadInbox(true); }
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
     if(m.type==='chat-new'){
