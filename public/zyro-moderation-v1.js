@@ -92,7 +92,10 @@
          const body=card.querySelector(`[data-recipient="${role}"] textarea[data-compose]`)?.value.trim()||'';
          void withBusy(async()=>{
            if(body.length<10)throw Error('Il messaggio deve contenere almeno 10 caratteri.');
-           if(!confirm('Confermi l’invio privato al destinatario selezionato?'))return;
+           const confirmed=window.zyroOwnerDialog
+             ?await window.zyroOwnerDialog({title:'Invia messaggio ufficiale',description:role==='reporter'?'Il messaggio arriverà soltanto al segnalante.':'Il messaggio arriverà soltanto all’utente segnalato.',submitLabel:'Invia messaggio'})
+             :confirm('Confermi l’invio privato al destinatario selezionato?');
+           if(!confirmed)return;
            await request('/api/admin/report-message',{reportId:id,recipient:role,body});
            await reloadAdmin();
          });return;
