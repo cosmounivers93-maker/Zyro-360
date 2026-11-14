@@ -13,7 +13,10 @@ export function installReportMessaging({
   const lookup = id => getDb().userReports.find(r => r.id === id);
   const append = (r, from, to, body, type='manual') => {
     r.messages ||= [];
-    if (r.messages.length >= 120) throw Object.assign(new Error('Limite messaggi della pratica raggiunto.'), {status:409});
+    if (r.messages.length >= 120) {
+      if(type==='automatic')return null;
+      throw Object.assign(new Error('Limite messaggi della pratica raggiunto.'), {status:409});
+    }
     const m = {id:token(9), at:now(), from, to, body, type, seenAt:null};
     r.messages.push(m);
     return m;
@@ -58,7 +61,7 @@ export function installReportMessaging({
     try {append(r,role,'admin',body,'reply');}catch(e){return res.status(e.status||400).json({error:e.message});}
     recordAction('report-user-reply',req.user.id,r.id,role);
     save();
-    notify(null,'admin-new-report',r.id,'Risposta a una segnalazione • Zyro 360');
+    notify(null,'admin-report-reply',r.id,'Risposta a una segnalazione • Zyro 360');
     res.json({ok:true});
   });
   app.post('/api/reports/read',requireAuth,limit,(req,res)=>{
