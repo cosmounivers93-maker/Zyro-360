@@ -1,0 +1,27 @@
+name: ZYRO 360 - Moderation messaging tests
+on:
+  pull_request:
+    paths:
+      - 'report-messaging.mjs'
+      - 'server.mjs'
+      - 'public/app.js'
+      - 'public/zyro-moderation-v1.js'
+      - 'public/index.html'
+      - 'tests/report-messaging.test.mjs'
+      - '.github/workflows/moderation-messaging.yml'
+  push:
+    branches: [feature/moderation-report-messaging-20261114]
+permissions:
+  contents: read
+jobs:
+  check-moderation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: node --check server.mjs
+      - run: node --check public/app.js
+      - run: node --check public/zyro-moderation-v1.js
+      - run: node --test tests/report-messaging.test.mjs
