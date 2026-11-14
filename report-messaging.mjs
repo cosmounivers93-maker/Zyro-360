@@ -74,6 +74,19 @@ export function installReportMessaging({
     if(changed)save();
     res.json({ok:true});
   });
+  // A receipt in the user's inbox and a foreground popup must acknowledge only
+  // the specific message, never all unread messages in the case.
+  app.post('/api/reports/read-message',requireAuth,limit,(req,res)=>{
+    const r=lookup(String(req.body?.reportId||''));
+    const role=r&&asMember(r,req.user.id);
+    if(!role || (role==='reported'&&!(r.messages||[]).some(m=>m.to==='reported')))
+      return res.status(404).json({error:'Pratica non disponibile.'});
+    const item=(r.messages||[]).find(m=>
+      m.id===String(req.body?.messageId||'') && m.to===role && m.from==='admin');
+    if(!item)return res.status(404).json({error:'Messaggio non disponibile.'});
+    if(!item.seenAt){item.seenAt=now();save();}
+    res.json({ok:true,messageId:item.id,seenAt:item.seenAt});
+  });
   app.post('/api/admin/report-message',requireAuth,requireAdmin,limit,(req,res)=>{
     const r=lookup(String(req.body?.reportId||''));
     const to=req.body?.recipient;

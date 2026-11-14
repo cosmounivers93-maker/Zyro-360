@@ -92,3 +92,74 @@
   #zyroAdminPanel .zyro-case-conversations{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media(max-width:380px){#zyroAdminPanel .zyro-case-parties{grid-template-columns:1fr}}
+
+
+/* V2 — official moderation messages visible on app login, light glass theme. */
+dialog.zyro-official-notice{
+  box-sizing:border-box;position:fixed;max-width:min(420px,calc(100vw - 28px));
+  width:100%;max-height:min(82dvh,760px);margin:auto;
+  padding:0;overflow-y:auto;overscroll-behavior:contain;
+  border:1px solid #c8d7f7;border-radius:23px;
+  background:linear-gradient(150deg,#fff 0%,#faf8ff 52%,#effbff 100%);
+  color:#21324f;box-shadow:0 22px 75px rgba(38,49,87,.27);
+  font-family:inherit
+}
+dialog.zyro-official-notice::backdrop{
+  background:rgba(20,31,65,.48);
+  backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)
+}
+.zyro-official-notice .zyro-official-notice-head{
+  display:flex;align-items:center;gap:12px;padding:22px 20px 13px
+}
+.zyro-official-notice .zyro-official-notice-seal{
+  display:grid;place-items:center;width:46px;height:46px;flex:none;
+  border-radius:15px;color:#fff;font-size:25px;
+  background:linear-gradient(135deg,#8065d8,#44bcd2)
+}
+.zyro-official-notice .zyro-official-notice-head small{
+  display:block;margin-bottom:5px;letter-spacing:1.1px;
+  font-size:10px;font-weight:800;color:#5f72a1
+}
+.zyro-official-notice .zyro-official-notice-head strong{font-size:16px;color:#303a68}
+.zyro-official-notice .zyro-official-notice-main{padding:5px 20px 8px}
+.zyro-official-notice .zyro-official-notice-main>small{
+  display:block;font-size:11px;font-weight:800;color:#6751b1
+}
+.zyro-official-notice h2{
+  font-size:22px;line-height:1.25;margin:8px 0 16px;color:#233354
+}
+.zyro-official-notice #zyroOfficialNoticeText{
+  white-space:pre-wrap;overflow-wrap:anywhere;
+  line-height:1.65;font-size:14px;color:#2d415c;
+  padding:15px;border-radius:15px;border:1px solid #dce5f7;
+  background:rgba(255,255,255,.83)
+}
+.zyro-official-notice .zyro-official-notice-meta{
+  display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;
+  font-size:11px;color:#63799b
+}
+.zyro-official-notice .zyro-official-notice-privacy{
+  font-size:11px;line-height:1.5;color:#647b94;margin:12px 0
+}
+.zyro-official-notice .zyro-official-notice-actions{
+  padding:6px 20px 22px;display:grid;grid-template-columns:1fr 1fr;gap:9px
+}
+.zyro-official-notice .zyro-official-notice-actions button{
+  min-width:0;min-height:46px;padding:11px 10px;
+  border-radius:12px;border:1px solid #cdd5ee;
+  color:#523fa6;background:#f2f0ff;font:inherit;font-size:12px;
+  font-weight:800;cursor:pointer
+}
+.zyro-official-notice #zyroOfficialNoticeReply{
+  grid-column:1/-1;color:white;border-color:#775fd1;
+  background:linear-gradient(120deg,#7660c5,#4b9cca)
+}
+.zyro-official-notice #zyroOfficialNoticeLater{
+  background:#f8f9fd;color:#65738b
+}
+.zyro-official-notice button:focus-visible{
+  outline:3px solid #775fd1;outline-offset:2px
+}
+@media(prefers-reduced-motion:reduce){
+ .zyro-official-notice,.zyro-official-notice *{animation:none!important;transition:none!important}
+}

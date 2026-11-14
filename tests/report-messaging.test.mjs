@@ -82,3 +82,44 @@ test('Frontend and backend JavaScript parse and the private inbox is linked',()=
  const syntax=spawnSync(process.execPath,['--check',new URL('../server.mjs',import.meta.url).pathname],{encoding:'utf8'});
  assert.equal(syntax.status,0,syntax.stderr);
 });
+
+test('Unread notices are specific to the intended user and acknowledged individually',async()=>{
+ const h=harness(),r={id:'notice1',reporterId:'alice',userId:'bob',reason:'Segnalazione riservata',at:1730000000000,status:'open'};
+ h.db.userReports.push(r);
+ h.service.onCreated(r); // automatic to the reporter
+ await h.invoke('POST','/api/admin/report-message','owner',{reportId:r.id,recipient:'reported',body:'Stiamo verificando la segnalazione in modo riservato.'});
+ await h.invoke('POST','/api/admin/report-message','owner',{reportId:r.id,recipient:'reported',body:'Ti chiediamo di mantenere comunicazioni rispettose.'});
+ const noticesToReported=r.messages.filter(m=>m.to==='reported');
+ assert.equal(noticesToReported.length,2);
+ const initial=await h.invoke('GET','/api/reports/mine','bob');
+ assert.equal(initial.data.reports[0].messages.filter(m=>m.from==='admin'&&!m.seenAt).length,2);
+ assert.equal((await h.invoke('POST','/api/reports/read-message','alice',{reportId:r.id,messageId:noticesToReported[0].id})).code,404);
+ assert.equal((await h.invoke('POST','/api/reports/read-message','eve',{reportId:r.id,messageId:noticesToReported[0].id})).code,404);
+ const before=h.saves;
+ const read=await h.invoke('POST','/api/reports/read-message','bob',{reportId:r.id,messageId:noticesToReported[0].id});
+ assert.equal(read.code,200);
+ assert.equal(h.saves,before+1);
+ assert.ok(noticesToReported[0].seenAt);
+ assert.equal(noticesToReported[1].seenAt,null);
+ const after=await h.invoke('GET','/api/reports/mine','bob');
+ assert.equal(after.data.reports[0].messages.filter(m=>m.from==='admin'&&!m.seenAt).length,1);
+ const repeated=await h.invoke('POST','/api/reports/read-message','bob',{reportId:r.id,messageId:noticesToReported[0].id});
+ assert.equal(repeated.code,200);
+ assert.equal(h.saves,before+1,'Repeated confirmations must be idempotent');
+ const reporter=await h.invoke('GET','/api/reports/mine','alice');
+ assert.equal(reporter.data.reports[0].messages.filter(m=>m.from==='admin'&&!m.seenAt).length,1);
+ assert.doesNotMatch(JSON.stringify(after.data),/alice|Segnalazione riservata|reporterId/);
+});
+
+test('On-login popup is shown only for unread admin messages and can be postponed',()=>{
+ const frontend=readFileSync(new URL('../public/zyro-moderation-v1.js',import.meta.url),'utf8');
+ const html=readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
+ assert.match(html,/id="zyroOfficialNotice"/);
+ for(const id of ['zyroOfficialNoticeReply','zyroOfficialNoticeRead','zyroOfficialNoticeLater'])
+   assert.match(html,new RegExp('id="'+id+'"'));
+ assert.match(frontend,/m\.from==='admin'&&!m\.seenAt/);
+ assert.match(frontend,/deferredNotices\.add\(openedNotice\.id\)/);
+ assert.match(frontend,/\/api\/reports\/read-message/);
+ assert.match(frontend,/window\.ZyroModeration=\{renderAdmin,loadInbox,onState,reset:resetNotices,showPendingNotice\}/);
+ assert.doesNotThrow(()=>new vm.Script(frontend));
+});
