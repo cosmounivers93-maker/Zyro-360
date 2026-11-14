@@ -298,6 +298,8 @@ function connectSocket(){
     if(m.type==='account-banned'){alert(m.notice||'Account sospeso.');location.reload();return;}
     if(m.type==='admin-users-changed' && current?.me?.isAdmin)scheduleAdminUsersRefresh();
     if(m.type==='admin-new-report' && current?.me?.isAdmin){toast('Nuova segnalazione ricevuta nel Centro amministratore.');void action(adminLoad);}
+    if(m.type==='admin-report-reply' && current?.me?.isAdmin){toast('Nuova risposta a una segnalazione.');void action(adminLoad);}
+    if(m.type==='report-message') { if(current?.me?.isAdmin)void action(adminLoad); else void window.ZyroModeration?.loadInbox(true); }
     if(m.type==='chat-new' && chatRoom) { if(m.chatType===chatRoom.type && (chatRoom.type==='circle' ? m.target===chatRoom.id : m.from===chatRoom.id || m.from===current?.me?.id))void loadChat(); }
     if(m.type==='chat-new'){
       window.dispatchEvent(new CustomEvent('zyro:chat-new',{detail:m}));
@@ -375,7 +377,7 @@ function setState(data){
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderProfileInvites();renderSettings();renderEmergencyCenterSetting();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();
+  renderHome();renderCircles();renderProfileInvites();renderSettings();renderEmergencyCenterSetting();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();window.ZyroModeration?.onState(data.me);
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) {
     theftTriggered=false; hideTheftOverlay(); stopSiren();
@@ -415,7 +417,7 @@ async function submitReport(){
  if(reason.length<12)throw Error('Descrivi il motivo in almeno 12 caratteri.');
  if(!confirm('Inviare una segnalazione privata all’amministratore?'))return;
  const result=await post('/api/report',{userId,reason});
- $('reportReason').value='';toast(result.message||'Segnalazione inviata.');
+ $('reportReason').value='';toast(result.message||'Segnalazione inviata.');void window.ZyroModeration?.loadInbox(true);
 }
 function fmtAdminDate(n){return n?new Date(n).toLocaleString('it-IT'):'Non disponibile';}
 function renderEmergencyCenterSetting(){
@@ -539,7 +541,7 @@ async function adminLoad(){
  }catch(error){if($('zyroAdminOverview'))$('zyroAdminOverview').textContent='Diagnostica non disponibile: '+error.message;}
  const allReports=data.reports||[];
  const reports=allReports.filter(r=>Boolean(r.adminArchivedAt)===adminArchivedView);
- $('adminReportCount').textContent=String(allReports.filter(r=>!r.adminArchivedAt&&r.status==='open').length);
+ $('adminReportCount').textContent=String(allReports.filter(r=>!r.adminArchivedAt&&['open','in_review'].includes(r.status)).length);
  $('adminUserCount').textContent=String(adminUsersCache.length);
  $('adminReports').innerHTML=reports.length?reports.map(r=>{
   const u=r.user,reporter=r.reporter;
@@ -552,6 +554,7 @@ async function adminLoad(){
  $('adminReports').querySelectorAll('[data-archive-report]').forEach(b=>b.addEventListener('click',()=>action(()=>adminArchive('report',b.dataset.archiveReport))));
  $('adminReports').querySelectorAll('[data-admin-review]').forEach(b=>b.addEventListener('click',()=>action(()=>adminReview(b.dataset.adminReview))));
  $('adminReports').querySelectorAll('[data-report-ban]').forEach(b=>b.addEventListener('click',()=>action(()=>adminChangeBan(b.dataset.reportBan))));
+ window.ZyroModeration?.renderAdmin(reports,adminLoad);
  $('adminAudit').innerHTML=(data.audit||[]).map(a=>`<p><b>${escapeHtml(a.kind)}</b> · ${escapeHtml(a.for||'')} · ${escapeHtml(fmtAdminDate(a.at))}</p>`).join('')||'<p>Nessuna azione registrata.</p>';
  $('adminStatus').textContent=`${adminUsersCache.length} account registrati. Dati aggiornati alle ${new Date().toLocaleTimeString('it-IT')}. Accesso riservato al proprietario.`;
  }catch(error){
