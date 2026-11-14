@@ -210,7 +210,7 @@
  }
  async function loadInbox(force=false){
    const el=$('zyroMyReports');if(!el||el.hidden)return;
-   if(!force && Date.now()-lastInboxAt<30000)return;
+   if(!force && Date.now()-lastInboxAt<30000){showPendingNotice();return;}
    lastInboxAt=Date.now();
    const accountId=activeUser?.id;
    try{
