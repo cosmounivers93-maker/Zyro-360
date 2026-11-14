@@ -1,0 +1,94 @@
+/* Centro segnalazioni v1 — clean glass UI, deliberately light-only. */
+#zyroAdminPanel .zyro-admin-reports{display:grid;gap:12px}
+#zyroAdminPanel .zyro-case-card,
+#zyroMyReports .zyro-inbox-case{
+  border:1px solid #c9d6f0;border-radius:19px;margin:10px 0;
+  background:linear-gradient(145deg,rgba(255,255,255,.94),rgba(238,249,255,.91));
+  box-shadow:0 7px 24px rgba(70,78,140,.08);color:#27344f;overflow:hidden
+}
+#zyroAdminPanel .zyro-case-card>summary,
+#zyroMyReports .zyro-inbox-case>summary{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:15px 14px;cursor:pointer;list-style:none;font-size:13px;font-weight:800
+}
+#zyroAdminPanel .zyro-case-card>summary::-webkit-details-marker,
+#zyroMyReports .zyro-inbox-case>summary::-webkit-details-marker{display:none}
+#zyroAdminPanel .zyro-case-summary-name{display:grid;gap:3px;min-width:0;overflow-wrap:anywhere}
+#zyroAdminPanel .zyro-case-summary-name small{font-size:11px;color:#647690;font-weight:500}
+#zyroAdminPanel .zyro-case-status,#zyroMyReports .zyro-inbox-case summary span{
+  font-size:10px;font-weight:800;max-width:42%;text-align:center;
+  padding:7px 9px;border-radius:30px;color:#624baf;background:#eae6ff
+}
+#zyroAdminPanel .zyro-case-main,#zyroMyReports .zyro-inbox-inner{
+  padding:15px 14px;border-top:1px solid #e0e7f8
+}
+#zyroAdminPanel .zyro-case-parties{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+#zyroAdminPanel .zyro-case-parties>div{
+  border:1px solid #dce8f5;border-radius:14px;padding:10px 9px;
+  background:rgba(250,254,255,.9);min-width:0
+}
+#zyroAdminPanel .zyro-case-parties small{display:block;color:#607b90;font-size:10px;font-weight:800;letter-spacing:.4px}
+#zyroAdminPanel .zyro-case-parties strong{display:block;font-size:13px;margin:6px 0;color:#21344c;overflow-wrap:anywhere}
+#zyroAdminPanel .zyro-case-parties code{font-size:10px;color:#678299;overflow-wrap:anywhere}
+#zyroAdminPanel .zyro-case-date,#zyroMyReports .zyro-inbox-inner>small{
+  display:block;font-size:11px;color:#63788f;margin:12px 0
+}
+#zyroAdminPanel .zyro-case-reason{background:#f6f4ff;border:1px solid #e4dcfc;border-radius:14px;padding:12px}
+#zyroAdminPanel .zyro-case-reason strong{color:#53449a;font-size:12px}
+#zyroAdminPanel .zyro-case-reason p{margin:7px 0 0;font-size:12px;line-height:1.5;color:#334563;white-space:pre-wrap;overflow-wrap:anywhere}
+#zyroAdminPanel .zyro-case-actions{display:flex;gap:8px;flex-wrap:wrap;margin:13px 0}
+#zyroAdminPanel .zyro-case-actions button,
+#zyroAdminPanel .zyro-case-conversation button,
+#zyroMyReports .zyro-inbox-inner button{
+  min-height:40px;border:1px solid #ccdaf5;border-radius:11px;padding:10px 13px;
+  font-size:12px;font-weight:800;color:#513da4;
+  background:linear-gradient(140deg,#f4f1ff,#eaf9ff);cursor:pointer
+}
+#zyroAdminPanel .zyro-case-conversations{display:grid;gap:12px}
+#zyroAdminPanel .zyro-case-conversation{
+  padding:13px;border:1px solid #d9e1f4;border-radius:15px;
+  background:rgba(255,255,255,.7);min-width:0
+}
+#zyroAdminPanel .zyro-case-conversation h4{font-size:14px;margin:0 0 11px;color:#384d86}
+#zyroAdminPanel .zyro-case-timeline,
+#zyroMyReports .zyro-case-timeline{
+  display:grid;gap:9px;max-height:260px;overflow-y:auto;overscroll-behavior:contain;
+  margin:10px 0 12px
+}
+#zyroAdminPanel .zyro-case-message,
+#zyroMyReports .zyro-case-message{
+  margin:0;border-radius:12px;border:1px solid #e1e7f3;
+  padding:10px 11px;background:#f8fbff;
+  overflow-wrap:anywhere
+}
+#zyroAdminPanel .zyro-case-message.is-staff,
+#zyroMyReports .zyro-case-message.is-staff{background:#f0ecff;border-color:#e0d6ff}
+#zyroAdminPanel .zyro-case-message b,#zyroMyReports .zyro-case-message b{font-size:11px;color:#4c4b89}
+#zyroAdminPanel .zyro-case-message p,#zyroMyReports .zyro-case-message p{
+  color:#2a3b52;font-size:12px;white-space:pre-wrap;line-height:1.45;margin:7px 0
+}
+#zyroAdminPanel .zyro-case-message small,#zyroMyReports .zyro-case-message small{color:#60728b;font-size:10px}
+#zyroAdminPanel .zyro-case-conversation label,#zyroMyReports .zyro-inbox-inner label{
+  display:block;font-size:12px;font-weight:700;color:#405276;margin:9px 0
+}
+#zyroAdminPanel .zyro-case-conversation select,
+#zyroAdminPanel .zyro-case-conversation textarea,
+#zyroMyReports .zyro-inbox-inner textarea{
+  box-sizing:border-box;display:block;width:100%;margin-top:5px;
+  border:1px solid #cfdcf0;border-radius:11px;background:#fff;color:#233753;
+  font:inherit;font-size:13px;padding:11px;min-height:42px
+}
+#zyroAdminPanel .zyro-case-conversation textarea,#zyroMyReports .zyro-inbox-inner textarea{resize:vertical}
+#zyroAdminPanel .zyro-case-empty,#zyroMyReports .zyro-case-empty{color:#6a7891;font-size:12px;line-height:1.5}
+#zyroMyReports .zyro-inbox-inner>p{color:#334b60;font-size:12px;overflow-wrap:anywhere}
+#zyroMyReports{border:1px solid #d8dff8;background:linear-gradient(145deg,#fff,#f5f9ff)}
+#zyroMyReports[hidden]{display:none!important}
+#zyroMyReports>small{display:block;margin-top:13px;color:#657b8d;font-size:11px;line-height:1.6}
+#zyroAdminPanel .zyro-case-card button:focus-visible,
+#zyroAdminPanel .zyro-case-card summary:focus-visible,
+#zyroMyReports button:focus-visible,
+#zyroMyReports summary:focus-visible{outline:3px solid #9d8df6;outline-offset:2px}
+@media(min-width:760px){
+  #zyroAdminPanel .zyro-case-conversations{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:380px){#zyroAdminPanel .zyro-case-parties{grid-template-columns:1fr}}
