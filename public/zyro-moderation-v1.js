@@ -30,6 +30,100 @@
  };
  const notifyError=e=>{const msg=e?.message||'Operazione non riuscita.'; if(window.toast)window.toast(msg,true);else alert(msg);};
  const withBusy=async(fn)=>{if(busy)return;busy=true;try{await fn();}catch(e){notifyError(e);}finally{busy=false;}};
+
+ // Signed-in users receive a visible in-app message; only the server decides
+ // when a message is read, and only the intended recipient can acknowledge it.
+ let activeUser=null, inboxReports=[], openedNotice=null, noticeSending=false;
+ const deferredNotices=new Set();
+ function dismissNotice(){
+   const dialog=$('zyroOfficialNotice');
+   if(dialog?.open){if(typeof dialog.close==='function')dialog.close();else dialog.removeAttribute('open');}
+   openedNotice=null;
+ }
+ function unreadMessages(){
+   return inboxReports.flatMap(r=>(r.messages||[])
+     .filter(m=>m.from==='admin'&&!m.seenAt&&!deferredNotices.has(m.id))
+     .map(m=>({reportId:r.id,role:r.role,...m})))
+     .sort((a,b)=>a.at-b.at);
+ }
+ function safeToShowNotice(){
+   if(!activeUser||activeUser.isAdmin || document.hidden) return false;
+   if($('appScreen')?.classList.contains('hidden'))return false;
+   if(activeUser.sos || !$('theftOverlay')?.classList.contains('hidden'))return false;
+   if(document.querySelector('dialog[open]:not(#zyroOfficialNotice),[role="alertdialog"]:not(.hidden),.zyro-owner-dialog-backdrop'))return false;
+   return true;
+ }
+ function showPendingNotice(){
+   const dialog=$('zyroOfficialNotice');
+   if(!dialog || dialog.open || !safeToShowNotice())return;
+   const queue=unreadMessages(), m=queue[0];if(!m)return;
+   openedNotice=m;
+   $('zyroOfficialNoticeText').textContent=m.body;
+   $('zyroOfficialNoticeDate').textContent=date(m.at);
+   $('zyroOfficialNoticeCount').textContent=queue.length>1
+     ?\`Hai \${queue.length} comunicazioni da leggere\`
+     :'Comunicazione privata';
+   $('zyroOfficialNoticeKind').textContent=m.role==='reporter'
+     ?'Aggiornamento sulla tua segnalazione'
+     :'Messaggio riservato al tuo account';
+   try{if(typeof dialog.showModal==='function')dialog.showModal();else dialog.setAttribute('open','');}
+   catch{openedNotice=null;}
+ }
+ function deferNotice(){
+   if(openedNotice)deferredNotices.add(openedNotice.id);
+   dismissNotice();
+   showPendingNotice();
+ }
+ async function acknowledgeNotice(openConversation=false){
+   if(noticeSending || !openedNotice)return;
+   noticeSending=true;
+   const accountId=activeUser?.id;
+   const m=openedNotice;
+   try{
+     const response=await request('/api/reports/read-message',
+       {reportId:m.reportId,messageId:m.id});
+     if(activeUser?.id!==accountId)return;
+     for(const r of inboxReports)if(r.id===m.reportId){
+       const item=(r.messages||[]).find(x=>x.id===m.id);
+       if(item)item.seenAt=response.seenAt||Date.now();
+     }
+     dismissNotice();
+     if(openConversation){
+       // Keep other notices available on a later revisit, without stacking
+       // dialogs on top of the conversation the user just opened.
+       for(const rest of unreadMessages())deferredNotices.add(rest.id);
+       if(typeof window.showView==='function')window.showView('settings');
+       await loadInbox(true);
+       setTimeout(()=>{
+         const target=[...document.querySelectorAll('#zyroMyReportsList details[data-inbox-id]')]
+           .find(el=>el.dataset.inboxId===m.reportId);
+         if(target){target.open=true;target.scrollIntoView({block:'start',behavior:'smooth'});
+           target.querySelector('textarea[data-user-reply]')?.focus({preventScroll:true});}
+         else $('zyroMyReports')?.scrollIntoView({block:'start',behavior:'smooth'});
+       },120);
+     }else showPendingNotice();
+   }catch(e){notifyError(e);}
+   finally{noticeSending=false;}
+ }
+ function bindOfficialNotice(){
+   const dialog=$('zyroOfficialNotice');if(!dialog||dialog.dataset.bound)return;
+   dialog.dataset.bound='yes';
+   $('zyroOfficialNoticeLater')?.addEventListener('click',deferNotice);
+   $('zyroOfficialNoticeRead')?.addEventListener('click',()=>void acknowledgeNotice(false));
+   $('zyroOfficialNoticeReply')?.addEventListener('click',()=>void acknowledgeNotice(true));
+   dialog.addEventListener('cancel',event=>{event.preventDefault();deferNotice();});
+   document.addEventListener('visibilitychange',()=>{
+     if(!document.hidden && activeUser && !activeUser.isAdmin){
+       void loadInbox(true);showPendingNotice();
+     }
+   });
+   window.addEventListener('focus',()=>{if(activeUser && !activeUser.isAdmin)void loadInbox(true);});
+ }
+ function resetNotices(){
+   dismissNotice();deferredNotices.clear();inboxReports=[];activeUser=null;
+   lastInboxAt=0;lastUser='';
+ }
+
  const messagesFor=(r,role)=>(r.messages||[]).filter(m=>m.to===role||m.from===role);
  const thread=(r,role)=>{
    const list=messagesFor(r,role);
@@ -118,8 +212,11 @@
    const el=$('zyroMyReports');if(!el||el.hidden)return;
    if(!force && Date.now()-lastInboxAt<30000)return;
    lastInboxAt=Date.now();
+   const accountId=activeUser?.id;
    try{
      const data=await request('/api/reports/mine');
+     if(!activeUser || activeUser.id!==accountId)return;
+     inboxReports=data.reports||[];
      const list=$('zyroMyReportsList');if(!list)return;
      list.innerHTML=data.reports.length?data.reports.map(r=>`<details class="zyro-inbox-case" data-inbox-id="${safe(r.id)}">
        <summary><strong>${r.role==='reporter'?'Segnalazione inviata':'Messaggio dall’amministrazione'}</strong><span>${safe(labels[r.status]||r.status)}</span></summary>
@@ -130,11 +227,16 @@
          <label>Rispondi privatamente all’amministrazione<textarea data-user-reply rows="3" maxlength="800" placeholder="Scrivi eventuali chiarimenti o informazioni aggiuntive"></textarea></label>
          <button type="button" data-reply-send>Invia risposta</button>
        </div></details>`).join(''):'<p class="zyro-case-empty">Nessun messaggio o segnalazione presente.</p>';
+     showPendingNotice();
      if(!list.dataset.inboxBound){
        list.dataset.inboxBound='yes';
        list.addEventListener('toggle',event=>{
          const details=event.target.closest('details[data-inbox-id]');
-         if(details?.open)void request('/api/reports/read',{reportId:details.dataset.inboxId}).catch(()=>{});
+         if(details?.open)void request('/api/reports/read',{reportId:details.dataset.inboxId}).then(()=>{
+           const report=inboxReports.find(r=>r.id===details.dataset.inboxId);
+           for(const m of report?.messages||[])if(m.from==='admin'&&!m.seenAt)m.seenAt=Date.now();
+           if(openedNotice?.reportId===details.dataset.inboxId)dismissNotice();
+         }).catch(()=>{});
        },true);
        list.addEventListener('click',event=>{
          const btn=event.target.closest('[data-reply-send]');if(!btn)return;
@@ -153,12 +255,18 @@
    const box=$('zyroMyReports');
    if(!box)return;
    box.hidden=!user || user.isAdmin===true;
-   if(!user){lastUser='';return;}
-   if(lastUser!==user.id){lastInboxAt=0;lastUser=user.id;box.querySelector('#zyroMyReportsList')?.replaceChildren();}
-   void loadInbox();
+   if(!user){resetNotices();return;}
+   if(lastUser!==user.id){
+     resetNotices();lastUser=user.id;
+     box.querySelector('#zyroMyReportsList')?.replaceChildren();
+   }
+   activeUser=user;
+   if(!user.isAdmin)void loadInbox();
+   else dismissNotice();
  }
- window.ZyroModeration={renderAdmin,loadInbox,onState};
+ window.ZyroModeration={renderAdmin,loadInbox,onState,reset:resetNotices,showPendingNotice};
  document.addEventListener('DOMContentLoaded',()=>{
+   bindOfficialNotice();
    $('zyroMyReportsRefresh')?.addEventListener('click',()=>void loadInbox(true));
  });
 })();
