@@ -1,0 +1,155 @@
+/* ZYRO 360 1.85 — LIGHT GLASS RELEASE
+   Visual layer only: all permissions, SOS, GPS, chat, payments and moderation
+   continue to run through existing server-authorized handlers. */
+:root,html,html[data-theme="light"],html[data-theme="dark"]{
+  color-scheme:light!important;
+  --bg:#f5f8ff;--text:#1b2d52;--muted:#586c8e;
+  --navy:#293b7c;--mint:#855de8;--mint-d:#487fea;
+  --neo-bg:#f6f9ff;--neo-surface:#fff;--neo-deep:#ebf1ff;
+  --neo-card:rgba(255,255,255,.80);--neo-edge:rgba(113,112,227,.28);
+  --neo-purple:#8a63ed;--neo-blue:#458bee;--neo-cyan:#36bfd0;
+  --neo-pink:#e65ea7;--neo-text:#1b2d52;--neo-muted:#647795;
+  --neo-shadow:0 12px 28px rgba(77,100,164,.11);
+  --border:rgba(114,133,185,.25);
+}
+html,body,body.zyro-await-intro{
+  background:radial-gradient(ellipse at 8% 0%,rgba(153,120,255,.20),transparent 46%),
+    radial-gradient(ellipse at 95% 100%,rgba(62,211,221,.19),transparent 44%),
+    linear-gradient(155deg,#fcfdff,#edf4ff 82%)!important;
+  color:#1b2d52!important;
+}
+body{background-attachment:fixed!important}
+#authScreen{color:#223759!important}
+#authScreen .auth-brand{color:#273c78!important;text-shadow:0 0 10px rgba(112,96,213,.15)}
+#authScreen .auth-brand b{color:#8566e9!important}
+#authScreen .brand-emblem{background:linear-gradient(145deg,#f2e9ff,#dceefc)!important;border:1px solid #c4b7f6!important;color:#8f65e7!important;box-shadow:0 7px 24px rgba(102,90,203,.15)!important}
+#authScreen .auth-card{
+  background:rgba(255,255,255,.83)!important;
+  color:#23375b!important;border:1px solid rgba(175,188,237,.63)!important;
+  box-shadow:0 18px 56px rgba(70,102,176,.13)!important;
+  -webkit-backdrop-filter:blur(19px);backdrop-filter:blur(19px);
+}
+#authScreen .auth-card h1{color:#27395c!important}
+#authScreen .auth-card h1 span,#authScreen .eyebrow{color:#8a63e8!important}
+#authScreen .auth-copy,#authScreen .auth-note,#authScreen .field>span,#authScreen .tiny-auth{color:#61738e!important}
+#authScreen .auth-tabs{background:#edf2ff!important;border:1px solid rgba(141,151,217,.20)!important}
+#authScreen .auth-tab{color:#536b90!important}
+#authScreen .auth-tab.active{background:linear-gradient(112deg,#8f65ed,#58b7e9)!important;color:#fff!important;box-shadow:0 5px 16px rgba(112,103,217,.22)!important}
+#authScreen input{background:#fff!important;color:#223757!important;border:1px solid #cbd8f2!important}
+#authScreen input::placeholder{color:#7f8da6!important}
+#authScreen #authSubmit{background:linear-gradient(110deg,#9166ee,#40c2d5)!important;color:#fff!important;border-color:#8f90e7!important;opacity:1}
+#authScreen .tiny-auth{color:#667692!important}
+#appScreen,#appScreen .container{background:transparent!important;color:#1b2d52!important}
+#appScreen>.topbar{
+  z-index:32!important;background:rgba(255,255,255,.63)!important;
+  border-bottom:1px solid rgba(167,172,232,.48)!important;
+  box-shadow:0 8px 24px rgba(54,90,159,.09)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(140%);backdrop-filter:blur(18px) saturate(140%);
+}
+#appScreen>.topbar .brand,#appScreen>.topbar .brand.zyro-neon-wordmark{
+  justify-content:flex-start!important;text-align:left!important;
+  padding:0!important;margin:0!important;border:0!important;
+  background:transparent!important;box-shadow:none!important;
+  color:#55449e!important;font-weight:800!important;
+  letter-spacing:1.35px!important;font-size:17px!important;
+}
+#appScreen>.topbar .brand>span{color:#55449e!important;text-shadow:0 0 9px rgba(159,109,244,.18)!important}
+#appScreen>.topbar .brand b{color:#8471ed!important;text-shadow:0 0 10px rgba(112,98,233,.22)!important}
+#appScreen>.topbar .brand-emblem{display:none!important}
+#appScreen>.topbar .connection-pill{
+  background:rgba(246,249,255,.85)!important;color:#3a557b!important;
+  border:1px solid rgba(122,146,213,.33)!important;box-shadow:none!important;
+}
+#appScreen>.bottom-nav{
+  z-index:40!important;background:rgba(255,255,255,.80)!important;
+  border-top:1px solid rgba(157,165,225,.36)!important;
+  box-shadow:0 -5px 20px rgba(63,97,165,.10)!important;
+  -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);
+}
+#appScreen>.bottom-nav .nav-item{color:#5d7092!important;text-shadow:none!important;touch-action:manipulation}
+#appScreen>.bottom-nav .nav-item.active,#appScreen>.bottom-nav .nav-item.active .nav-icon{
+  color:#785ce7!important;text-shadow:none!important;
+  filter:drop-shadow(0 0 5px rgba(146,115,242,.2))!important;
+}
+#appScreen>.bottom-nav .nav-item.active:before{
+  background:linear-gradient(90deg,#8764e9,#54bddf)!important;
+  box-shadow:0 0 8px rgba(127,98,235,.22)!important;
+}
+#appScreen #homeView #liveMap,#appScreen #homeView #zyroVectorMap{
+  background:#e5effb!important;
+}
+#appScreen #homeView #liveMap .zyro-neo-night-overlay{display:none!important}
+#appScreen #homeView .zyro-atlas-legend,
+#appScreen #homeView #mapZoomControls,
+#appScreen #homeView #mapStatus,
+#appScreen #homeView #mapAttribution{
+  background:rgba(255,255,255,.81)!important;color:#34496f!important;
+  border:1px solid rgba(115,142,205,.40)!important;
+  box-shadow:0 5px 17px rgba(61,88,158,.12)!important;
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+}
+#appScreen #homeView #mapZoomControls button,
+#appScreen #homeView #mapAttribution a{color:#38598e!important}
+#appScreen #homeView .zyro-command-row{background:rgba(245,248,255,.48)!important;border-color:rgba(152,160,220,.45)!important;backdrop-filter:blur(14px)}
+#appScreen #homeView :is(.zyro-command-share,.zyro-command-locate,.zyro-command-sos){color:#fff!important}
+#appScreen .view:not(.home-map-view){color:#223858!important}
+#appScreen .view:not(.home-map-view) :is(h1,h2,h3,.page-heading h1,.profile-heading h1,.section-head h2,.panel-title h2,.chat-heading-row h2){color:#243a68!important;text-shadow:none!important}
+#appScreen .view:not(.home-map-view) :is(.panel,.stat-card,.circle-card,.contact-card,.profile-photo-editor,.zyro-appearance-panel,.chat-hub,.chat-room,.how-it-works,.pick-panel,.zyro-v15-panel,.zyro-plan-card,.chat-room-card,.chat-room-item){
+  background:rgba(255,255,255,.85)!important;
+  border:1px solid rgba(158,173,227,.47)!important;
+  color:#243a60!important;border-radius:20px!important;
+  box-shadow:0 8px 24px rgba(67,94,161,.09)!important;
+}
+#appScreen .view:not(.home-map-view) :is(p,small,.setting-description,.panel-title p,.profile-photo-heading p,.how-heading p:last-child){color:#5c7090!important}
+#appScreen .view:not(.home-map-view) :is(.panel-icon,.stat-icon,.profile-photo-icon,.how-icon,.appearance-emblem){
+  background:linear-gradient(135deg,#efe7ff,#def6fa)!important;
+  border:1px solid rgba(161,138,224,.35)!important;
+  color:#805fdd!important;box-shadow:none!important;
+}
+#appScreen .view:not(.home-map-view) :is(input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),select,textarea),
+#profileSettingsDrawer :is(input:not([type="checkbox"]),select,textarea){
+  background:#fff!important;color:#263c61!important;
+  border:1px solid #c6d3ee!important;border-radius:14px!important;
+}
+#appScreen .view:not(.home-map-view) :is(input,select,textarea)::placeholder{color:#8694af!important}
+#appScreen .view:not(.home-map-view) :is(.btn-primary,.zyro-v15-primary){
+  background:linear-gradient(115deg,#8c66e9,#43bacc)!important;
+  border:1px solid #9997e5!important;color:#fff!important;
+  box-shadow:0 5px 16px rgba(104,114,204,.19)!important;
+}
+#appScreen .view:not(.home-map-view) :is(.btn-outline,.btn-dark,.zyro-v15-secondary){
+  background:#eef2ff!important;color:#4d4f9d!important;border-color:#bbc7ed!important;
+}
+#appScreen .view:not(.home-map-view) .zyro-plan-card.zyro-plan-family{
+  background:linear-gradient(145deg,#fff,#f0eaff 60%,#e7f6fb)!important;
+  color:#253c62!important;border-color:#bdb1e9!important;
+}
+#appScreen .view:not(.home-map-view) .zyro-plan-card :is(h3,strong,li,.zyro-plan-tag,.zyro-plan-price>span,.zyro-plan-caption){color:#273d68!important}
+#appScreen .view:not(.home-map-view) .zyro-plan-tag{background:#eee8ff!important;color:#7052c4!important}
+#appScreen .view:not(.home-map-view) .zyro-plan-soon:not(:disabled){background:linear-gradient(110deg,#8064e6,#37b8cb)!important;color:#fff!important}
+#profileSettingsBackdrop.zyro-settings-backdrop{background:rgba(38,52,95,.24)!important}
+#profileSettingsDrawer.zyro-settings-drawer,#profileSettingsDrawer .zyro-settings-detail{
+  background:rgba(249,251,255,.97)!important;color:#25395e!important;
+  border-color:rgba(160,173,228,.47)!important;
+}
+#profileSettingsDrawer :is(h2,h3,strong,.zyro-settings-back,.mini-overline){color:#304771!important}
+#profileSettingsDrawer .zyro-drawer-menu>button{
+  background:rgba(255,255,255,.83)!important;color:#2c456d!important;
+  border:1px solid rgba(174,188,233,.45)!important;
+}
+#profileSettingsDrawer .zyro-drawer-menu>button small{color:#6880a0!important}
+#profileSettingsDrawer :is(.zyro-settings-glyph,.zyro-drawer-icon-button){
+  background:#eee9ff!important;color:#7754ce!important;border:1px solid #d5c9f5!important;
+}
+#profileSettingsDrawer :is(.zyro-v15-mic,.zyro-v15-destination,.how-content){background:#fff!important;color:#29446a!important;border-color:#d4dcf1!important}
+#profileSettingsDrawer #premiumStatus{background:#edf7fa!important;color:#315a76!important;border-color:#a6dce8!important}
+#zyroSettingsMenu [data-settings-target="appearance"],#zyroSettingsPanels [data-settings-panel="appearance"],.zyro-theme-option,[data-theme-choice]{display:none!important}
+body.zyro-chat-full #chatConversation{background:#f4f7ff!important;color:#23385b!important}
+body.zyro-chat-full #chatConversation .chat-header{background:linear-gradient(110deg,#ede6ff,#e3f2ff)!important;color:#2c456e!important}
+body.zyro-chat-full #chatConversation .chat-bubble{background:#fff!important;color:#26385f!important;border-color:#d3def1!important}
+body.zyro-chat-full #chatConversation .chat-bubble.mine{background:linear-gradient(110deg,#8f68eb,#497bdb)!important;color:#fff!important;border-color:#857bdc!important}
+body.zyro-chat-full #chatConversation :is(input,textarea){background:#fff!important;color:#273d60!important;border-color:#c5d4ef!important}
+#zyroOfficialNotice{background:#fff!important;color:#293b62!important}
+#appScreen button:not(:disabled){-webkit-tap-highlight-color:transparent}
+@media(max-width:390px){#appScreen>.topbar .brand.zyro-neon-wordmark{font-size:15px!important;letter-spacing:.8px!important}}
+@media(prefers-reduced-motion:reduce){#appScreen :is(.nav-item,.btn){transition:none!important}}
