@@ -1,0 +1,70 @@
+name: ZYRO 360 - Verifica grafica reale 1.88
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/index.html'
+      - 'public/zyro-approved-glass-v188.css'
+      - '.github/workflows/visual-login-v188.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  screenshot-login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Browser Chromium per la verifica visuale
+        run: |
+          npm install --no-save playwright-core@1.56.1
+          google-chrome --version
+      - name: Test reale screenshot su server Render
+        shell: bash
+        run: |
+          node --input-type=module <<'EOF'
+          import { chromium } from 'playwright-core';
+          import { existsSync, mkdirSync } from 'node:fs';
+          const execPath=['/usr/bin/google-chrome','/usr/bin/chromium','/usr/bin/chromium-browser']
+            .find(existsSync);
+          if(!execPath)throw Error('Browser Chromium non trovato');
+          mkdirSync('visual-evidence',{recursive:true});
+          const browser=await chromium.launch({headless:true,executablePath:execPath,args:['--no-sandbox']});
+          try{
+            const page=await browser.newPage({viewport:{width:390,height:844},deviceScaleFactor:1});
+            await page.goto('https://zyro-360.onrender.com/?visual=188',{waitUntil:'domcontentloaded',timeout:90000});
+            const proceed=page.locator('#zyroWelcomeProceed');
+            if(await proceed.isVisible({timeout:15000}).catch(()=>false))await proceed.click({timeout:20000});
+            await page.locator('#authScreen .auth-card').waitFor({state:'visible',timeout:30000});
+            const data=await page.evaluate(()=>{
+              const style=(selector)=>getComputedStyle(document.querySelector(selector));
+              return {
+                logo:style('#authScreen .brand-emblem').backgroundImage,
+                bg:style('#authScreen.auth-shell').backgroundImage,
+                card:style('#authScreen .auth-card').backgroundColor,
+                button:style('#authScreen #authSubmit').backgroundImage,
+                title:document.querySelector('#authScreen .auth-brand').textContent.trim(),
+                subtitle:document.querySelector('#appScreen .zyro-brand-caption')?.textContent.trim(),
+                stylesheet:[...document.styleSheets].some(s=>s.href?.includes('zyro-approved-glass-v188.css'))
+              };
+            });
+            console.log(JSON.stringify(data,null,2));
+            if(!data.stylesheet||!data.logo.includes('zyro-icon-192-v37.png')||
+               !data.bg.includes('linear-gradient')||!data.subtitle.includes('Tu e la tua cerchia')||
+               !data.title.includes('ZYRO')||!data.button.includes('linear-gradient')){
+              throw Error('La pagina Render non mostra tutta la grafica approvata');
+            }
+            await page.screenshot({path:'visual-evidence/zyro-login-188.png',fullPage:true});
+            console.log('PASS: grafica login 1.88 effettivamente distribuita dal server');
+          }finally{await browser.close();}
+          EOF
+      - name: Salva schermata reale per revisione
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZYRO360-GRAFICA-REALE-188
+          path: visual-evidence/
+          if-no-files-found: warn
