@@ -1,0 +1,97 @@
+/* ZYRO 360 v192 — only UI adjustments approved in November screenshots.
+   Preserve DOM, clicks, location permissions, SOS, Pick Pocket, Check-in,
+   Accompagnami, chats, subscriptions and moderation API responses. */
+@media (max-width:760px) {
+ html[data-theme="light"] body #appScreen > .topbar,
+ html[data-theme="light"] body #appScreen:has(#homeView:not(.hidden)) > .topbar {
+   box-sizing:border-box!important;display:flex!important;justify-content:flex-start!important;
+   align-items:center!important;gap:8px!important;
+   height:62px!important;min-height:62px!important;max-height:62px!important;
+   padding:7px 13px!important;isolation:isolate!important;
+   border:0!important;border-bottom:1px solid rgba(147,173,221,.68)!important;
+   border-radius:0 0 17px 17px!important;
+   background:linear-gradient(110deg,rgba(253,255,255,.84),rgba(236,235,255,.76) 53%,rgba(220,248,255,.81))!important;
+   background-color:transparent!important;
+   -webkit-backdrop-filter:blur(16px) saturate(1.25)!important;
+   backdrop-filter:blur(16px) saturate(1.25)!important;
+   box-shadow:0 4px 14px rgba(55,75,145,.13)!important;
+ }
+ html[data-theme="light"] body #appScreen > .topbar .brand.zyro-neon-wordmark,
+ html[data-theme="light"] body #appScreen:has(#homeView:not(.hidden)) > .topbar .brand.zyro-neon-wordmark {
+   display:flex!important;flex-direction:row!important;justify-content:flex-start!important;
+   align-items:center!important;position:relative!important;flex:0 1 auto!important;
+   min-width:0!important;width:auto!important;max-width:calc(100% - 132px)!important;
+   height:auto!important;min-height:0!important;margin:0!important;padding:4px 2px!important;
+   gap:0!important;background:none!important;background-color:transparent!important;
+   border:0!important;border-radius:0!important;box-shadow:none!important;
+   filter:none!important;transform:none!important;letter-spacing:1.4px!important;
+ }
+ html[data-theme="light"] body #appScreen > .topbar .brand.zyro-neon-wordmark > .zyro-brand-title,
+ html[data-theme="light"] body #appScreen:has(#homeView:not(.hidden)) > .topbar .brand > .zyro-brand-title {
+   display:block!important;white-space:nowrap!important;font:800 19px/1.15 system-ui,sans-serif!important;
+   letter-spacing:1.4px!important;color:#334e88!important;
+   -webkit-text-fill-color:#334e88!important;text-shadow:0 0 9px rgba(122,115,235,.12)!important;
+ }
+ html[data-theme="light"] body #appScreen > .topbar .brand.zyro-neon-wordmark > .zyro-brand-title b,
+ html[data-theme="light"] body #appScreen:has(#homeView:not(.hidden)) > .topbar .brand > .zyro-brand-title b {
+   color:#7757c3!important;-webkit-text-fill-color:#7757c3!important;
+   text-shadow:0 0 9px rgba(131,111,240,.20)!important;
+ }
+ html[data-theme="light"] body #appScreen > .topbar .brand::before,
+ html[data-theme="light"] body #appScreen > .topbar .brand::after {
+   display:none!important;content:none!important;
+ }
+ html[data-theme="light"] body #appScreen > .topbar .connection-pill {
+   position:absolute!important;right:12px!important;top:50%!important;
+   transform:translateY(-50%)!important;max-width:127px!important;
+   padding:7px 9px!important;gap:5px!important;
+   background:rgba(255,255,255,.73)!important;color:#274665!important;
+   border:1px solid rgba(153,176,226,.65)!important;border-radius:999px!important;
+   box-shadow:0 2px 8px rgba(40,65,117,.09)!important;
+   font-size:11px!important;white-space:nowrap!important;
+ }
+ html[data-theme="light"] body #appScreen > .bottom-nav {
+   background:linear-gradient(120deg,rgba(253,255,255,.91),rgba(238,244,255,.88),rgba(241,231,255,.88))!important;
+   -webkit-backdrop-filter:blur(16px) saturate(1.18)!important;
+   backdrop-filter:blur(16px) saturate(1.18)!important;
+   border:1px solid rgba(164,188,235,.72)!important;
+ }
+ /* Both unchecked and checked states remain readable without JavaScript. */
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share,
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share:not(.is-sharing) {
+   background:linear-gradient(135deg,#2c99cb,#5b62cf)!important;
+   color:white!important;border:1px solid #348cc5!important;
+   opacity:1!important;filter:none!important;
+   box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 3px 9px rgba(46,86,162,.22)!important;
+ }
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share:has(#shareToggle:checked),
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share.is-sharing {
+   background:linear-gradient(140deg,#127c9c,#4c5bc4)!important;
+   border-color:#3ca6bb!important;
+ }
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share :is(.zyro-cmd-title,.zyro-cmd-icon,.zyro-cmd-state),
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share .zyro-cmd-icon svg {
+   color:#fff!important;-webkit-text-fill-color:#fff!important;
+   opacity:1!important;filter:none!important;
+   text-shadow:0 1px 2px rgba(20,42,90,.28)!important;
+ }
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share .zyro-cmd-title {
+   font-weight:850!important;font-size:clamp(11px,2.75vw,13px)!important;
+   line-height:1.17!important;
+ }
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share .zyro-cmd-state {
+   font-weight:850!important;font-size:10px!important;
+ }
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share:active {
+   filter:brightness(1.12)!important;
+ }
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share:has(#shareToggle:focus-visible) {
+   outline:3px solid #4e5bbf!important;outline-offset:2px!important;
+ }
+ html[data-theme="light"] body #appScreen #homeView .zyro-command-row label.zyro-command-share:has(#shareToggle:disabled) {
+   opacity:.85!important;cursor:not-allowed!important;
+ }
+ #profileSettingsDrawer #zyroPlanOptions>summary .zyro-mode-summary-label {color:#294775!important}
+ #profileSettingsDrawer #zyroPlanOptions>summary .zyro-mode-summary-label small {color:#476c91!important}
+ #zyroAdminPanel .zyro-case-parties > div {background:rgba(246,251,255,.92)!important;border-color:rgba(161,185,237,.75)!important}
+}
