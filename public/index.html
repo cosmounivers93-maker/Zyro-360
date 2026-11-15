@@ -343,6 +343,72 @@ html,body{overscroll-behavior-x:none}
 #zyroAdminPanel .zyro-admin-emergency-dialog-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
 #zyroAdminPanel .zyro-admin-emergency-dialog-actions button{flex:1;min-width:110px}
 </style>
+<style>
+/* ZYRO 360 v179 — keep optional emergency consent within registration card on Android/WebView. */
+#authScreen #authForm{width:100%;min-width:0}
+#authScreen #emergencyConsentField:not(.hidden){
+  display:grid;
+  grid-template-columns:20px minmax(0,1fr);
+  align-items:start;
+  gap:12px;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+  margin:15px 0 0;
+  padding:14px;
+  border:1px solid rgba(107,157,211,.28);
+  border-radius:16px;
+  background:linear-gradient(135deg,rgba(237,248,255,.96),rgba(247,242,255,.96));
+  line-height:1.5;
+  text-align:left;
+}
+#authScreen #emergencyConsentRegister{
+  -webkit-appearance:checkbox;
+  appearance:checkbox;
+  display:block;
+  box-sizing:border-box;
+  width:20px!important;
+  min-width:20px!important;
+  max-width:20px!important;
+  height:20px!important;
+  margin:2px 0 0!important;
+  padding:0!important;
+  flex:none;
+  accent-color:#526ddc;
+}
+#authScreen #emergencyConsentRegisterInfo{
+  display:block;
+  min-width:0;
+  max-width:100%;
+  margin:0;
+  overflow-wrap:anywhere;
+  white-space:normal;
+  color:#214764;
+  font-size:13px;
+  font-weight:400;
+  line-height:1.5;
+}
+#authScreen #emergencyConsentRegisterInfo strong{
+  display:block;
+  color:#214764;
+  font-size:13px;
+  font-weight:750;
+  line-height:1.45;
+}
+#authScreen #emergencyConsentRegisterInfo small{
+  display:block;
+  margin:6px 0 0!important;
+  color:#536f86;
+  font-size:12px;
+  font-weight:400;
+  line-height:1.55;
+  overflow-wrap:anywhere;
+}
+@media(max-width:390px){
+  #authScreen #emergencyConsentField:not(.hidden){gap:10px;padding:12px}
+}
+</style>
 </head>
 <body class="zyro-await-intro">
 <div id="authScreen" class="auth-shell">
@@ -357,8 +423,8 @@ html,body{overscroll-behavior-x:none}
       <label id="nameField" class="field hidden"><span>Il tuo nome</span><input id="name" name="name" type="text" autocomplete="name" maxlength="36" placeholder="Come vuoi essere chiamato"></label>
       <label class="field"><span>Email</span><input id="email" name="email" type="email" autocomplete="email" required placeholder="nome@email.it"></label>
       <label class="field"><span>Password</span><input id="password" name="password" type="password" autocomplete="current-password" required minlength="10" placeholder="Almeno 10 caratteri"></label>
-      <label id="emergencyConsentField" class="field hidden" style="display:flex;align-items:flex-start;gap:12px;line-height:1.5">
-        <input id="emergencyConsentRegister" type="checkbox" style="margin-top:4px;flex:none" aria-describedby="emergencyConsentRegisterInfo">
+      <label id="emergencyConsentField" class="field hidden zyro-emergency-consent">
+        <input id="emergencyConsentRegister" type="checkbox" aria-describedby="emergencyConsentRegisterInfo">
         <span id="emergencyConsentRegisterInfo"><strong>Facoltativo: condividi la posizione con il Centro Emergenze durante un SOS</strong><small style="display:block;margin-top:5px">Il solo account proprietario può vedere la posizione inviata durante un SOS, anche fuori dalla tua cerchia, e l'ultima posizione fino a 24 ore dopo la chiusura. Puoi revocare il consenso nelle impostazioni.</small></span>
       </label>
       <button id="authSubmit" class="btn btn-primary btn-wide" type="submit">Entra nella tua cerchia <span>→</span></button>
