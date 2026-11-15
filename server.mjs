@@ -474,7 +474,7 @@ app.post('/api/register', limit, (req, res) => {
   if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 160 || password.length < 10 || password.length > 128) return res.status(400).json({error:'Inserisci nome, email valida e una password di almeno 10 caratteri.'});
   if (Object.values(db.users).some(u => u.email === email)) return res.status(409).json({error:'Email già registrata.'});
   const id = token(12), salt = token(16);
-  db.users[id] = { id, name, profileNamePrefix:profileSlug(name), email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], sosAudioConsent: false, emergencyCenterConsent: req.body.emergencyCenterConsent === true, avatar: null };
+  db.users[id] = { id, name, profileNamePrefix:profileSlug(name), email, salt, passwordHash: passwordHash(password, salt), createdAt: now(), sharing: false, pushSubs: [], gpsRecipients: [], sosRecipients: [], sosAudioConsent: false, emergencyCenterConsent: false, avatar: null };
   auditLogin(req, db.users[id]);db.users[id].registrationIp=db.users[id].lastLoginIp;db.users[id].registrationDevice=db.users[id].lastDevice; loginUser(res, id);notifyAdminUsers(); res.json({ ok:true });
 });
 app.post('/api/login', limit, (req, res) => {
