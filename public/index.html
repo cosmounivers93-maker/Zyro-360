@@ -328,6 +328,25 @@ html,body{overscroll-behavior-x:none}
 <link rel="stylesheet" href="/zyro-release-185-light.css?v=185.1">
 <link rel="stylesheet" href="/zyro-home-final-v187.css?v=187.0">
 <link rel="stylesheet" href="/zyro-approved-glass-v188.css?v=188.0">
+
+<style id="zyro-approved-home-correction-v189">
+/* Solo Home: ripristino titolo e contrasto GPS, nessuna logica modificata. */
+#appScreen > .topbar .brand.zyro-neon-wordmark > .zyro-brand-caption{display:none!important}
+#appScreen #homeView .zyro-command-row label.zyro-command-share:not(.is-sharing){
+  background:rgba(250,252,255,.90)!important;
+  border-color:#a5c5e3!important;
+  color:#324c79!important;
+  opacity:1!important;
+}
+#appScreen #homeView .zyro-command-row label.zyro-command-share:not(.is-sharing) :is(.zyro-cmd-title,.zyro-cmd-icon,.zyro-cmd-state),
+#appScreen #homeView .zyro-command-row label.zyro-command-share:not(.is-sharing) .zyro-cmd-icon svg{
+  color:#294771!important;opacity:1!important;
+  text-shadow:none!important;filter:none!important;
+}
+#appScreen #homeView .zyro-command-row label.zyro-command-share.is-sharing :is(.zyro-cmd-title,.zyro-cmd-icon,.zyro-cmd-state){
+  color:#fff!important;opacity:1!important;
+}
+</style>
 </head>
 <body class="zyro-await-intro">
 <div id="authScreen" class="auth-shell">
@@ -351,7 +370,7 @@ html,body{overscroll-behavior-x:none}
 
 <div id="appScreen" class="app-shell hidden">
   <header class="topbar">
-    <div class="brand zyro-neon-wordmark" aria-label="ZYRO 360"><span class="zyro-brand-title">ZYRO <b>360</b></span><span class="zyro-brand-caption">Tu e la tua cerchia</span></div>
+    <div class="brand zyro-neon-wordmark" aria-label="ZYRO 360"><span class="zyro-brand-title">ZYRO <b>360</b></span></div>
     <div class="connection-pill" role="status" aria-live="polite" aria-label="Stato connessione Zyro 360"><span id="connectionDot" class="connection-dot" aria-hidden="true"></span><span id="connectionText">Connessione...</span></div>
   </header>
   <main class="container">
