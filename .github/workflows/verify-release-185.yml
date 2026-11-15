@@ -1,0 +1,40 @@
+name: ZYRO 360 - Verifica release 1.85 sul server
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'public/index.html'
+      - 'public/app.js'
+      - 'public/sw.js'
+      - 'public/zyro-release-185-light.css'
+      - '.github/workflows/verify-release-185.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check-live-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verifica che Render mostri realmente la release 1.85
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://zyro-360.onrender.com'
+          for attempt in $(seq 1 25); do
+            if curl --fail --location --silent --show-error --max-time 30 --retry 1 "$base/?verify=185" -o /tmp/zyro-live.html \
+               && curl --fail --location --silent --show-error --max-time 30 "$base/zyro-release-185-light.css?v=185.1" -o /tmp/zyro-light.css \
+               && curl --fail --location --silent --show-error --max-time 30 "$base/app.js?v=185.1" -o /tmp/zyro-app.js \
+               && curl --fail --location --silent --show-error --max-time 30 "$base/sw.js?v=185-light-glass" -o /tmp/zyro-sw.js \
+               && grep -Fq 'zyro-release-185-light.css' /tmp/zyro-live.html \
+               && grep -Fq 'zyro-release" content="1.85-light-glass"' /tmp/zyro-live.html \
+               && grep -Fq "zyroTheme='light'" /tmp/zyro-app.js \
+               && grep -Fq 'zyro-360-v185-light-glass' /tmp/zyro-sw.js \
+               && grep -Fq '.zyro-welcome-screen' /tmp/zyro-light.css; then
+              echo "OK: Render serve homepage, JavaScript, CSS e cache della release 1.85."
+              exit 0
+            fi
+            echo "Render non ancora allineato alla release 1.85 (tentativo $attempt)."
+            sleep 8
+          done
+          echo "::error::Render non mostra ancora la release 1.85. Verificare deploy automatico o deploy manuale nel dashboard Render."
+          exit 1
