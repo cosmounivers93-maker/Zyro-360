@@ -377,7 +377,7 @@ function setState(data){
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderProfileInvites();renderSettings();renderEmergencyCenterSetting();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();window.ZyroModeration?.onState(data.me);
+  renderHome();renderCircles();renderProfileInvites();renderSettings();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();window.ZyroModeration?.onState(data.me);
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) {
     theftTriggered=false; hideTheftOverlay(); stopSiren();
@@ -400,7 +400,7 @@ function renderAdminAccess(){
  $('premiumPanel')?.classList.toggle('zyro-premium-owner',admin);
  // The owner's diagnostics should load even if the WebSocket never connects.
  if(admin && !adminLoaded && !adminLoadPending && Date.now()-adminLastAttemptAt>10000)scheduleAdminUsersRefresh();
- if(!admin){closeAdminEmergenciesDialog();adminArchivedView=false;if($('adminArchiveToggle')){$('adminArchiveToggle').textContent='Mostra archiviate';$('adminArchiveToggle').setAttribute('aria-pressed','false');}adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
+ if(!admin){adminArchivedView=false;if($('adminArchiveToggle')){$('adminArchiveToggle').textContent='Mostra archiviate';$('adminArchiveToggle').setAttribute('aria-pressed','false');}adminLoaded=false;adminUsersCache=[];$('adminUsers').replaceChildren();$('adminReports').replaceChildren();$('adminAudit').replaceChildren();}
 }
 function renderReportContacts(){
  const select=$('reportUser');if(!select)return;
@@ -420,70 +420,6 @@ async function submitReport(){
  $('reportReason').value='';toast(result.message||'Segnalazione inviata.');void window.ZyroModeration?.loadInbox(true);
 }
 function fmtAdminDate(n){return n?new Date(n).toLocaleString('it-IT'):'Non disponibile';}
-function renderEmergencyCenterSetting(){
- const toggle=$('emergencyCenterToggle');
- if(!toggle||!current)return;
- toggle.checked=current.me.emergencyCenterConsent===true;
- $('emergencyCenterStatus').textContent=toggle.checked
-  ?'Condivisione con il Centro Emergenze autorizzata solo durante un SOS. Puoi disattivarla in qualsiasi momento.'
-  :'Centro Emergenze non autorizzato. La tua posizione non è accessibile all’amministratore tramite questa funzione.';
-}
-function renderAdminEmergencies(emergencies=[]){
- const root=$('adminEmergencies');
- if(!root||!current?.me?.isAdmin)return;
- root.innerHTML=emergencies.length?emergencies.map(e=>{
-   const p=e.lastPosition;
-   const lat=p&&Number.isFinite(Number(p.lat))?Number(p.lat):null;
-   const lon=p&&Number.isFinite(Number(p.lon))?Number(p.lon):null;
-   const hasFix=lat!==null&&lon!==null;
-   const mapUrl=hasFix?'https://www.openstreetmap.org/?mlat='+encodeURIComponent(lat)+'&mlon='+encodeURIComponent(lon)+'#map=17/'+encodeURIComponent(lat)+'/'+encodeURIComponent(lon):null;
-   const locationLine=hasFix
-    ?'<span>Coordinate: '+escapeHtml(lat.toFixed(5))+', '+escapeHtml(lon.toFixed(5))+' · Precisione dichiarata: '+escapeHtml(Math.round(Number(p.accuracy)||0))+' m</span><br><span>Ultimo rilevamento GPS: '+escapeHtml(fmtAdminDate(p.updatedAt))+'</span>'
-    :'<span>Posizione GPS non ancora disponibile</span>';
-   return '<article class="zyro-admin-report"><div class="zyro-admin-report-top"><b>'+escapeHtml(e.name||'Utente')+'</b><span>'+(e.active?'SOS attivo':'SOS concluso')+'</span></div>'+
-     '<p>Attivato il '+escapeHtml(fmtAdminDate(e.startedAt))+(e.endedAt?' · Terminato il '+escapeHtml(fmtAdminDate(e.endedAt)):'')+'</p>'+
-     (e.lastAddress?'<p>Via rilevata all’attivazione del SOS: <b>'+escapeHtml(e.lastAddress)+'</b></p>':'<p>Indirizzo non disponibile (GPS o geocodifica assente).</p>')+
-     '<p>'+locationLine+'</p>'+
-     (mapUrl?'<p><a href="'+escapeHtml(mapUrl)+'" target="_blank" rel="noopener noreferrer">Apri l’ultima posizione su OpenStreetMap</a></p>':'')+
-     '<small>Visibile soltanto per SOS con condivisione autorizzata, fino a 24 ore dalla chiusura.</small></article>';
- }).join(''):'<p class="setting-description">Nessun SOS con condivisione autorizzata. Nessuna posizione di altri utenti è disponibile.</p>';
-}
-// I dettagli sensibili SOS vengono richiesti esclusivamente all'apertura della finestra.
-let adminEmergenciesRequestSeq=0;
-function closeAdminEmergenciesDialog(){
- const dialog=$('adminEmergenciesDialog');
- if(!dialog)return;
- adminEmergenciesRequestSeq++;
- if(dialog.open){
-  if(typeof dialog.close==='function')dialog.close();
-  else dialog.removeAttribute('open');
- }
- $('adminEmergencies')?.replaceChildren();
-}
-async function loadAdminEmergenciesDialog(){
- const dialog=$('adminEmergenciesDialog'),root=$('adminEmergencies');
- if(!dialog?.open||!root||!current?.me?.isAdmin)return;
- const ownerId=current.me.id,requestId=++adminEmergenciesRequestSeq;
- root.textContent='Caricamento delle sole posizioni SOS autorizzate…';
- try{
-  const feed=await api('/api/admin/emergencies');
-  if(!dialog.open||!current?.me?.isAdmin||current.me.id!==ownerId||requestId!==adminEmergenciesRequestSeq)return;
-  renderAdminEmergencies(feed.emergencies||[]);
- }catch(error){
-  if(dialog.open&&current?.me?.isAdmin&&current.me.id===ownerId&&requestId===adminEmergenciesRequestSeq)
-   root.textContent='Impossibile caricare le posizioni SOS: '+error.message;
- }
-}
-function openAdminEmergenciesDialog(){
- if(!current?.me?.isAdmin)return;
- const dialog=$('adminEmergenciesDialog');
- if(!dialog)return;
- if(!dialog.open){
-  if(typeof dialog.showModal==='function')dialog.showModal();
-  else dialog.setAttribute('open','');
- }
- void loadAdminEmergenciesDialog();
-}
 function renderAdminUsers(){
  const term=$('adminFilter').value.trim().toLowerCase();
  const users=adminUsersCache.filter(u=>Boolean(u.adminArchivedAt)===adminArchivedView).filter(u=>[u.name,u.email,u.id,u.profileId,u.lastLoginIp,u.registrationIp,u.lastDevice?.manufacturer,u.lastDevice?.model].some(v=>String(v||'').toLowerCase().includes(term)));
@@ -1029,7 +965,7 @@ function showView(view){
   if(!order.includes(view))return;
   const previousView=activeView;
   const changed=previousView!==view;
-  if(view!=='settings'){closeAdminEmergenciesDialog();closeProfileSettings();}
+  if(view!=='settings')closeProfileSettings();
   if(view!=='chats'&&chatRoom)closeChat();
   activeView=view;
   document.body.classList.toggle('zyro-home-no-brand',view==='home');
@@ -3143,31 +3079,7 @@ async function init(){
   $('chatForm').addEventListener('submit',e=>{e.preventDefault();action(async()=>{const text=$('chatText').value.trim();if(!text&&!chatPhotoData)return;await sendChat(text,chatPhotoData);});});
   $('chatPhoto').addEventListener('change',e=>{const file=e.target.files?.[0];if(file)action(async()=>{chatPhotoData=await imageData(file,520,105000);$('chatPendingPhoto').textContent='📷 '+file.name+' pronta da inviare';});});
   document.querySelectorAll('[data-quick]').forEach(b=>b.addEventListener('click',()=>action(()=>sendChat(b.dataset.quick,null))));
-  $('emergencyCenterToggle').addEventListener('change',()=>{
-    const toggle=$('emergencyCenterToggle'),enabled=toggle.checked;
-    toggle.disabled=true;
-    void action(async()=>{
-      try{
-        await post('/api/settings/emergency-center',{enabled});
-        await refresh();
-        toast(enabled?'Condivisione con il Centro Emergenze autorizzata durante SOS.':'Consenso al Centro Emergenze revocato.');
-      }catch(error){toggle.checked=!enabled;throw error;}
-      finally{toggle.disabled=false;}
-    });
-  });
   $('reportSubmit').addEventListener('click',()=>action(submitReport));
-  $('adminEmergenciesOpen').addEventListener('click',openAdminEmergenciesDialog);
-  $('adminEmergenciesClose').addEventListener('click',closeAdminEmergenciesDialog);
-  $('adminEmergenciesDone').addEventListener('click',closeAdminEmergenciesDialog);
-  $('adminEmergenciesRefresh').addEventListener('click',()=>void loadAdminEmergenciesDialog());
-  $('adminEmergenciesDialog').addEventListener('close',()=>{
-    adminEmergenciesRequestSeq++;
-    $('adminEmergencies').replaceChildren();
-    if(current?.me?.isAdmin&&activeView==='settings')$('adminEmergenciesOpen').focus();
-  });
-  $('adminEmergenciesDialog').addEventListener('click',event=>{
-    if(event.target===event.currentTarget)closeAdminEmergenciesDialog();
-  });
   $('adminLoad').addEventListener('click',()=>action(adminLoad));
   $('adminArchiveToggle').addEventListener('click',()=>{adminArchivedView=!adminArchivedView;$('adminArchiveToggle').setAttribute('aria-pressed',String(adminArchivedView));$('adminArchiveToggle').textContent=adminArchivedView?'Torna all’elenco principale':'Mostra archiviate';void action(adminLoad);});
   document.querySelectorAll('[data-admin-tab]').forEach(b=>b.addEventListener('click',()=>showAdminTab(b.dataset.adminTab)));
