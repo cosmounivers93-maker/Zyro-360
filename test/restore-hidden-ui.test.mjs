@@ -20,7 +20,7 @@ test('billing UI does not reinsert the restore button, while retaining automatic
 });
 
 test('service worker cache version changes so refreshed UI can be installed',()=>{
-  assert.match(sw,/zyro-360-v188-approved-glass/);
+  assert.match(sw,/zyro-360-v189-home-header-gps-contrast/);
   assert.match(sw,/zyro-circle-modes-v2\.css/);
   assert.match(sw,/zyro-circle-picker-v3\.css/);
   assert.match(sw,/zyro-circle-picker-v3\.js/);
@@ -36,9 +36,11 @@ test('release 1.85 loads the updated light-only interface',()=>{
 });
 
 const home187=readFileSync(new URL('../public/zyro-home-final-v187.css',import.meta.url),'utf8');
-test('release 1.87 forces a readable top-left brand and the requested Home title',()=>{
+test('release 1.89 preserves the approved top-left ZYRO title without an extra subtitle',()=>{
   assert.ok(html.includes('zyro-home-final-v187.css?v=187.0'));
-  assert.ok(html.includes('class="zyro-brand-caption">Tu e la tua cerchia</span>'));
+  assert.ok(!html.includes('class="zyro-brand-caption">Tu e la tua cerchia</span>'));
+  assert.ok(html.includes('zyro-approved-home-correction-v189'));
+  assert.ok(html.includes('label.zyro-command-share:not(.is-sharing)'));
   assert.ok(html.includes('class="zyro-brand-title">ZYRO <b>360</b>'));
   assert.ok(home187.includes('justify-content:flex-start!important'));
   assert.ok(home187.includes('visibility:visible!important'));
@@ -59,9 +61,9 @@ test('release 1.88 restores approved light login and V37 shield while preserving
   assert.ok(approvedGlass.includes('#authScreen.auth-shell'));
   assert.ok(approvedGlass.includes('zyro-icon-192-v37.png'));
   assert.ok(approvedGlass.includes('rgba(255,255,255,.88)'));
-  assert.ok(sw.includes('zyro-360-v188-approved-glass'));
+  assert.ok(sw.includes('zyro-360-v189-home-header-gps-contrast'));
   assert.ok(sw.includes('zyro-approved-glass-v188.css'));
-  assert.ok(html.includes('Tu e la tua cerchia'));
+  assert.ok(!html.includes('class="zyro-brand-caption">Tu e la tua cerchia</span>'));
   assert.ok(html.includes('zyro-moderation-v1.js'));
   assert.match(moderation,/admin|segnalazion/i);
   assert.ok(billing.includes('zyro360_unico'));
