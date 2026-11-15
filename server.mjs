@@ -296,7 +296,10 @@ function stateFor(id) {
     status:inv.status, expiresAt:inv.expiresAt, createdAt:inv.createdAt,
     direction:inv.to===id?'received':'sent',
     peerName:db.users[inv.to===id?inv.from:inv.to]?.name||'Utente'
-  })).filter(inv=>inv.status==='pending').sort((a,b)=>b.createdAt-a.createdAt).slice(0,60);
+  })).filter(inv=>inv.status==='pending'||inv.direction==='sent'&&(
+    inv.status!=='accepted' || !!db.circles[inv.circleId] &&
+      memberIds(inv.circleId).includes(inv.to) && memberIds(inv.circleId).includes(inv.from)
+  )).sort((a,b)=>b.createdAt-a.createdAt).slice(0,60);
   return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)),
   sosAudioRecipients:(me.sosAudioRecipients||[]).filter(x=>sharedCircle(id,x)),
   pickRemoteContacts:familyActive(me)?(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)):[],
