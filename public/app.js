@@ -242,7 +242,7 @@ function acceptCompassReading(raw,now=Date.now()){
   aimHeading();
 }
 const ZYRO_THEME_KEY='zyro360-appearance-v8';
-let zyroTheme='dark';
+let zyroTheme='light';
 // Pick Pocket is a foreground browser experiment, not an Android system lock.
 let pickArmed=false, theftTriggered=false, lastMotionAt=0, motionPeaks=0, motionSamples=0, armTime=0;
 const pickSelected = new Set();
@@ -1881,10 +1881,10 @@ class ZyroRasterMap{
 function syncStableMarkers(){stableMap?.schedule();}
 function focusStableMap(lat,lon,zoom=16){if(!stableMap||!mapValidPoint({lat,lon}))return;stableMap.easeTo({center:[Number(lon),Number(lat)],zoom});}
 function applyZyroTheme(next,persist=true){
- zyroTheme=next==='light'?'light':'dark';document.documentElement.dataset.theme=zyroTheme;
- document.querySelector('meta[name="theme-color"]')?.setAttribute('content',zyroTheme==='dark'?'#071626':'#e8f5f7');
+ zyroTheme='light';document.documentElement.dataset.theme='light';
+ document.querySelector('meta[name="theme-color"]')?.setAttribute('content','#f6f9ff');
  for(const btn of document.querySelectorAll('[data-theme-choice]')){const selected=btn.dataset.themeChoice===zyroTheme;btn.classList.toggle('is-selected',selected);btn.setAttribute('aria-pressed',String(selected));}
- if(persist)try{localStorage.setItem(ZYRO_THEME_KEY,zyroTheme);}catch{}
+ if(persist)try{localStorage.setItem(ZYRO_THEME_KEY,'light');}catch{}
  stableMap?.setStyle(zyroTheme);
 }
 function ensureStableMap(){
@@ -2793,10 +2793,9 @@ function initZyroDuePicker(){
 
 async function init(){
   initZyroDuePicker();
-  let storedTheme=null;try{storedTheme=localStorage.getItem(ZYRO_THEME_KEY);}catch{}
-  applyZyroTheme(storedTheme||'dark',false);
+  applyZyroTheme('light',true);
   await zyroWelcomeBeforeStart();
-  for(const button of document.querySelectorAll('[data-theme-choice]'))button.addEventListener('click',()=>applyZyroTheme(button.dataset.themeChoice));
+  // Tema unico chiaro, senza selettore o riattivazione della modalita scura.
   $('mapRetry')?.addEventListener('click',()=>{stableAttempts=0;removeStableMap();mapHideFailure();ensureStableMap();});
   window.addEventListener('online',()=>{if(current){stableAttempts=0;removeStableMap();renderMap();}});
   const params=new URLSearchParams(location.search);inviteFromLink=params.get('invite');
@@ -3110,7 +3109,7 @@ async function init(){
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
     pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;window.ZyroModeration?.reset();chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=29-sos-activation-visible').catch(()=>{});
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=185-light-glass').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);
