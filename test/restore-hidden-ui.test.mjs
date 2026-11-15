@@ -27,10 +27,10 @@ test('service worker cache version changes so refreshed UI can be installed',()=
 });
 
 test('release 1.85 loads the updated light-only interface',()=>{
-  assert.match(html,/zyro-release-185-light\\.css/);
+  assert.match(html,/zyro-release-185-light\.css/);
   assert.match(html,/<meta name="color-scheme" content="light">/);
   assert.doesNotMatch(html,/data-settings-target="appearance"/);
   assert.match(js,/zyroTheme='light'/);
-  assert.match(js,/applyZyroTheme\\('light',true\\)/);
-  assert.match(sw,/zyro-release-185-light\\.css/);
+  assert.match(js,/applyZyroTheme\('light',true\)/);
+  assert.match(sw,/zyro-release-185-light\.css/);
 });
