@@ -20,8 +20,17 @@ test('billing UI does not reinsert the restore button, while retaining automatic
 });
 
 test('service worker cache version changes so refreshed UI can be installed',()=>{
-  assert.match(sw,/zyro-360-v29-sos-activation-visible/);
+  assert.match(sw,/zyro-360-v185-light-glass/);
   assert.match(sw,/zyro-circle-modes-v2\.css/);
   assert.match(sw,/zyro-circle-picker-v3\.css/);
   assert.match(sw,/zyro-circle-picker-v3\.js/);
+});
+
+test('release 1.85 loads the updated light-only interface',()=>{
+  assert.match(html,/zyro-release-185-light\\.css/);
+  assert.match(html,/<meta name="color-scheme" content="light">/);
+  assert.doesNotMatch(html,/data-settings-target="appearance"/);
+  assert.match(js,/zyroTheme='light'/);
+  assert.match(js,/applyZyroTheme\\('light',true\\)/);
+  assert.match(sw,/zyro-release-185-light\\.css/);
 });
