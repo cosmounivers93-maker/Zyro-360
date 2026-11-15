@@ -53,17 +53,17 @@ test('release 1.87 forces a readable top-left brand and the requested Home title
 const approvedGlass=readFileSync(new URL('../public/zyro-approved-glass-v188.css',import.meta.url),'utf8');
 const moderation=readFileSync(new URL('../public/zyro-moderation-v1.js',import.meta.url),'utf8');
 const billing=readFileSync(new URL('../play-billing.mjs',import.meta.url),'utf8');
-test('release 1.88 restores approved light login and V37 shield without touching permissions or payments',()=>{
-  assert.match(html,/zyro-approved-glass-v188\\.css\\?v=188\\.0/);
-  assert.match(html,/zyro-icon-192-v37\\.png/);
-  assert.match(approvedGlass,/#authScreen\\.auth-shell/);
-  assert.match(approvedGlass,/zyro-icon-192-v37\\.png/);
-  assert.match(approvedGlass,/rgba\\(255,255,255,\\.88\\)/);
-  assert.match(sw,/zyro-360-v188-approved-glass/);
-  assert.match(sw,/zyro-approved-glass-v188\\.css/);
-  assert.match(html,/Tu e la tua cerchia/);
-  assert.match(html,/zyro-moderation-v1\\.js/);
+test('release 1.88 restores approved light login and V37 shield while preserving payments and reports',()=>{
+  assert.ok(html.includes('/zyro-approved-glass-v188.css?v=188.0'));
+  assert.ok(html.includes('/zyro-icon-192-v37.png'));
+  assert.ok(approvedGlass.includes('#authScreen.auth-shell'));
+  assert.ok(approvedGlass.includes('zyro-icon-192-v37.png'));
+  assert.ok(approvedGlass.includes('rgba(255,255,255,.88)'));
+  assert.ok(sw.includes('zyro-360-v188-approved-glass'));
+  assert.ok(sw.includes('zyro-approved-glass-v188.css'));
+  assert.ok(html.includes('Tu e la tua cerchia'));
+  assert.ok(html.includes('zyro-moderation-v1.js'));
   assert.match(moderation,/admin|segnalazion/i);
-  assert.match(billing,/zyro360_unico/);
+  assert.ok(billing.includes('zyro360_unico'));
   assert.match(js,/unico-mensile|billing-sync/);
 });
