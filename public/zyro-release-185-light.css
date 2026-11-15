@@ -153,3 +153,32 @@ body.zyro-chat-full #chatConversation :is(input,textarea){background:#fff!import
 #appScreen button:not(:disabled){-webkit-tap-highlight-color:transparent}
 @media(max-width:390px){#appScreen>.topbar .brand.zyro-neon-wordmark{font-size:15px!important;letter-spacing:.8px!important}}
 @media(prefers-reduced-motion:reduce){#appScreen :is(.nav-item,.btn){transition:none!important}}
+
+/* Welcome / onboarding follows exactly the same light-glass palette. */
+.zyro-welcome-screen{
+  background:radial-gradient(ellipse at 100% 0,rgba(132,100,235,.17),transparent 43%),
+    radial-gradient(ellipse at 0 95%,rgba(51,192,209,.17),transparent 42%),
+    linear-gradient(155deg,#fbfdff,#edf4ff)!important;
+  color:#273e62!important;
+}
+.zyro-welcome-brand,.zyro-welcome-screen h1{color:#263e67!important}
+.zyro-welcome-brand span,.zyro-welcome-kicker{color:#8061db!important}
+.zyro-welcome-intro,.zyro-welcome-note{color:#58718e!important}
+.zyro-welcome-card{
+  background:rgba(255,255,255,.82)!important;color:#2b4368!important;
+  border-color:rgba(143,154,222,.40)!important;
+  box-shadow:0 6px 18px rgba(82,107,170,.07)!important;
+}
+.zyro-welcome-card>span{
+  background:#f0eaff!important;border-color:#b8a6f0!important;color:#8060df!important;
+}
+.zyro-welcome-card h2{color:#263e66!important}
+.zyro-welcome-card p{color:#5b7090!important}
+.zyro-welcome-actions{border-top-color:rgba(153,169,222,.41)!important}
+.zyro-welcome-actions button{
+  background:linear-gradient(110deg,#8d64e9,#46c5cc)!important;
+  color:#fff!important;border-color:#8d91e5!important;
+  box-shadow:0 6px 18px rgba(110,121,208,.18)!important;
+}
+.zyro-welcome-screen a{color:#6852ca!important}
+.zyro-welcome-screen :focus-visible{outline-color:#775be4!important}
