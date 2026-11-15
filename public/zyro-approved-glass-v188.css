@@ -129,3 +129,17 @@ html body #appScreen #homeView .zyro-command-row .zyro-command-btn .zyro-cmd-tit
 @media(prefers-reduced-motion:reduce){
   html body #authScreen *{scroll-behavior:auto!important}
 }
+
+/* Correzione mirata: ripristina il glass approvato nelle barre fisse Android.
+   La regola mobile in public/index.html spegne il backdrop-filter; qui viene
+   ripristinato senza cambiare geometria, titoli, colori, tab o funzioni. */
+@media (max-width:760px) {
+  html body #appScreen > .topbar {
+    -webkit-backdrop-filter:blur(13px) saturate(1.13)!important;
+    backdrop-filter:blur(13px) saturate(1.13)!important;
+  }
+  html body #appScreen > .bottom-nav {
+    -webkit-backdrop-filter:blur(20px) saturate(1.2)!important;
+    backdrop-filter:blur(20px) saturate(1.2)!important;
+  }
+}
