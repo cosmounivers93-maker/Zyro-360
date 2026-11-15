@@ -1,12 +1,13 @@
 <!doctype html>
 <html lang="it">
 <head>
+<meta name="zyro-release" content="1.85-light-glass">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b1831">
+  <meta name="theme-color" content="#f6f9ff">
   <meta name="zyro-ui-build" content="v56-fluidita-reattiva">
   <meta name="description" content="Zyro 360: una rete privata di persone fidate con posizione condivisa, SOS e ascolto audio consensuale.">
-  <meta name="color-scheme" content="light dark">
+  <meta name="color-scheme" content="light">
   <link rel="manifest" href="/manifest.webmanifest?v=37">
   <link rel="icon" type="image/png" href="/zyro-icon-192-v37.png">
   <link rel="apple-touch-icon" href="/zyro-icon-192-v37.png">
@@ -324,6 +325,7 @@ html,body{overscroll-behavior-x:none}
 }
 </style>
 
+<link rel="stylesheet" href="/zyro-release-185-light.css?v=185.1">
 </head>
 <body class="zyro-await-intro">
 <div id="authScreen" class="auth-shell">
@@ -801,8 +803,7 @@ html,body{overscroll-behavior-x:none}
       <button id="profileSettingsClose" class="zyro-drawer-icon-button" type="button" aria-label="Chiudi impostazioni">✕</button>
     </div>
     <nav id="zyroSettingsMenu" class="zyro-drawer-menu" aria-label="Sezioni impostazioni">
-      <button type="button" data-settings-target="appearance"><span class="zyro-settings-glyph">◐</span><span>Aspetto dell'app<small>Tema chiaro o scuro</small></span><b>›</b></button>
-      <button type="button" data-settings-target="help"><span class="zyro-settings-glyph">?</span><span>Come funziona l'app<small>Guida a cerchie, SOS e protezioni remote</small></span><b>›</b></button>
+            <button type="button" data-settings-target="help"><span class="zyro-settings-glyph">?</span><span>Come funziona l'app<small>Guida a cerchie, SOS e protezioni remote</small></span><b>›</b></button>
       <button type="button" data-settings-target="quickSos"><span class="zyro-settings-glyph">🆘</span><span>SOS rapido<small>Pulsante nella tendina delle Impostazioni rapide</small></span><b>›</b></button>
       <button type="button" data-settings-target="premium"><span class="zyro-settings-glyph">✦</span><span>Abbonamenti<small>Piano unico · 2,99 €/mese</small></span><b>›</b></button>
       <button type="button" data-settings-target="emergency"><span class="zyro-settings-glyph">✚</span><span>Numeri di emergenza<small>Chiama il 112</small></span><b>›</b></button>
@@ -900,7 +901,7 @@ html,body{overscroll-behavior-x:none}
    <div class="zyro-due-actions"><button type="button" id="zyroDueClear">Cancella</button><button type="button" id="zyroDueCancel">Annulla</button><button type="button" id="zyroDueConfirm">Imposta</button></div>
  </section>
 </div>
-<script src="/app.js?v=82.4" defer></script>
+<script src="/app.js?v=185.1" defer></script>
 <script src="/zyro-moderation-v1.js?v=2" defer></script>
 <script src="/zyro-circle-picker-v3.js?v=3" defer></script>
 <script src="/zyro-chat-notifications-v1.js?v=1" defer></script>
