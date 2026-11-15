@@ -1,0 +1,131 @@
+/* ZYRO 360 — Ripristino grafico approvato
+ * Revision 188. ONLY presentation: never modify SOS, Check-in, Pick Pocket,
+ * admin reports, messages, account logic, Play Billing or authorization rules.
+ * Match the approved light cyan/violet/white glass design and original V37 shield.
+ */
+
+/* The previous patch styled the card but left the login page itself dark. */
+html,html[data-theme="light"],body{
+  color-scheme:light!important;
+  --bg:#f5faff;--text:#243d69;--muted:#617792;
+}
+html body #authScreen.auth-shell{
+  background:
+    radial-gradient(ellipse at 90% 7%,rgba(79,205,224,.16),transparent 45%),
+    radial-gradient(ellipse at 5% 93%,rgba(159,129,243,.17),transparent 48%),
+    linear-gradient(160deg,#fafcff 0%,#f0f6ff 54%,#e8f8fc 100%)!important;
+  color:#2b466d!important;
+  min-height:100dvh!important;
+}
+html body #authScreen .auth-brand{
+  color:#4f5eb0!important;filter:none!important;
+  text-shadow:none!important;opacity:1!important;
+  font-size:16px!important;letter-spacing:1.65px!important;
+}
+html body #authScreen .auth-brand>span{
+  color:#3b558b!important;opacity:1!important;text-shadow:none!important;
+}
+html body #authScreen .auth-brand b{color:#6e66d4!important}
+html body #authScreen .auth-brand .brand-emblem{
+  background:#e7faff url('/zyro-icon-192-v37.png') center / cover no-repeat!important;
+  width:43px!important;height:43px!important;min-width:43px!important;
+  border-radius:13px!important;border:1px solid #bcdaf2!important;
+  color:transparent!important;font-size:0!important;text-shadow:none!important;
+  box-shadow:0 5px 15px rgba(64,112,172,.14)!important;
+}
+html body #authScreen .auth-card{
+  background:rgba(255,255,255,.88)!important;
+  color:#273e65!important;
+  border:1px solid rgba(173,191,236,.69)!important;
+  box-shadow:0 19px 48px rgba(78,107,155,.13)!important;
+  border-radius:27px!important;
+  -webkit-backdrop-filter:blur(16px) saturate(1.08)!important;
+  backdrop-filter:blur(16px) saturate(1.08)!important;
+}
+html body #authScreen .auth-card .center-shield{
+  background:#f7fdff url('/zyro-icon-192-v37.png') center / contain no-repeat!important;
+  border:4px solid #e3f5ff!important;
+  border-radius:25px!important;
+  color:transparent!important;font-size:0!important;text-shadow:none!important;
+  box-shadow:0 8px 25px rgba(82,156,191,.17)!important;
+}
+html body #authScreen .auth-illustration .orbit-ring{
+  border-color:rgba(138,167,217,.65)!important;
+}
+html body #authScreen .auth-illustration .orb{
+  background:rgba(255,255,255,.95)!important;
+  box-shadow:0 3px 12px rgba(91,132,179,.15)!important;
+}
+html body #authScreen .auth-card h1{color:#253f69!important}
+html body #authScreen .auth-card h1 span{color:#7666df!important}
+html body #authScreen .auth-card .eyebrow{color:#7966d6!important}
+html body #authScreen .auth-card :is(.auth-copy,.auth-note){
+  color:#5a7391!important;text-shadow:none!important;
+}
+html body #authScreen .auth-card .field>span,
+html body #authScreen .auth-card label.field span{
+  color:#455f83!important;font-weight:650!important;
+}
+html body #authScreen .auth-tabs{
+  background:rgba(233,241,254,.88)!important;
+  border:1px solid #d6e1f6!important;
+  box-shadow:none!important;
+}
+html body #authScreen .auth-tab{color:#567396!important}
+html body #authScreen .auth-tab.active{
+  background:linear-gradient(110deg,#896be8,#48b8d7)!important;
+  border-color:transparent!important;color:#fff!important;
+  box-shadow:0 4px 13px rgba(111,143,221,.18)!important;
+}
+html body #authScreen .auth-card input{
+  background:#fff!important;color:#243d62!important;
+  border:1px solid #cad9ee!important;
+  box-shadow:none!important;opacity:1!important;
+}
+html body #authScreen .auth-card input::placeholder{
+  color:#8795ab!important;opacity:1!important;
+}
+html body #authScreen .auth-card input:focus{
+  border-color:#807be3!important;outline:2px solid rgba(133,117,229,.19)!important;
+}
+html body #authScreen #authSubmit{
+  background:linear-gradient(108deg,#8669e5,#41c4d2)!important;
+  color:#fff!important;border:1px solid #9fb1e8!important;
+  text-shadow:none!important;opacity:1!important;
+  box-shadow:0 6px 20px rgba(95,122,210,.19)!important;
+}
+html body #authScreen>.tiny-auth,
+html body #authScreen .tiny-auth{
+  color:#637793!important;text-shadow:none!important;
+}
+html body #authScreen .auth-note{font-size:11px!important}
+
+/* Original approved palette for circles, chat, profile and reports. */
+html body #appScreen .view:not(.home-map-view){
+  color:#293f67!important;
+}
+html body #appScreen .view:not(.home-map-view)
+:is(.panel,.circle-card,.contact-card,.stat-card,.chat-room,
+.zyro-plan-card,.profile-identity-card,.zyro-v15-panel,.pick-panel){
+  background:rgba(255,255,255,.86)!important;
+  border:1px solid rgba(169,185,229,.51)!important;
+  box-shadow:0 6px 22px rgba(71,95,155,.08)!important;
+}
+html body #appScreen .bottom-nav .nav-item.active{
+  color:#705ccf!important;
+}
+html body #appScreen>.topbar{
+  background:rgba(251,253,255,.78)!important;
+}
+html body #appScreen>.topbar .zyro-brand-title,
+html body #appScreen>.topbar .zyro-brand-title b{
+  color:#5b56ae!important;opacity:1!important;text-shadow:none!important;
+}
+
+/* Keep the high-contrast three-button Home fixed in release 187. */
+html body #appScreen #homeView .zyro-command-row .zyro-command-btn .zyro-cmd-title{
+  color:#fff!important;opacity:1!important;
+}
+@media(prefers-reduced-motion:reduce){
+  html body #authScreen *{scroll-behavior:auto!important}
+}
