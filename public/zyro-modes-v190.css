@@ -1,7 +1,7 @@
 /* ZYRO 360 v190 — small functional additions; preserve v188 approved glass UI. */
 #homeJourneyRequests.hidden{display:none!important}
 #homeJourneyRequests.zyro-home-journey-requests:not(.hidden){
-  position:relative;z-index:16;margin:8px 12px 12px;
+  position:absolute!important;top:clamp(165px,22dvh,250px);left:10px;right:10px;z-index:32;margin:0 auto;max-width:540px;
   display:grid;gap:9px;max-height:min(34vh,290px);overflow-y:auto;
   overscroll-behavior:contain
 }
