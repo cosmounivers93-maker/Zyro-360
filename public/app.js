@@ -88,6 +88,11 @@ function zyroHandlePushOpen(kind){
  });
 }
 window.addEventListener('zyro:push-open',event=>zyroHandlePushOpen(event.detail?.kind));
+if('serviceWorker'in navigator){
+ navigator.serviceWorker.addEventListener('message',event=>{
+  if(event.data?.type==='zyro:push-open')zyroHandlePushOpen(event.data.kind);
+ });
+}
 
 let zyroGroupCodeLastCircleId='';
 let adminUsersCache = [];
@@ -444,7 +449,19 @@ function setState(data){
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
   renderHome();renderCircles();renderProfileInvites();renderSettings();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();zyroRefreshFollowJourney();renderAdminAccess();renderReportContacts();renderInvitedPeople();window.ZyroModeration?.onState(data.me);
-  if(zyroPendingPushKind){const kind=zyroPendingPushKind;zyroPendingPushKind='';queueMicrotask(()=>zyroHandlePushOpen(kind));}
+  const pendingNativeKind=window.ZyroPendingPushKind;
+  window.ZyroPendingPushKind=null;
+  const pendingFromUrl=new URLSearchParams(window.location.search).get('zyro_push_kind');
+  const queuedKind=zyroPendingPushKind||pendingNativeKind||pendingFromUrl;
+  if(queuedKind){
+    zyroPendingPushKind='';
+    if(pendingFromUrl){
+      const url=new URL(window.location.href);
+      url.searchParams.delete('zyro_push_kind');
+      window.history.replaceState(null,'',url.pathname+url.search+url.hash);
+    }
+    queueMicrotask(()=>zyroHandlePushOpen(queuedKind));
+  }
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) {
     theftTriggered=false; hideTheftOverlay(); stopSiren();
@@ -1627,6 +1644,24 @@ function stopAudioRelaySender(){
   void r.ctx.close().catch(()=>{});
 }
 async function enablePush(){
+  if(isNativeZyro()){
+    if(!current?.me?.id)throw Error('Accedi al tuo account prima di attivare gli avvisi.');
+    // This is the same explicit permission action as Profilo → Abilita permessi.
+    // WebView's PushManager is not supported; use native Android + FCM only.
+    window.prompt('ZYRO360_REQUEST_NOTIFICATIONS_NATIVE','');
+    await zyroRegisterAndroidPush(true);
+    const status=await api('/api/push/android/status');
+    if(!status.firebaseConfigured)
+      throw Error('Il server non ha Firebase configurato: le notifiche non possono ancora essere inviate.');
+    if(!status.linkedToCurrentSession)
+      throw Error('Il telefono non risulta collegato al tuo account Firebase. Controlla Internet e riprova da Abilita permessi.');
+    const allowed=window.ZyroAndroidNotificationEnabled===true;
+    $('pushStatus').textContent=allowed
+      ?'Firebase collegato. Notifiche consentite su Android; verifica la consegna con il test.'
+      :'Firebase collegato. Verifica e consenti gli avvisi in Impostazioni Android → Zyro 360 → Notifiche.';
+    toast(allowed?'Notifiche collegate. Prova un messaggio da un altro telefono.':'Controlla il permesso notifiche sul telefono.');
+    return;
+  }
   if(!current?.pushEnabled)throw Error('Le notifiche Web Push non sono ancora configurate sul server.');
   if(!('serviceWorker'in navigator) || !('PushManager'in window)) {
     const nativeAndroid=/\bwv\b|; wv\)/i.test(navigator.userAgent);
