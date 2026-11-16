@@ -49,7 +49,7 @@ test('release 1.89 preserves the approved top-left ZYRO title without an extra s
     assert.ok(home187.includes('.zyro-command-'+kind),'Home action has a distinct, readable design: '+kind);
   }
   assert.ok(sw.includes('zyro-home-final-v187.css'));
-  assert.ok(js.includes('/sw.js?v=187-home-final'));
+  assert.ok(js.includes('/sw.js?v=190-push-accompagnami'));
 });
 
 const approvedGlass=readFileSync(new URL('../public/zyro-approved-glass-v188.css',import.meta.url),'utf8');
