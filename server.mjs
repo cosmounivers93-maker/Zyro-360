@@ -80,7 +80,7 @@ async function initializeStorage() {
     catch (err) { if (err.code !== 'ENOENT') throw err; db = structuredClone(initial); }
     console.warn('[ZYRO storage] MODALITÀ TEMPORANEA: account e chat possono sparire a ogni deploy/riavvio.');
   }
-  db.journeys ||= {}; db.checkins ||= {}; db.adminAudit ||= []; db.userReports ||= []; db.profileInvites ||= {};
+  db.journeys ||= {}; db.checkins ||= {}; db.modeDismissals ||= {}; db.adminAudit ||= []; db.userReports ||= []; db.profileInvites ||= {};
   db.pickRemoteCommands ||= {}; db.pickRemoteAudit ||= [];
   // Retire owner-only emergency location; preserve ordinary SOS and circle permissions.
   let retiredAdminGpsChanged=false;
@@ -172,7 +172,7 @@ const publicJourney = (j,viewer) => {
    pending:(j.recipients||[]).filter(id=>journeyDecision(j,id)==='pending').length,
    declined:(j.recipients||[]).filter(id=>journeyDecision(j,id)==='declined').length}:undefined};
 };
-const publicCheckin = (c,viewer) => c && (c.userId===viewer || (c.recipients||[]).includes(viewer)) ? {id:c.id,userId:c.userId,name:db.users[c.userId]?.name||'Contatto',dueAt:c.dueAt,status:c.status,completedAt:c.completedAt||null} : null;
+const publicCheckin = (c,viewer) => c && (c.userId===viewer || ((c.recipients||[]).includes(viewer)&&sharedCircle(c.userId,viewer))) ? {id:c.id,userId:c.userId,name:db.users[c.userId]?.name||'Contatto',dueAt:c.dueAt,status:c.status,completedAt:c.completedAt||null,autoSosTriggeredAt:c.autoSosTriggeredAt||null} : null;
 
 const cleanText = (s, max = 60) => String(s || '').trim().replace(/[\u0000-\u001F\u007F<>]/g, '').slice(0, max);
 const publicUser = u => ({ id: u.id, profileId:publicProfileId(u), name: u.name, avatar: u.avatar || null });
@@ -302,7 +302,7 @@ function stateFor(id) {
   pickRemoteContacts:familyActive(me)?(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteRingContacts:familyActive(me)?(me.pickRemoteRingContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
   pickRemoteLockContacts:familyActive(me)?(me.pickRemoteLockContacts??me.pickRemoteContacts??[]).filter(x=>sharedCircle(id,x)):[],
-  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, profileInvites:myInvites, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(Boolean), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(Boolean), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
+  sosAudioConsent:familyActive(me)&&me.sosAudioConsent===true,premiumPlan:premiumPlan(me),features:planFeatures(me), gpsRecipients:gpsRecipientsFor(me), premiumActive:premiumActive(me), creatorPremium:isAdmin(me), premiumGiftLifetime:me.premiumGiftLifetime===true, premiumUntil:premiumExpiry(me), isAdmin:isAdmin(me), journey:publicJourney(db.journeys[id],id), checkin:publicCheckin(db.checkins[id],id) }, circles, profileInvites:myInvites, alerts, journeys:Object.values(db.journeys).filter(j=>j.status==='active'||j.status==='late'||(j.arrivedAt||j.endedAt)>now()-24*3600*1000).map(j=>publicJourney(j,id)).filter(j=>j&&!db.modeDismissals?.[id]?.journeys?.[j.id]), checkins:Object.values(db.checkins).filter(c=>c.status==='pending'||c.status==='late'||c.completedAt>now()-24*3600*1000).map(c=>publicCheckin(c,id)).filter(c=>c&&!db.modeDismissals?.[id]?.checkins?.[c.id]), billingReady:billingReady(), persistentStorage:storageKind==='postgres', pushEnabled: !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) || fcmReady, vapidPublicKey: process.env.VAPID_PUBLIC_KEY || null };
 }
 function sendSocket(ws, msg) { if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); }
 function pushState(id) { const payload = { type: 'state', data: stateFor(id) }; for (const ws of connections(id)) sendSocket(ws, payload); }
@@ -865,11 +865,32 @@ app.post('/api/position', requireAuth, (req,res) => {
   const t=now(); if (t-(lastPos.get(req.user.id)||0)<2400) return res.json({ok:true}); lastPos.set(req.user.id,t);
   locations.set(req.user.id,{lat,lon,accuracy,updatedAt:t});
   const j=db.journeys[req.user.id];
-  if(j?.status==='active' && j.autoArrival===true && j.destinationPoint && accuracy<=100){
-    j.nearCount = metersBetween({lat,lon},j.destinationPoint) <= 120 ? (j.nearCount||0)+1 : 0;
-    if(j.nearCount>=2){j.status='arrived';j.arrivedAt=t;save();void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),'✅ Arrivo confermato',`${req.user.name} è arrivato/a a ${j.destination}.`);}
+  if(j && ['active','late'].includes(j.status) && j.autoArrival===true && j.destinationPoint && accuracy<=60){
+    const distance=metersBetween({lat,lon},j.destinationPoint);
+    // Reject one-off GPS drift and trips started already beside the destination.
+    if(distance>180 && !j.observedOutsideDestination){
+      j.observedOutsideDestination=true;j.nearCount=0;save();
+    }else if(distance<=100 && j.observedOutsideDestination){
+      if(!j.lastNearAt||t-j.lastNearAt>=8000){
+        j.nearCount=(j.nearCount||0)+1;j.lastNearAt=t;save();
+      }
+      if(j.nearCount>=2){
+        j.status='arrived';j.arrivedAt=t;j.endedAt=t;
+        j.autoSosPushStatus=j.autoSosPushStatus==='pending'?'stopped':j.autoSosPushStatus;
+        const alert=j.autoSosAlertId&&db.alerts[j.autoSosAlertId];
+        if(alert?.active&&alert.source==='journey-deadline'&&alert.journeyId===j.id){
+          alert.active=false;alert.endedAt=t;
+          for(const id of alertAudience(alert))for(const ws of connections(id))sendSocket(ws,{type:'sos-ended',userId:req.user.id});
+        }
+        save();
+        void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),
+          '✅ Arrivo a destinazione',`${req.user.name} è arrivato a destinazione: ${j.destination}.`);
+      }
+    }else if(distance>100 && j.nearCount){
+      j.nearCount=0;j.lastNearAt=null;save();
+    }
   }
-  refreshRelated(req.user.id); res.json({ok:true});
+    refreshRelated(req.user.id); res.json({ok:true});
 });
 
 const configuredPush = !!(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
@@ -1053,6 +1074,7 @@ function journeyAudience(userId, ids){const chosen=allowedRecipients(userId,ids)
 // A sleeping/free Render instance cannot guarantee punctual execution;
 // a truly dependable alert needs an always-on worker / managed job scheduler.
 const journeySosPushInFlight=new Set();
+const checkinSosPushInFlight=new Set();
 function overdueCheck(){
  const t=now();let changed=false;
  for(const j of Object.values(db.journeys)){
@@ -1079,11 +1101,20 @@ function overdueCheck(){
  }
  for(const c of Object.values(db.checkins))if(c.status==='pending'&&c.dueAt<=t){
   c.status='late';c.lateAt=t;changed=true;
-  void sendEventPush(c.recipients,'⌛ Check-in mancato',
-   `${db.users[c.userId]?.name||'Un contatto'} non ha confermato in tempo. Contattalo/a, non presumere un'emergenza.`);
-  for(const x of c.recipients)pushState(x);
+  const owner=db.users[c.userId];
+  const recipients=(c.recipients||[]).filter(id=>id!==c.userId&&db.users[id]&&!db.users[id].bannedAt&&
+    sharedCircle(c.userId,id)&&(owner?.sosRecipients||[]).includes(id));
+  const existing=currentAlert(c.userId);
+  if(owner&&!owner.bannedAt&&recipients.length&&!existing){
+    const alert={id:token(12),userId:c.userId,recipients,startedAt:t,active:true,
+      hasAudio:false,kind:'sos',source:'checkin-deadline',checkinId:c.id,address:null};
+    db.alerts[alert.id]=alert;
+    c.autoSosAlertId=alert.id;c.autoSosTriggeredAt=t;c.autoSosPushStatus='pending';
+    c.autoSosPushAttempts=0;c.autoSosNextRetryAt=t;
+  }else c.autoSosPushStatus=existing?'existing-alert':'no-authorized-recipient';
+  refreshRelated(c.userId);
  }
- const jobs=[];
+  const jobs=[];
  for(const j of Object.values(db.journeys)){
   if(j.status!=='late'||j.autoSosPushStatus!=='pending'||!j.autoSosAlertId ||
      journeySosPushInFlight.has(j.id)|| (j.autoSosNextRetryAt||0)>t)continue;
@@ -1100,7 +1131,38 @@ function overdueCheck(){
   journeySosPushInFlight.add(j.id);changed=true;
   jobs.push({j,targets,ownerName:db.users[j.userId]?.name||'Il tuo contatto'});
  }
+ const checkinJobs=[];
+ for(const c of Object.values(db.checkins)){
+  if(c.status!=='late'||c.autoSosPushStatus!=='pending'||!c.autoSosAlertId||
+     checkinSosPushInFlight.has(c.id)||(c.autoSosNextRetryAt||0)>t)continue;
+  const alert=db.alerts[c.autoSosAlertId];
+  if(!alert?.active||alert.source!=='checkin-deadline'||alert.checkinId!==c.id){
+    c.autoSosPushStatus='stopped';changed=true;continue;
+  }
+  if((c.autoSosPushAttempts||0)>=3){c.autoSosPushStatus='not-accepted';changed=true;continue;}
+  const owner=db.users[c.userId];
+  const targets=alert.recipients.filter(id=>db.users[id]&&!db.users[id].bannedAt&&
+     sharedCircle(c.userId,id)&&(owner?.sosRecipients||[]).includes(id));
+  if(!targets.length){c.autoSosPushStatus='no-authorized-recipient';changed=true;continue;}
+  c.autoSosPushAttempts=(c.autoSosPushAttempts||0)+1;
+  c.autoSosNextRetryAt=t+60000;checkinSosPushInFlight.add(c.id);changed=true;
+  checkinJobs.push({c,targets,ownerName:owner?.name||'Il tuo contatto'});
+ }
  if(changed)save();
+ for(const {c,targets,ownerName} of checkinJobs){
+  void sendEventPush(targets,'🆘 SOS automatico • Check-in',
+    `${ownerName} non ha confermato il check-in entro l'orario previsto. Verifica subito che stia bene e apri Zyro 360.`,'sos')
+    .then(outcome=>{
+      c.autoSosPushAccepted=outcome.accepted;c.autoSosPushAttempted=outcome.attempted;
+      if(outcome.accepted>0)c.autoSosPushStatus='provider-accepted';
+      else if(c.autoSosPushAttempts>=3)c.autoSosPushStatus='not-accepted';
+      save();refreshRelated(c.userId);
+    }).catch(err=>{
+      console.error('[ZYRO Check-in] Invio SOS non accettato:',err?.message||'errore');
+      if(c.autoSosPushAttempts>=3)c.autoSosPushStatus='not-accepted';
+      save();refreshRelated(c.userId);
+    }).finally(()=>checkinSosPushInFlight.delete(c.id));
+ }
  for(const {j,targets,ownerName} of jobs){
   void sendEventPush(targets,'🆘 SOS automatico • Accompagnami',
    `${ownerName} non ha confermato l'arrivo a ${j.destination} entro l'orario previsto. Verifica subito che stia bene e apri Zyro 360.`,'sos')
@@ -1215,7 +1277,7 @@ app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
   return res.status(409).json({error:'Termina prima un SOS o Pick Pocket attivo.'});
  const point=req.body.destinationPoint?validCoords(req.body.destinationPoint):null;
  if(req.body.destinationPoint && !point)return res.status(400).json({error:'Coordinate della destinazione non valide.'});
- const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,dueAt,autoArrival:false,nearCount:0};
+ const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,dueAt,autoArrival:!!point,observedOutsideDestination:false,nearCount:0};
  db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
  void sendEventPush(recipients,'🚶 Richiesta Accompagnami',`${req.user.name} ti chiede di seguire il suo percorso verso ${destination}. Apri Zyro 360 per accettare o rifiutare.`);
  res.json({ok:true,journey:publicJourney(j,req.user.id)});
@@ -1233,7 +1295,7 @@ app.post('/api/journey/respond',requireAuth,limit,(req,res)=>{
  j.responseBy[req.user.id]=req.body.accept?'accepted':'declined';
  save();refreshRelated(ownerId);
  void sendEventPush([ownerId],req.body.accept?'✅ Accompagnamento accettato':'Accompagnamento rifiutato',
-  `${req.user.name} ${req.body.accept?'ha accettato':'ha rifiutato'} la richiesta di accompagnamento.`);
+  `${req.user.name} ${req.body.accept?'ha accettato la tua richiesta Accompagnami. Puoi iniziare il percorso.':'ha rifiutato la richiesta Accompagnami.'}`);
  res.json({ok:true,accepted:req.body.accept,journey:publicJourney(j,req.user.id)});
 });
 app.post('/api/journey/end',requireAuth,(req,res)=>{
@@ -1253,13 +1315,44 @@ app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
  const recipients=journeyAudience(req.user.id,req.body.recipients),minutes=Number(req.body.minutes);
  if(!recipients||!Number.isInteger(minutes)||minutes<5||minutes>1440)return res.status(400).json({error:'Scegli i contatti e un controllo tra 5 e 1440 minuti.'});
  if(['pending','late'].includes(db.checkins[req.user.id]?.status))return res.status(409).json({error:'Hai già un check-in attivo.'});
+ if(storageKind!=='postgres'||(!fcmReady&&!configuredPush)||process.env.ZYRO_JOURNEY_SOS_ALWAYS_ON!=='true')
+   return res.status(503).json({error:'SOS automatico Check-in non disponibile: servono database persistente, notifiche configurate e servizio server sempre attivo.'});
+ if(!recipients.every(id=>(req.user.sosRecipients||[]).includes(id)))
+   return res.status(409).json({error:'Prima autorizza tutti i destinatari scelti a ricevere SOS in Profilo → Persone invitate.'});
+ if(currentAlert(req.user.id))return res.status(409).json({error:'Termina prima il SOS o Pick Pocket attivo.'});
  const c={id:token(10),userId:req.user.id,recipients,dueAt:now()+minutes*60000,status:'pending',startedAt:now()};db.checkins[req.user.id]=c;save();refreshRelated(req.user.id);res.json({ok:true,checkin:publicCheckin(c,req.user.id)});
 });
 app.post('/api/checkin/end',requireAuth,(req,res)=>{
  const c=db.checkins[req.user.id];if(!c||!['pending','late'].includes(c.status))return res.status(404).json({error:'Nessun check-in attivo.'});
- const confirmed=req.body.confirmed===true;c.status=confirmed?'confirmed':'cancelled';c.completedAt=now();save();refreshRelated(req.user.id);
+ const confirmed=req.body.confirmed===true;c.status=confirmed?'confirmed':'cancelled';c.completedAt=now();
+ c.autoSosPushStatus=c.autoSosPushStatus==='pending'?'stopped':c.autoSosPushStatus;
+ const autoAlert=c.autoSosAlertId&&db.alerts[c.autoSosAlertId];
+ if(autoAlert?.active&&autoAlert.source==='checkin-deadline'&&autoAlert.checkinId===c.id){
+   autoAlert.active=false;autoAlert.endedAt=now();
+   for(const id of alertAudience(autoAlert))for(const ws of connections(id))sendSocket(ws,{type:'sos-ended',userId:req.user.id});
+ }
+ save();refreshRelated(req.user.id);
  if(confirmed)void sendEventPush(c.recipients,'✅ Check-in confermato',`${req.user.name} ha confermato di stare bene.`);
  res.json({ok:true});
+});
+// Each invited viewer may hide a finished card; its original event remains in the database.
+app.post('/api/modes/dismiss',requireAuth,limit,(req,res)=>{
+ const type=req.body?.type,id=String(req.body?.id||'');
+ if(!['journey','checkin'].includes(type)||!/^[a-f0-9]{12,96}$/i.test(id))
+   return res.status(400).json({error:'Elemento da rimuovere non valido.'});
+ const record=Object.values(type==='journey'?db.journeys:db.checkins).find(x=>x.id===id);
+ const finished=type==='journey'?['arrived','cancelled'].includes(record?.status):
+   ['confirmed','cancelled'].includes(record?.status);
+ if(!finished||record.userId===req.user.id||!(record.recipients||[]).includes(req.user.id)||
+    !sharedCircle(record.userId,req.user.id))
+   return res.status(403).json({error:'Puoi rimuovere solo i tuoi avvisi conclusi.'});
+ db.modeDismissals ||= {};db.modeDismissals[req.user.id]||={journeys:{},checkins:{}};
+ const key=type==='journey'?'journeys':'checkins';
+ db.modeDismissals[req.user.id][key]||={};
+ db.modeDismissals[req.user.id][key][id]=now();
+ for(const [key2,at] of Object.entries(db.modeDismissals[req.user.id][key]))
+   if(at<now()-30*24*3600000)delete db.modeDismissals[req.user.id][key][key2];
+ save();pushState(req.user.id);res.json({ok:true});
 });
 setInterval(overdueCheck,20000).unref();
 
