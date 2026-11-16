@@ -1336,9 +1336,10 @@ app.post('/api/checkin/end',requireAuth,(req,res)=>{
  res.json({ok:true});
 });
 // Each invited viewer may hide a finished card; its original event remains in the database.
+// IDs are generated with token(10) as base64url, NOT hex; keep legacy hex IDs valid too.
 app.post('/api/modes/dismiss',requireAuth,limit,(req,res)=>{
  const type=req.body?.type,id=String(req.body?.id||'');
- if(!['journey','checkin'].includes(type)||!/^[a-f0-9]{12,96}$/i.test(id))
+ if(!['journey','checkin'].includes(type)||!/^[A-Za-z0-9_-]{12,96}$/.test(id))
    return res.status(400).json({error:'Elemento da rimuovere non valido.'});
  const record=Object.values(type==='journey'?db.journeys:db.checkins).find(x=>x.id===id);
  const finished=type==='journey'?['arrived','cancelled'].includes(record?.status):
