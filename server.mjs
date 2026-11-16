@@ -887,7 +887,7 @@ app.post('/api/position', requireAuth, (req,res) => {
         }
         save();
         void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),
-          '✅ Arrivo a destinazione',`${req.user.name} è arrivato a destinazione: ${j.destination}.`);
+          '✅ Arrivo a destinazione',`${req.user.name} è arrivato a destinazione: ${j.destination}.`,'journey-status');
       }
     }else if(distance>100 && j.nearCount){
       j.nearCount=0;j.lastNearAt=null;save();
@@ -1312,7 +1312,7 @@ app.post('/api/journey/end',requireAuth,(req,res)=>{
   automatedAlert.active=false;automatedAlert.endedAt=now();
   for(const id of alertAudience(automatedAlert))for(const ws of connections(id))sendSocket(ws,{type:'sos-ended',userId:req.user.id});
  }
- save();refreshRelated(req.user.id);void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`);res.json({ok:true});
+ save();refreshRelated(req.user.id);void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`,'journey-status');res.json({ok:true});
 });
 app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
  if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
