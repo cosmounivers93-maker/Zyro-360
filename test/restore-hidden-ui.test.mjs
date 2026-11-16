@@ -20,7 +20,7 @@ test('billing UI does not reinsert the restore button, while retaining automatic
 });
 
 test('service worker cache version changes so refreshed UI can be installed',()=>{
-  assert.match(sw,/zyro-360-v189-home-header-gps-contrast/);
+  assert.match(sw,/zyro-360-v190-push-accompagnami/);
   assert.match(sw,/zyro-circle-modes-v2\.css/);
   assert.match(sw,/zyro-circle-picker-v3\.css/);
   assert.match(sw,/zyro-circle-picker-v3\.js/);
@@ -61,7 +61,7 @@ test('release 1.88 restores approved light login and V37 shield while preserving
   assert.ok(approvedGlass.includes('#authScreen.auth-shell'));
   assert.ok(approvedGlass.includes('zyro-icon-192-v37.png'));
   assert.ok(approvedGlass.includes('rgba(255,255,255,.88)'));
-  assert.ok(sw.includes('zyro-360-v189-home-header-gps-contrast'));
+  assert.ok(sw.includes('zyro-360-v190-push-accompagnami'));
   assert.ok(sw.includes('zyro-approved-glass-v188.css'));
   assert.ok(!html.includes('class="zyro-brand-caption">Tu e la tua cerchia</span>'));
   assert.ok(html.includes('zyro-moderation-v1.js'));
