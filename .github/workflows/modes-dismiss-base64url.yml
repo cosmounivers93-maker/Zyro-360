@@ -1,0 +1,34 @@
+name: ZYRO 360 - Fix rimozione Check-in e Accompagnami
+on:
+  push:
+    branches:
+      - 'fix/zyro-mode-dismiss-base64url-20261116'
+    paths:
+      - 'server.mjs'
+      - 'public/app.js'
+      - 'tests/modes-dismiss-base64url.test.mjs'
+      - '.github/workflows/modes-dismiss-base64url.yml'
+  pull_request:
+    paths:
+      - 'server.mjs'
+      - 'tests/modes-dismiss-base64url.test.mjs'
+      - '.github/workflows/modes-dismiss-base64url.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verifica sintassi
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+      - name: Test X schede concluse e autorizzazioni
+        run: node --test tests/modes-dismiss-base64url.test.mjs
