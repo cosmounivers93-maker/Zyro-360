@@ -1,0 +1,45 @@
+/* ZYRO 360 v190 — small functional additions; preserve v188 approved glass UI. */
+#homeJourneyRequests.hidden{display:none!important}
+#homeJourneyRequests.zyro-home-journey-requests:not(.hidden){
+  position:absolute!important;top:clamp(165px,22dvh,250px);left:10px;right:10px;z-index:32;margin:0 auto;max-width:540px;
+  display:grid;gap:9px;max-height:min(34vh,290px);overflow-y:auto;
+  overscroll-behavior:contain
+}
+#homeJourneyRequests .zyro-home-journey-card{
+  border:1px solid rgba(131,173,222,.52);border-radius:20px;
+  background:linear-gradient(124deg,rgba(247,253,255,.96),rgba(235,230,255,.94));
+  box-shadow:0 8px 25px rgba(68,93,150,.17);
+  padding:13px 14px;color:#264569
+}
+#homeJourneyRequests .zyro-home-journey-card strong{
+  display:block;font-size:14px;line-height:1.45;overflow-wrap:anywhere
+}
+#homeJourneyRequests .zyro-home-journey-card p{font-size:12px;line-height:1.45;margin:7px 0}
+#homeJourneyRequests .zyro-journey-request-actions{margin-top:9px}
+#homeJourneyRequests .zyro-journey-request-actions button{
+  min-height:45px;border-radius:13px;font-size:13px;
+}
+#journeyContactsStatus .zyro-mode-feed-heading,
+#checkinContactsStatus .zyro-mode-feed-heading{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+#checkinContactsStatus .zyro-mode-feed-heading{
+  margin:9px 0;padding:13px 12px;border:1px solid rgba(127,163,204,.33);
+  border-radius:14px;
+  background:linear-gradient(120deg,rgba(250,254,255,.92),rgba(244,237,255,.83));
+  color:#36536f;
+}
+.zyro-mode-feed-heading>strong,.zyro-mode-feed-heading>span{min-width:0;overflow-wrap:anywhere}
+.zyro-mode-dismiss{
+  flex:0 0 38px;width:38px;height:38px;border:1px solid rgba(125,152,200,.54);
+  border-radius:12px;background:rgba(255,255,255,.65);
+  color:#4964a9;font-size:27px;font-weight:500;line-height:1;cursor:pointer;
+}
+.zyro-mode-dismiss:focus-visible{
+  outline:3px solid #5e75da;outline-offset:3px;
+}
+.zyro-mode-dismiss:disabled{opacity:.5;cursor:wait}
+@media(max-width:390px){
+ #homeJourneyRequests.zyro-home-journey-requests:not(.hidden){margin:7px 7px 10px}
+ #homeJourneyRequests .zyro-home-journey-card{padding:12px}
+}
