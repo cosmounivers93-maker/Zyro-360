@@ -13,6 +13,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import webpush from 'web-push';
 import pg from 'pg';
 import firebaseAdmin from 'firebase-admin';
+import {notificationChannelFor,MODERN_CHANNEL_SET} from './fcm-channel-compat.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
@@ -901,11 +902,7 @@ async function sendFcm(recipients,title,body,kind='general') {
         android:{
           priority:'high',ttl:kind==='sos'?300000:120000,
           notification:{
-            channelId:kind==='sos'||kind==='pickpocket'?'zyro_sos_v199':
-              kind==='chat'?'zyro_chat_v199':
-              kind==='journey'?'zyro_journey_v199':
-              ['warning','alert','checkin','admin-warning','report-warning'].includes(kind)
-                ?'zyro_warning_v1':'zyro_updates_v199',
+            channelId:notificationChannelFor(kind,entry.notificationChannels),
             priority:kind==='sos'||kind==='pickpocket'?'high':'default',
             // Android 8+ channel settings carry the original Zyro sound/vibration.
             defaultSound:false,defaultVibrateTimings:false,
@@ -989,7 +986,12 @@ app.post('/api/push/android/register',requireAuth,limit,(req,res)=>{
   // A phone moving between accounts must not continue receiving old accounts' alerts.
   for(const user of Object.values(db.users))
     user.fcmTokens=(user.fcmTokens||[]).filter(x=>x.token!==deviceToken);
-  const registered={token:deviceToken,session,at:now()};
+  // Only newer Android builds may opt into the new notification channels.
+  // Missing, stale, or malformed capability information defaults to the
+  // previous channel IDs so older phones keep their SOS alert sound.
+  const notificationChannels=req.body?.notificationChannels===MODERN_CHANNEL_SET
+    ? MODERN_CHANNEL_SET : null;
+  const registered={token:deviceToken,session,at:now(),notificationChannels};
   req.user.fcmTokens=(req.user.fcmTokens||[]).filter(hasLiveFcmSession).slice(-4);
   req.user.fcmTokens.push(registered);
   save();res.json({ok:true,enabled:true,linkedToCurrentSession:true});
