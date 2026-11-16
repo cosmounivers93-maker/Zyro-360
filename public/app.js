@@ -75,7 +75,7 @@ window.addEventListener('zyro:request-fcm-status',async()=>{
 window.addEventListener('online',()=>void zyroRegisterAndroidPush(true));
 let zyroPendingPushKind='';
 function zyroHandlePushOpen(kind){
- if(!['chat','journey-request','journey-response','checkin','sos','pickpocket'].includes(kind))return;
+ if(!['chat','journey-request','journey-response','journey-status','checkin','invite','sos','pickpocket'].includes(kind))return;
  if(!current?.me?.id){zyroPendingPushKind=kind;return;}
  void refresh().catch(()=>{}).finally(()=>{
   if(!current?.me?.id)return;
@@ -86,7 +86,8 @@ function zyroHandlePushOpen(kind){
      j.response==='pending'&&['active','late'].includes(j.status));
    if(incoming)zyroShowJourneyRequestDialog(incoming,true);
    requestAnimationFrame(()=>$('homeJourneyRequests')?.scrollIntoView({block:'nearest',behavior:'smooth'}));
-  }else if(kind==='journey-response'||kind==='checkin')showView('modes');
+  }else if(kind==='journey-response'||kind==='journey-status'||kind==='checkin')showView('modes');
+  else if(kind==='invite')showView('circles');
   else showView('home');
  });
 }
