@@ -2000,9 +2000,10 @@ class ZyroRasterMap{
   this.drawPreviewDestination(w,h,center);
  }
  drawJourneyRoute(w,h,center){
-  const approved=(current?.journeys||[]).find(j=>j.userId!==current.me.id &&
+  const approvedTrips=(current?.journeys||[]).filter(j=>j.userId!==current.me.id &&
    j.response==='accepted' && ['active','late'].includes(j.status) &&
    mapValidPoint(j.currentPoint) && mapValidPoint(j.destinationPoint));
+  const approved=approvedTrips.find(j=>j.userId===zyroFollowOwnerId)||approvedTrips[0];
   const preview=$('journeyMapOverlay')&&!$('journeyMapOverlay').classList.contains('hidden');
   // During destination editing the dedicated purple center pin takes priority.
   if(preview||!approved){this.routeLayer.style.display='none';return;}
@@ -2400,8 +2401,8 @@ async function answerJourney(button){
   zyroFollowOwnerId=button.dataset.journeyUser;
   showView('home');zyroRefreshFollowJourney();
   const trip=(current?.journeys||[]).find(j=>j.userId===zyroFollowOwnerId&&j.response==='accepted');
-  if(trip&&mapValidPoint(trip.currentPoint))
-   requestAnimationFrame(()=>focusStableMap(trip.currentPoint.lat,trip.currentPoint.lon,14));
+  const point=trip&&(mapValidPoint(trip.currentPoint)?trip.currentPoint:trip.destinationPoint);
+  if(point&&mapValidPoint(point))requestAnimationFrame(()=>focusStableMap(point.lat,point.lon,14));
  }else if(zyroFollowOwnerId===button.dataset.journeyUser){
   zyroFollowOwnerId='';zyroRefreshFollowJourney();
  }
