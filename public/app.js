@@ -24,6 +24,71 @@ function adminDeviceLabel(d){
 window.addEventListener('zyro:android-ready',()=>{void syncDeviceInfo();});
 const $ = id => document.getElementById(id);
 let current = null;
+
+// Link the native Firebase token to the currently authenticated account.
+// The token is never written to localStorage or device logs.
+let zyroFcmRegisteredFor='',zyroFcmInFlight=null,zyroFcmPendingToken='';
+async function zyroRegisterAndroidPush(force=false){
+ const token=String(window.ZyroAndroidPush?.token||zyroFcmPendingToken||'');
+ const accountId=current?.me?.id;
+ if(!accountId||token.length<60)return;
+ const key=accountId+'|'+token;
+ if(!force&&zyroFcmRegisteredFor===key)return;
+ if(zyroFcmInFlight)return zyroFcmInFlight;
+ zyroFcmInFlight=(async()=>{
+  try{
+   const result=await post('/api/push/android/register',{token});
+   if(current?.me?.id===accountId){
+    zyroFcmRegisteredFor=key;
+    window.ZyroFCMStatus={connected:result?.linkedToCurrentSession===true};
+   }
+  }catch(error){
+   if(current?.me?.id===accountId){
+    zyroFcmRegisteredFor='';
+    window.ZyroFCMStatus={connected:false};
+   }
+   console.warn('[ZYRO push] Registrazione Firebase non riuscita:',error?.message||'errore');
+  }finally{window.dispatchEvent(new Event('zyro:fcm-status'));}
+ })();
+ try{await zyroFcmInFlight;}finally{zyroFcmInFlight=null;}
+}
+window.addEventListener('zyro:android-push-token',event=>{
+ if(event.detail?.platform!=='android')return;
+ const token=event.detail?.token;
+ if(typeof token==='string'&&token.length>=60){
+  zyroFcmPendingToken=token;
+  void zyroRegisterAndroidPush();
+ }
+});
+window.addEventListener('zyro:android-ready',()=>void zyroRegisterAndroidPush());
+window.addEventListener('zyro:force-fcm-register',()=>void zyroRegisterAndroidPush(true));
+window.addEventListener('zyro:request-fcm-status',async()=>{
+ if(!current?.me?.id)return;
+ await zyroRegisterAndroidPush();
+ try{
+  const status=await api('/api/push/android/status');
+  window.ZyroFCMStatus={connected:status.linkedToCurrentSession===true,
+   firebaseConfigured:status.firebaseConfigured===true};
+  window.dispatchEvent(new Event('zyro:fcm-status'));
+ }catch{/* Connection state will be shown by the existing permission panel. */}
+});
+window.addEventListener('online',()=>void zyroRegisterAndroidPush(true));
+let zyroPendingPushKind='';
+function zyroHandlePushOpen(kind){
+ if(!['chat','journey-request','journey-response','checkin','sos','pickpocket'].includes(kind))return;
+ if(!current?.me?.id){zyroPendingPushKind=kind;return;}
+ void refresh().catch(()=>{}).finally(()=>{
+  if(!current?.me?.id)return;
+  if(kind==='chat')showView('chats');
+  else if(kind==='journey-request'){
+   showView('home');
+   requestAnimationFrame(()=>$('homeJourneyRequests')?.scrollIntoView({block:'nearest',behavior:'smooth'}));
+  }else if(kind==='journey-response'||kind==='checkin')showView('modes');
+  else showView('home');
+ });
+}
+window.addEventListener('zyro:push-open',event=>zyroHandlePushOpen(event.detail?.kind));
+
 let zyroGroupCodeLastCircleId='';
 let adminUsersCache = [];
 let adminArchivedView=false;
@@ -361,6 +426,7 @@ function setState(data){
   if(prev?.me?.id!==data.me.id){verifiedChatRooms=null;verifiedChatOwner='';chatDirectorySequence++;}
   if(data.billingReady&&window.ZyroBillingSupported&&prev?.me?.id!==data.me.id)void zyroNativeRequest('billing-sync').catch(()=>{});
   void syncDeviceInfo();
+  void zyroRegisterAndroidPush();
   // Revoking explicit opt-in stops ongoing live audio locally as well.
   if((data.me.sosAudioConsent!==true || data.me.features?.sosAudio!==true) && localStream)stopAudio();
   // A contact who leaves a circle or loses SOS microphone permission cannot
@@ -378,6 +444,7 @@ function setState(data){
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
   renderHome();renderCircles();renderProfileInvites();renderSettings();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();window.ZyroModeration?.onState(data.me);
+  if(zyroPendingPushKind){const kind=zyroPendingPushKind;zyroPendingPushKind='';queueMicrotask(()=>zyroHandlePushOpen(kind));}
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) {
     theftTriggered=false; hideTheftOverlay(); stopSiren();
@@ -3152,7 +3219,7 @@ async function init(){
   });
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
-    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;window.ZyroModeration?.reset();chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');zyroFcmRegisteredFor='';window.ZyroFCMStatus={connected:false};closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;window.ZyroModeration?.reset();chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=187-home-final').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
