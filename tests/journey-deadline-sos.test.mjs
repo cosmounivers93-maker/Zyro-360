@@ -74,10 +74,10 @@ test('no new SOS is created if another alarm already exists',async()=>{
  assert.equal(x.db.journeys.owner.autoSosPushStatus,'existing-alert');
  assert.equal(x.pushes.length,0);
 });
-test('deadline is explicit, bounded and does not inherit legacy automatic GPS arrival',()=>{
+test('deadline is explicit and bounded, with consent-based GPS arrival enabled',()=>{
  const start=server.slice(server.indexOf("app.post('/api/journey/start'"),server.indexOf("app.post('/api/journey/respond'"));
  assert.match(start,/requestedDeadline\?Number\(req\.body\.dueAt\):null/);
- assert.match(start,/dueAt,autoArrival:false/);
+ assert.match(start,/dueAt,autoArrival:!!point/);
  assert.match(start,/storageKind!=='postgres'/);
  assert.match(start,/ZYRO_JOURNEY_SOS_ALWAYS_ON/);
  assert.match(start,/!fcmReady&&!configuredPush/);
