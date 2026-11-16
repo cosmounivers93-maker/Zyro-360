@@ -2,9 +2,9 @@ name: ZYRO 360 v190 - test Check-in e Accompagnami
 on:
   push:
     branches: [feature/checkin-accompagnami-sos-20261116]
-    paths: [server.mjs, public/app.js, public/index.html, public/zyro-modes-v190.css, tests/modes-v190.test.mjs, .github/workflows/test-modes-v190.yml]
+    paths: [server.mjs, public/app.js, public/index.html, public/zyro-modes-v190.css, tests/modes-v190.test.mjs, tests/journey-deadline-sos.test.mjs, .github/workflows/test-modes-v190.yml]
   pull_request:
-    paths: [server.mjs, public/app.js, public/index.html, public/zyro-modes-v190.css, tests/modes-v190.test.mjs]
+    paths: [server.mjs, public/app.js, public/index.html, public/zyro-modes-v190.css, tests/modes-v190.test.mjs, tests/journey-deadline-sos.test.mjs]
   workflow_dispatch:
 permissions:
   contents: read
