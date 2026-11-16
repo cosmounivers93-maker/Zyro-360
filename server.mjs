@@ -13,6 +13,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import webpush from 'web-push';
 import pg from 'pg';
 import firebaseAdmin from 'firebase-admin';
+import {notificationChannelFor,MODERN_CHANNEL_SET} from './fcm-channel-compat.mjs';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.resolve(process.env.DATA_DIR || path.join(root, 'data'));
@@ -296,7 +297,10 @@ function stateFor(id) {
     status:inv.status, expiresAt:inv.expiresAt, createdAt:inv.createdAt,
     direction:inv.to===id?'received':'sent',
     peerName:db.users[inv.to===id?inv.from:inv.to]?.name||'Utente'
-  })).filter(inv=>inv.status==='pending'||inv.direction==='sent').sort((a,b)=>b.createdAt-a.createdAt).slice(0,60);
+  })).filter(inv=>inv.status==='pending'||inv.direction==='sent'&&(
+    inv.status!=='accepted' || !!db.circles[inv.circleId] &&
+      memberIds(inv.circleId).includes(inv.to) && memberIds(inv.circleId).includes(inv.from)
+  )).sort((a,b)=>b.createdAt-a.createdAt).slice(0,60);
   return { me: { ...publicUser(me), email: me.email, sharing: !!me.sharing, sos: currentAlert(id)?.id || null, alertKind: currentAlert(id)?.kind || null, theftShare: !!(currentAlert(id)?.kind==='pickpocket' && currentAlert(id)?.recipients?.length), sosRecipients: (me.sosRecipients || []).filter(x => sharedCircle(id,x)),
   sosAudioRecipients:(me.sosAudioRecipients||[]).filter(x=>sharedCircle(id,x)),
   pickRemoteContacts:familyActive(me)?(me.pickRemoteContacts||[]).filter(x=>sharedCircle(id,x)):[],
@@ -898,9 +902,10 @@ async function sendFcm(recipients,title,body,kind='general') {
         android:{
           priority:'high',ttl:kind==='sos'?300000:120000,
           notification:{
-            channelId:kind==='sos'||kind==='pickpocket'?'zyro_sos_v2':kind==='chat'?'zyro_chat_v2':'zyro_updates',
+            channelId:notificationChannelFor(kind,entry.notificationChannels),
             priority:kind==='sos'||kind==='pickpocket'?'high':'default',
-            defaultSound:true,defaultVibrateTimings:true,
+            // Android 8+ channel settings carry the original Zyro sound/vibration.
+            defaultSound:false,defaultVibrateTimings:false,
             visibility:'private'
           }
         },
@@ -981,7 +986,12 @@ app.post('/api/push/android/register',requireAuth,limit,(req,res)=>{
   // A phone moving between accounts must not continue receiving old accounts' alerts.
   for(const user of Object.values(db.users))
     user.fcmTokens=(user.fcmTokens||[]).filter(x=>x.token!==deviceToken);
-  const registered={token:deviceToken,session,at:now()};
+  // Only newer Android builds may opt into the new notification channels.
+  // Missing, stale, or malformed capability information defaults to the
+  // previous channel IDs so older phones keep their SOS alert sound.
+  const notificationChannels=req.body?.notificationChannels===MODERN_CHANNEL_SET
+    ? MODERN_CHANNEL_SET : null;
+  const registered={token:deviceToken,session,at:now(),notificationChannels};
   req.user.fcmTokens=(req.user.fcmTokens||[]).filter(hasLiveFcmSession).slice(-4);
   req.user.fcmTokens.push(registered);
   save();res.json({ok:true,enabled:true,linkedToCurrentSession:true});
