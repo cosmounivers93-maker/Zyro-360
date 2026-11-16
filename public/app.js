@@ -82,12 +82,18 @@ function zyroHandlePushOpen(kind){
   if(kind==='chat')showView('chats');
   else if(kind==='journey-request'){
    showView('home');
+   const incoming=(current?.journeys||[]).find(j=>j.userId!==current.me.id &&
+     j.response==='pending'&&['active','late'].includes(j.status));
+   if(incoming)zyroShowJourneyRequestDialog(incoming,true);
    requestAnimationFrame(()=>$('homeJourneyRequests')?.scrollIntoView({block:'nearest',behavior:'smooth'}));
   }else if(kind==='journey-response'||kind==='checkin')showView('modes');
   else showView('home');
  });
 }
-window.addEventListener('zyro:push-open',event=>zyroHandlePushOpen(event.detail?.kind));
+window.addEventListener('zyro:push-open',event=>{
+ window.ZyroPendingPushKind=null;
+ zyroHandlePushOpen(event.detail?.kind);
+});
 if('serviceWorker'in navigator){
  navigator.serviceWorker.addEventListener('message',event=>{
   if(event.data?.type==='zyro:push-open')zyroHandlePushOpen(event.data.kind);
@@ -428,7 +434,11 @@ function setState(data){
   const prev = current;
   current=data;
   // Never reuse the authenticated chat directory after a profile switch.
-  if(prev?.me?.id!==data.me.id){verifiedChatRooms=null;verifiedChatOwner='';chatDirectorySequence++;}
+  if(prev?.me?.id!==data.me.id){
+    verifiedChatRooms=null;verifiedChatOwner='';chatDirectorySequence++;
+    zyroJourneyPromptSeen.clear();
+    $('zyroJourneyPromptOverlay')?.remove();
+  }
   if(data.billingReady&&window.ZyroBillingSupported&&prev?.me?.id!==data.me.id)void zyroNativeRequest('billing-sync').catch(()=>{});
   void syncDeviceInfo();
   void zyroRegisterAndroidPush();
@@ -741,6 +751,66 @@ function renderHome(){
   renderMap();
 }
 // Accompagnami invites must also be actionable on Home, not just Android notifications.
+
+const zyroJourneyPromptSeen=new Set();
+function zyroShowJourneyRequestDialog(j,force=false){
+ if(!j||!current?.me?.id||j.userId===current.me.id||j.response!=='pending'||
+    !['active','late'].includes(j.status))return;
+ if(!force&&(document.visibilityState==='hidden'||
+    current.me.sos||current.alerts?.some(a=>a.kind==='sos')))return;
+ const old=$('zyroJourneyPromptOverlay');
+ if(old)return; // Never replace a prompt while someone is reading it.
+ if(zyroJourneyPromptSeen.has(j.id)&&!force)return;
+ zyroJourneyPromptSeen.add(j.id);
+ const backdrop=document.createElement('div');
+ backdrop.id='zyroJourneyPromptOverlay';backdrop.className='zyro-journey-prompt-backdrop';
+ backdrop.dataset.journeyId=j.id;
+ const dialog=document.createElement('section');dialog.className='zyro-journey-prompt';
+ dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
+ const heading=document.createElement('h2');heading.id='zyroJourneyPromptTitle';
+ heading.textContent='Richiesta Accompagnami';dialog.setAttribute('aria-labelledby',heading.id);
+ const message=document.createElement('p');
+ message.textContent=j.name+' ti chiede di accompagnarlo verso '+j.destination+'.';
+ const note=document.createElement('p');note.className='zyro-journey-prompt-hint';
+ note.textContent='Se accetti puoi vedere il percorso condiviso. Puoi smettere di seguirlo in qualsiasi momento.';
+ const actions=document.createElement('div');actions.className='zyro-journey-prompt-actions';
+ const yes=document.createElement('button'),no=document.createElement('button'),later=document.createElement('button');
+ yes.type=no.type=later.type='button';
+ yes.textContent='Accetta e segui';no.textContent='Rifiuta';
+ later.textContent='Più tardi';later.className='zyro-journey-prompt-later';
+ const previous=document.activeElement;
+ function close(){
+  backdrop.remove();
+  if(previous?.isConnected&&typeof previous.focus==='function')previous.focus();
+ }
+ async function reply(accept){
+  yes.disabled=no.disabled=later.disabled=true;
+  try{
+   await answerJourney({dataset:{
+    journeyAnswer:accept?'yes':'no',journeyUser:j.userId,journeyId:j.id
+   }});
+   close();
+  }catch(error){
+   yes.disabled=no.disabled=later.disabled=false;
+   toast(error.message||'Risposta non inviata.',true);
+  }
+ }
+ yes.addEventListener('click',()=>void reply(true));
+ no.addEventListener('click',()=>void reply(false));
+ later.addEventListener('click',close);
+ backdrop.addEventListener('click',event=>{if(event.target===backdrop)close();});
+ backdrop.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){event.preventDefault();close();}
+  if(event.key==='Tab'){
+   const buttons=[yes,no,later],i=buttons.indexOf(document.activeElement);
+   if(event.shiftKey&&i===0){event.preventDefault();later.focus();}
+   else if(!event.shiftKey&&i===2){event.preventDefault();yes.focus();}
+  }
+ });
+ actions.append(yes,no,later);dialog.append(heading,message,note,actions);
+ backdrop.append(dialog);document.body.append(backdrop);yes.focus();
+}
+
 function renderHomeJourneyRequests(){
  const root=$('homeJourneyRequests');if(!root||!current)return;
  const requests=(current.journeys||[]).filter(x=>x.userId!==current.me.id&&
@@ -755,6 +825,8 @@ function renderHomeJourneyRequests(){
   '<button type="button" data-journey-answer="no" data-journey-user="'+escapeHtml(x.userId)+
   '" data-journey-id="'+escapeHtml(x.id)+'">Non accompagnare</button></div></article>').join('');
  updateMarkupIfChanged(root,html);
+ const incoming=requests.find(j=>!zyroJourneyPromptSeen.has(j.id));
+ if(incoming&&document.visibilityState==='visible')zyroShowJourneyRequestDialog(incoming);
  if(!root.dataset.zyroWired){
    root.dataset.zyroWired='1';
    root.addEventListener('click',event=>{
