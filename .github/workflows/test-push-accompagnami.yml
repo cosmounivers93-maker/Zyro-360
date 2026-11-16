@@ -1,0 +1,30 @@
+name: ZYRO 360 - notifiche Android e Accompagnami
+on:
+  pull_request:
+    paths:
+      - 'server.mjs'
+      - 'public/app.js'
+      - 'public/index.html'
+      - 'public/zyro-follow-journey-v1.css'
+      - 'tests/push-android-accompagnami.test.mjs'
+      - '.github/workflows/test-push-accompagnami.yml'
+  push:
+    branches:
+      - 'fix/zyro-push-accompagnami-20261116'
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify syntax
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+      - name: Test push linking and Accompagnami notification flow
+        run: node --test tests/push-android-accompagnami.test.mjs
