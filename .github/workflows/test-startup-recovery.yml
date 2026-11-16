@@ -1,0 +1,25 @@
+name: ZYRO 360 - loading startup recovery
+on:
+  pull_request:
+    paths:
+      - 'public/index.html'
+      - 'public/zyro-startup-watchdog-v1.js'
+      - 'tests/startup-watchdog-recovery.test.mjs'
+      - '.github/workflows/test-startup-recovery.yml'
+  push:
+    branches: ['fix/zyro-startup-loading-timeout-20261116']
+permissions:
+  contents: read
+jobs:
+  boot-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check startup script
+        run: node --check public/zyro-startup-watchdog-v1.js
+      - name: Recovery UI tests
+        run: node --test tests/startup-watchdog-recovery.test.mjs
