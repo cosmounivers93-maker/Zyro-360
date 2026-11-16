@@ -22,7 +22,7 @@ self.addEventListener('push',event=>{
 });
 self.addEventListener('notificationclick',event=>{
   const kind=event.notification.data?.kind||'general';
-  const allowed=new Set(['chat','journey-request','journey-response','checkin','sos','pickpocket','invite']);
+  const allowed=new Set(['chat','journey-request','journey-response','journey-status','checkin','sos','pickpocket','invite']);
   const safeKind=allowed.has(kind)?kind:'general';
   event.notification.close();event.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(async cs=>{
     for(const client of cs){
