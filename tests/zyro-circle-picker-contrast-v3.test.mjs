@@ -18,7 +18,7 @@ test('v3 scripts and style are included after existing CSS and app initializatio
   assert.match(sw,/zyro-360-v190-push-accompagnami/);
   assert.match(sw,/zyro-circle-picker-v3\.js/);
   assert.match(sw,/zyro-circle-picker-v3\.css/);
-  assert.match(app,/sw\.js\?v=29-sos-activation-visible/);
+  assert.match(app,/sw\.js\?v=190-push-accompagnami/);
 });
 
 test('native circle inputs remain backing form fields, with modal controls and change events',()=>{
