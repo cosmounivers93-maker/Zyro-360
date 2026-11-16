@@ -31,5 +31,5 @@ test('FCM chooses the channel for each device token, not the recipient account',
  assert.match(server,/fcmEntriesFor\(userId\)/);
  assert.match(server,/token:entry\.token/);
  assert.match(server,/priority:'high',ttl:kind==='sos'/);
- assert.match(server,/if\(!fcmReady\) return/);
+ assert.match(server,/if\s*\(!fcmReady\)\s*return/);
 });
