@@ -443,7 +443,7 @@ function setState(data){
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderProfileInvites();renderSettings();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();window.ZyroModeration?.onState(data.me);
+  renderHome();renderCircles();renderProfileInvites();renderSettings();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();zyroRefreshFollowJourney();renderAdminAccess();renderReportContacts();renderInvitedPeople();window.ZyroModeration?.onState(data.me);
   if(zyroPendingPushKind){const kind=zyroPendingPushKind;zyroPendingPushKind='';queueMicrotask(()=>zyroHandlePushOpen(kind));}
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) {
@@ -1060,6 +1060,7 @@ function showView(view){
   if(view!=='settings')closeProfileSettings();
   if(view!=='chats'&&chatRoom)closeChat();
   activeView=view;
+  zyroRefreshFollowJourney();
   document.body.classList.toggle('zyro-home-no-brand',view==='home');
   for(const id of order)$(`${id}View`).classList.toggle('hidden',id!==view);
   document.querySelectorAll('.bottom-nav .nav-item').forEach(button=>button.classList.toggle('active',button.dataset.view===view));
@@ -2244,12 +2245,59 @@ async function dismissCompletedMode(button){
  await refresh();
  toast('Elemento concluso rimosso dalla tua schermata.');
 }
+
+let zyroFollowOwnerId='';
+function zyroRefreshFollowJourney(){
+ const existing=$('zyroFollowJourneyBar');
+ if(!current?.me?.id||activeView!=='home'){
+  if(existing)existing.hidden=true;
+  return;
+ }
+ const available=(current.journeys||[]).filter(j=>j.userId!==current.me.id &&
+  j.response==='accepted'&&['active','late'].includes(j.status));
+ const trip=available.find(j=>j.userId===zyroFollowOwnerId)||available[0];
+ if(!trip){if(existing)existing.hidden=true;return;}
+ let bar=existing;
+ if(!bar){
+  bar=document.createElement('aside');
+  bar.id='zyroFollowJourneyBar';bar.className='zyro-follow-journey';
+  bar.setAttribute('aria-label','Navigazione Accompagnami attiva');
+  bar.innerHTML='<div class="zyro-follow-journey-copy"><strong></strong><span></span></div>'+
+   '<a class="zyro-follow-journey-link" target="_blank" rel="noopener noreferrer">Naviga</a>'+
+   '<button type="button" class="zyro-follow-journey-focus">Mappa</button>';
+  document.body.append(bar);
+  bar.querySelector('button').addEventListener('click',()=>{
+   const j=(current?.journeys||[]).find(x=>x.userId===zyroFollowOwnerId&&x.response==='accepted');
+   if(j&&mapValidPoint(j.currentPoint))focusStableMap(j.currentPoint.lat,j.currentPoint.lon,14);
+  });
+ }
+ zyroFollowOwnerId=trip.userId;
+ bar.hidden=false;
+ bar.querySelector('strong').textContent='Accompagni '+trip.name;
+ bar.querySelector('span').textContent='Destinazione: '+trip.destination;
+ const link=bar.querySelector('a');
+ if(mapValidPoint(trip.destinationPoint)){
+  link.hidden=false;
+  link.href='https://www.google.com/maps/dir/?api=1&destination='+
+   encodeURIComponent(trip.destinationPoint.lat+','+trip.destinationPoint.lon)+'&travelmode=walking';
+ }else{link.hidden=true;link.removeAttribute('href');}
+}
+
 async function answerJourney(button){
  const yes=button.dataset.journeyAnswer==='yes';
  await post('/api/journey/respond',{userId:button.dataset.journeyUser,
   journeyId:button.dataset.journeyId,accept:yes});
  await refresh();
- toast(yes?'Richiesta accettata. Puoi seguire la posizione e vedere la mappa.':'Accompagnamento non condiviso. Nessuna posizione del percorso visibile.');
+ if(yes){
+  zyroFollowOwnerId=button.dataset.journeyUser;
+  showView('home');zyroRefreshFollowJourney();
+  const trip=(current?.journeys||[]).find(j=>j.userId===zyroFollowOwnerId&&j.response==='accepted');
+  if(trip&&mapValidPoint(trip.currentPoint))
+   requestAnimationFrame(()=>focusStableMap(trip.currentPoint.lat,trip.currentPoint.lon,14));
+ }else if(zyroFollowOwnerId===button.dataset.journeyUser){
+  zyroFollowOwnerId='';zyroRefreshFollowJourney();
+ }
+ toast(yes?'Accompagnamento accettato. Segui il percorso dalla mappa e dalla barra di navigazione.':'Accompagnamento rifiutato. Nessuna posizione del percorso visibile.');
 }
 async function searchJourneyAddress(){
  const street=$('journeyStreet').value.trim(),city=$('journeyCity').value.trim(),postal=$('journeyPostal').value.trim();
@@ -3219,7 +3267,7 @@ async function init(){
   });
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
-    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');zyroFcmRegisteredFor='';window.ZyroFCMStatus={connected:false};closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;window.ZyroModeration?.reset();chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');zyroFcmRegisteredFor='';window.ZyroFCMStatus={connected:false};$('zyroFollowJourneyBar')?.remove();zyroFollowOwnerId='';closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;window.ZyroModeration?.reset();chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
   if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=187-home-final').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
