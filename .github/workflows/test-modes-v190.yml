@@ -1,0 +1,26 @@
+name: ZYRO 360 v190 - test Check-in e Accompagnami
+on:
+  push:
+    branches: [feature/checkin-accompagnami-sos-20261116]
+    paths: [server.mjs, public/app.js, public/index.html, public/zyro-modes-v190.css, tests/modes-v190.test.mjs, .github/workflows/test-modes-v190.yml]
+  pull_request:
+    paths: [server.mjs, public/app.js, public/index.html, public/zyro-modes-v190.css, tests/modes-v190.test.mjs]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  modes-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Analisi sintattica server e app
+        run: |
+          node --check server.mjs
+          node --check public/app.js
+      - name: Test sicurezza Check-in, viaggio e interfaccia
+        run: node --test tests/modes-v190.test.mjs
+      - name: Regressione viaggio e SOS
+        run: node --test tests/journey-deadline-sos.test.mjs tests/journey-consent-v71.test.mjs
