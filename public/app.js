@@ -24,6 +24,83 @@ function adminDeviceLabel(d){
 window.addEventListener('zyro:android-ready',()=>{void syncDeviceInfo();});
 const $ = id => document.getElementById(id);
 let current = null;
+
+// Link the native Firebase token to the currently authenticated account.
+// The token is never written to localStorage or device logs.
+let zyroFcmRegisteredFor='',zyroFcmInFlight=null,zyroFcmPendingToken='';
+async function zyroRegisterAndroidPush(force=false){
+ const token=String(window.ZyroAndroidPush?.token||zyroFcmPendingToken||'');
+ const accountId=current?.me?.id;
+ if(!accountId||token.length<60)return;
+ const key=accountId+'|'+token;
+ if(!force&&zyroFcmRegisteredFor===key)return;
+ if(zyroFcmInFlight)return zyroFcmInFlight;
+ zyroFcmInFlight=(async()=>{
+  try{
+   const result=await post('/api/push/android/register',{token});
+   if(current?.me?.id===accountId){
+    zyroFcmRegisteredFor=key;
+    window.ZyroFCMStatus={connected:result?.linkedToCurrentSession===true};
+   }
+  }catch(error){
+   if(current?.me?.id===accountId){
+    zyroFcmRegisteredFor='';
+    window.ZyroFCMStatus={connected:false};
+   }
+   console.warn('[ZYRO push] Registrazione Firebase non riuscita:',error?.message||'errore');
+  }finally{window.dispatchEvent(new Event('zyro:fcm-status'));}
+ })();
+ try{await zyroFcmInFlight;}finally{zyroFcmInFlight=null;}
+}
+window.addEventListener('zyro:android-push-token',event=>{
+ if(event.detail?.platform!=='android')return;
+ const token=event.detail?.token;
+ if(typeof token==='string'&&token.length>=60){
+  zyroFcmPendingToken=token;
+  void zyroRegisterAndroidPush();
+ }
+});
+window.addEventListener('zyro:android-ready',()=>void zyroRegisterAndroidPush());
+window.addEventListener('zyro:force-fcm-register',()=>void zyroRegisterAndroidPush(true));
+window.addEventListener('zyro:request-fcm-status',async()=>{
+ if(!current?.me?.id)return;
+ await zyroRegisterAndroidPush();
+ try{
+  const status=await api('/api/push/android/status');
+  window.ZyroFCMStatus={connected:status.linkedToCurrentSession===true,
+   firebaseConfigured:status.firebaseConfigured===true};
+  window.dispatchEvent(new Event('zyro:fcm-status'));
+ }catch{/* Connection state will be shown by the existing permission panel. */}
+});
+window.addEventListener('online',()=>void zyroRegisterAndroidPush(true));
+let zyroPendingPushKind='';
+function zyroHandlePushOpen(kind){
+ if(!['chat','journey-request','journey-response','journey-status','checkin','invite','sos','pickpocket'].includes(kind))return;
+ if(!current?.me?.id){zyroPendingPushKind=kind;return;}
+ void refresh().catch(()=>{}).finally(()=>{
+  if(!current?.me?.id)return;
+  if(kind==='chat')showView('chats');
+  else if(kind==='journey-request'){
+   showView('home');
+   const incoming=(current?.journeys||[]).find(j=>j.userId!==current.me.id &&
+     j.response==='pending'&&['active','late'].includes(j.status));
+   if(incoming)zyroShowJourneyRequestDialog(incoming,true);
+   requestAnimationFrame(()=>$('homeJourneyRequests')?.scrollIntoView({block:'nearest',behavior:'smooth'}));
+  }else if(kind==='journey-response'||kind==='journey-status'||kind==='checkin')showView('modes');
+  else if(kind==='invite')showView('circles');
+  else showView('home');
+ });
+}
+window.addEventListener('zyro:push-open',event=>{
+ window.ZyroPendingPushKind=null;
+ zyroHandlePushOpen(event.detail?.kind);
+});
+if('serviceWorker'in navigator){
+ navigator.serviceWorker.addEventListener('message',event=>{
+  if(event.data?.type==='zyro:push-open')zyroHandlePushOpen(event.data.kind);
+ });
+}
+
 let zyroGroupCodeLastCircleId='';
 let adminUsersCache = [];
 let adminArchivedView=false;
@@ -358,9 +435,14 @@ function setState(data){
   const prev = current;
   current=data;
   // Never reuse the authenticated chat directory after a profile switch.
-  if(prev?.me?.id!==data.me.id){verifiedChatRooms=null;verifiedChatOwner='';chatDirectorySequence++;}
+  if(prev?.me?.id!==data.me.id){
+    verifiedChatRooms=null;verifiedChatOwner='';chatDirectorySequence++;
+    zyroJourneyPromptSeen.clear();
+    $('zyroJourneyPromptOverlay')?.remove();
+  }
   if(data.billingReady&&window.ZyroBillingSupported&&prev?.me?.id!==data.me.id)void zyroNativeRequest('billing-sync').catch(()=>{});
   void syncDeviceInfo();
+  void zyroRegisterAndroidPush();
   // Revoking explicit opt-in stops ongoing live audio locally as well.
   if((data.me.sosAudioConsent!==true || data.me.features?.sosAudio!==true) && localStream)stopAudio();
   // A contact who leaves a circle or loses SOS microphone permission cannot
@@ -377,7 +459,20 @@ function setState(data){
     pickArmed=true;
   if($('appScreen').classList.contains('hidden')) { $('authScreen').classList.add('hidden');$('appScreen').classList.remove('hidden'); }
   updateGeo(null, data.me.sharing || !!data.me.sos || mapTracking || pickArmed);
-  renderHome();renderCircles();renderProfileInvites();renderSettings();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();renderAdminAccess();renderReportContacts();renderInvitedPeople();window.ZyroModeration?.onState(data.me);
+  renderHome();renderCircles();renderProfileInvites();renderSettings();renderQuickSOSSettings();renderPickControls();renderSOSRecipients();renderChatRooms();renderV15();zyroRefreshFollowJourney();renderAdminAccess();renderReportContacts();renderInvitedPeople();window.ZyroModeration?.onState(data.me);
+  const pendingNativeKind=window.ZyroPendingPushKind;
+  window.ZyroPendingPushKind=null;
+  const pendingFromUrl=new URLSearchParams(window.location.search).get('zyro_push_kind');
+  const queuedKind=zyroPendingPushKind||pendingNativeKind||pendingFromUrl;
+  if(queuedKind){
+    zyroPendingPushKind='';
+    if(pendingFromUrl){
+      const url=new URL(window.location.href);
+      url.searchParams.delete('zyro_push_kind');
+      window.history.replaceState(null,'',url.pathname+url.search+url.hash);
+    }
+    queueMicrotask(()=>zyroHandlePushOpen(queuedKind));
+  }
   if (data.me.alertKind === 'pickpocket' && !theftTriggered) { theftTriggered=true; pickArmed=false; showTheftOverlay('È presente un allarme antifurto. Puoi fermarlo con la password.'); startSiren(); }
   if (data.me.alertKind !== 'pickpocket' && theftTriggered && !theftIsPending) {
     theftTriggered=false; hideTheftOverlay(); stopSiren();
@@ -657,6 +752,66 @@ function renderHome(){
   renderMap();
 }
 // Accompagnami invites must also be actionable on Home, not just Android notifications.
+
+const zyroJourneyPromptSeen=new Set();
+function zyroShowJourneyRequestDialog(j,force=false){
+ if(!j||!current?.me?.id||j.userId===current.me.id||j.response!=='pending'||
+    !['active','late'].includes(j.status))return;
+ if(!force&&(document.visibilityState==='hidden'||
+    current.me.sos||current.alerts?.some(a=>a.kind==='sos')))return;
+ const old=$('zyroJourneyPromptOverlay');
+ if(old)return; // Never replace a prompt while someone is reading it.
+ if(zyroJourneyPromptSeen.has(j.id)&&!force)return;
+ zyroJourneyPromptSeen.add(j.id);
+ const backdrop=document.createElement('div');
+ backdrop.id='zyroJourneyPromptOverlay';backdrop.className='zyro-journey-prompt-backdrop';
+ backdrop.dataset.journeyId=j.id;
+ const dialog=document.createElement('section');dialog.className='zyro-journey-prompt';
+ dialog.setAttribute('role','dialog');dialog.setAttribute('aria-modal','true');
+ const heading=document.createElement('h2');heading.id='zyroJourneyPromptTitle';
+ heading.textContent='Richiesta Accompagnami';dialog.setAttribute('aria-labelledby',heading.id);
+ const message=document.createElement('p');
+ message.textContent=j.name+' ti chiede di accompagnarlo verso '+j.destination+'.';
+ const note=document.createElement('p');note.className='zyro-journey-prompt-hint';
+ note.textContent='Se accetti puoi vedere il percorso condiviso. Puoi smettere di seguirlo in qualsiasi momento.';
+ const actions=document.createElement('div');actions.className='zyro-journey-prompt-actions';
+ const yes=document.createElement('button'),no=document.createElement('button'),later=document.createElement('button');
+ yes.type=no.type=later.type='button';
+ yes.textContent='Accetta e segui';no.textContent='Rifiuta';
+ later.textContent='Più tardi';later.className='zyro-journey-prompt-later';
+ const previous=document.activeElement;
+ function close(){
+  backdrop.remove();
+  if(previous?.isConnected&&typeof previous.focus==='function')previous.focus();
+ }
+ async function reply(accept){
+  yes.disabled=no.disabled=later.disabled=true;
+  try{
+   await answerJourney({dataset:{
+    journeyAnswer:accept?'yes':'no',journeyUser:j.userId,journeyId:j.id
+   }});
+   close();
+  }catch(error){
+   yes.disabled=no.disabled=later.disabled=false;
+   toast(error.message||'Risposta non inviata.',true);
+  }
+ }
+ yes.addEventListener('click',()=>void reply(true));
+ no.addEventListener('click',()=>void reply(false));
+ later.addEventListener('click',close);
+ backdrop.addEventListener('click',event=>{if(event.target===backdrop)close();});
+ backdrop.addEventListener('keydown',event=>{
+  if(event.key==='Escape'){event.preventDefault();close();}
+  if(event.key==='Tab'){
+   const buttons=[yes,no,later],i=buttons.indexOf(document.activeElement);
+   if(event.shiftKey&&i===0){event.preventDefault();later.focus();}
+   else if(!event.shiftKey&&i===2){event.preventDefault();yes.focus();}
+  }
+ });
+ actions.append(yes,no,later);dialog.append(heading,message,note,actions);
+ backdrop.append(dialog);document.body.append(backdrop);yes.focus();
+}
+
 function renderHomeJourneyRequests(){
  const root=$('homeJourneyRequests');if(!root||!current)return;
  const requests=(current.journeys||[]).filter(x=>x.userId!==current.me.id&&
@@ -671,6 +826,8 @@ function renderHomeJourneyRequests(){
   '<button type="button" data-journey-answer="no" data-journey-user="'+escapeHtml(x.userId)+
   '" data-journey-id="'+escapeHtml(x.id)+'">Non accompagnare</button></div></article>').join('');
  updateMarkupIfChanged(root,html);
+ const incoming=requests.find(j=>!zyroJourneyPromptSeen.has(j.id));
+ if(incoming&&document.visibilityState==='visible')zyroShowJourneyRequestDialog(incoming);
  if(!root.dataset.zyroWired){
    root.dataset.zyroWired='1';
    root.addEventListener('click',event=>{
@@ -993,6 +1150,7 @@ function showView(view){
   if(view!=='settings')closeProfileSettings();
   if(view!=='chats'&&chatRoom)closeChat();
   activeView=view;
+  zyroRefreshFollowJourney();
   document.body.classList.toggle('zyro-home-no-brand',view==='home');
   for(const id of order)$(`${id}View`).classList.toggle('hidden',id!==view);
   document.querySelectorAll('.bottom-nav .nav-item').forEach(button=>button.classList.toggle('active',button.dataset.view===view));
@@ -1559,6 +1717,24 @@ function stopAudioRelaySender(){
   void r.ctx.close().catch(()=>{});
 }
 async function enablePush(){
+  if(isNativeZyro()){
+    if(!current?.me?.id)throw Error('Accedi al tuo account prima di attivare gli avvisi.');
+    // This is the same explicit permission action as Profilo → Abilita permessi.
+    // WebView's PushManager is not supported; use native Android + FCM only.
+    window.prompt('ZYRO360_REQUEST_NOTIFICATIONS_NATIVE','');
+    await zyroRegisterAndroidPush(true);
+    const status=await api('/api/push/android/status');
+    if(!status.firebaseConfigured)
+      throw Error('Il server non ha Firebase configurato: le notifiche non possono ancora essere inviate.');
+    if(!status.linkedToCurrentSession)
+      throw Error('Il telefono non risulta collegato al tuo account Firebase. Controlla Internet e riprova da Abilita permessi.');
+    const allowed=window.ZyroAndroidNotificationEnabled===true;
+    $('pushStatus').textContent=allowed
+      ?'Firebase collegato. Notifiche consentite su Android; verifica la consegna con il test.'
+      :'Firebase collegato. Verifica e consenti gli avvisi in Impostazioni Android → Zyro 360 → Notifiche.';
+    toast(allowed?'Notifiche collegate. Prova un messaggio da un altro telefono.':'Controlla il permesso notifiche sul telefono.');
+    return;
+  }
   if(!current?.pushEnabled)throw Error('Le notifiche Web Push non sono ancora configurate sul server.');
   if(!('serviceWorker'in navigator) || !('PushManager'in window)) {
     const nativeAndroid=/\bwv\b|; wv\)/i.test(navigator.userAgent);
@@ -1824,9 +2000,10 @@ class ZyroRasterMap{
   this.drawPreviewDestination(w,h,center);
  }
  drawJourneyRoute(w,h,center){
-  const approved=(current?.journeys||[]).find(j=>j.userId!==current.me.id &&
+  const approvedTrips=(current?.journeys||[]).filter(j=>j.userId!==current.me.id &&
    j.response==='accepted' && ['active','late'].includes(j.status) &&
    mapValidPoint(j.currentPoint) && mapValidPoint(j.destinationPoint));
+  const approved=approvedTrips.find(j=>j.userId===zyroFollowOwnerId)||approvedTrips[0];
   const preview=$('journeyMapOverlay')&&!$('journeyMapOverlay').classList.contains('hidden');
   // During destination editing the dedicated purple center pin takes priority.
   if(preview||!approved){this.routeLayer.style.display='none';return;}
@@ -2177,12 +2354,59 @@ async function dismissCompletedMode(button){
  await refresh();
  toast('Elemento concluso rimosso dalla tua schermata.');
 }
+
+let zyroFollowOwnerId='';
+function zyroRefreshFollowJourney(){
+ const existing=$('zyroFollowJourneyBar');
+ if(!current?.me?.id||activeView!=='home'){
+  if(existing)existing.hidden=true;
+  return;
+ }
+ const available=(current.journeys||[]).filter(j=>j.userId!==current.me.id &&
+  j.response==='accepted'&&['active','late'].includes(j.status));
+ const trip=available.find(j=>j.userId===zyroFollowOwnerId)||available[0];
+ if(!trip){if(existing)existing.hidden=true;return;}
+ let bar=existing;
+ if(!bar){
+  bar=document.createElement('aside');
+  bar.id='zyroFollowJourneyBar';bar.className='zyro-follow-journey';
+  bar.setAttribute('aria-label','Navigazione Accompagnami attiva');
+  bar.innerHTML='<div class="zyro-follow-journey-copy"><strong></strong><span></span></div>'+
+   '<a class="zyro-follow-journey-link" target="_blank" rel="noopener noreferrer">Naviga</a>'+
+   '<button type="button" class="zyro-follow-journey-focus">Mappa</button>';
+  document.body.append(bar);
+  bar.querySelector('button').addEventListener('click',()=>{
+   const j=(current?.journeys||[]).find(x=>x.userId===zyroFollowOwnerId&&x.response==='accepted');
+   if(j&&mapValidPoint(j.currentPoint))focusStableMap(j.currentPoint.lat,j.currentPoint.lon,14);
+  });
+ }
+ zyroFollowOwnerId=trip.userId;
+ bar.hidden=false;
+ bar.querySelector('strong').textContent='Accompagni '+trip.name;
+ bar.querySelector('span').textContent='Destinazione: '+trip.destination;
+ const link=bar.querySelector('a');
+ if(mapValidPoint(trip.destinationPoint)){
+  link.hidden=false;
+  link.href='https://www.google.com/maps/dir/?api=1&destination='+
+   encodeURIComponent(trip.destinationPoint.lat+','+trip.destinationPoint.lon)+'&travelmode=walking';
+ }else{link.hidden=true;link.removeAttribute('href');}
+}
+
 async function answerJourney(button){
  const yes=button.dataset.journeyAnswer==='yes';
  await post('/api/journey/respond',{userId:button.dataset.journeyUser,
   journeyId:button.dataset.journeyId,accept:yes});
  await refresh();
- toast(yes?'Richiesta accettata. Puoi seguire la posizione e vedere la mappa.':'Accompagnamento non condiviso. Nessuna posizione del percorso visibile.');
+ if(yes){
+  zyroFollowOwnerId=button.dataset.journeyUser;
+  showView('home');zyroRefreshFollowJourney();
+  const trip=(current?.journeys||[]).find(j=>j.userId===zyroFollowOwnerId&&j.response==='accepted');
+  const point=trip&&(mapValidPoint(trip.currentPoint)?trip.currentPoint:trip.destinationPoint);
+  if(point&&mapValidPoint(point))requestAnimationFrame(()=>focusStableMap(point.lat,point.lon,14));
+ }else if(zyroFollowOwnerId===button.dataset.journeyUser){
+  zyroFollowOwnerId='';zyroRefreshFollowJourney();
+ }
+ toast(yes?'Accompagnamento accettato. Segui il percorso dalla mappa e dalla barra di navigazione.':'Accompagnamento rifiutato. Nessuna posizione del percorso visibile.');
 }
 async function searchJourneyAddress(){
  const street=$('journeyStreet').value.trim(),city=$('journeyCity').value.trim(),postal=$('journeyPostal').value.trim();
@@ -3152,8 +3376,8 @@ async function init(){
   });
   $('logoutButton').addEventListener('click',()=>action(async()=>{if(theftTriggered)throw Error('Prima ferma l’antifurto usando la password del proprietario.');if(current?.me.sos && !confirm('Il tuo SOS è ancora attivo. Vuoi uscire? L’allarme resterà aperto ma GPS e microfono si interromperanno su questo dispositivo.'))return;stopListening();stopAudio();
     if(isZyroNativeAvailable())await nativeBackgroundSync({sharing:false,pick:false});
-    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;window.ZyroModeration?.reset();chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
-  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=187-home-final').catch(()=>{});
+    pickArmed=false;window.removeEventListener('devicemotion',motionListener);await post('/api/logout');zyroFcmRegisteredFor='';window.ZyroFCMStatus={connected:false};$('zyroFollowJourneyBar')?.remove();zyroFollowOwnerId='';closeProfileSettings();showView('home');if(watchId!==null)navigator.geolocation?.clearWatch(watchId);watchId=null;lastCoords=null;clearHeadingMotion();mapTracking=false;ownCentered=false;removeStableMap();mapHideFailure();current=null;window.ZyroModeration?.reset();chatRoom=null;sosPending=null;socket?.close();socket=null;deviceSyncKey='';clearInterval(refreshTimer);$('appScreen').classList.add('hidden');$('authScreen').classList.remove('hidden');connection(false);$('password').value='';toast('Sei uscito dal tuo account.');}));
+  if('serviceWorker'in navigator && location.protocol==='https:')navigator.serviceWorker.register('/sw.js?v=190-push-accompagnami').catch(()=>{});
   try{const data=await api('/api/state');setState(data);closeProfileSettings();showView('home');connectSocket();}
   catch(err){
     if(err.status!==401) toast('Impossibile recuperare il profilo dal server: '+err.message,true);

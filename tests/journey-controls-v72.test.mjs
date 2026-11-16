@@ -51,7 +51,7 @@ test('Active journey hides preparation and restores it once the journey ends',()
  assert.equal(nodes.zyroJourneyOptions.open,false);
  assert.equal(nodes.journeyActive.classList.contains('hidden'),false);
  assert.equal(nodes.journeyInactive.classList.contains('hidden'),true);
- assert.equal(nodes.journeyStatus.textContent,'Percorso attivo');
+ assert.equal(nodes.journeyStatus.textContent,'Richiesta inviata · in attesa di accettazione');
  context.current.me.journey={id:'trip1',status:'cancelled'};
  render();
  assert.equal(nodes.zyroJourneyOptions.hidden,false);
@@ -121,7 +121,7 @@ test('Accompagnami offers an expected arrival date and server-backed SOS deadlin
  assert.match(journeyStart,/post\('\/api\/journey\/start',\{destination,recipients,destinationPoint:journeyTarget,\.\.\.\(dueAt===null\?\{\}:\{dueAt\}\)\}\)/);
  const postStart=server.slice(server.indexOf("app.post('/api/journey/start'"),server.indexOf("app.post('/api/journey/respond'"));
  assert.match(postStart,/req.body\?\.dueAt/);
- assert.match(postStart,/dueAt,autoArrival:false/);
+ assert.match(postStart,/autoArrival:!!point/);
  const scheduled=server.slice(server.indexOf('function overdueCheck(){'),server.indexOf("app.get('/api/premium/status'"));
  assert.match(scheduled,/j\.dueAt>t\)continue/);
  assert.match(scheduled,/kind:'sos',source:'journey-deadline'/);

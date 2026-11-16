@@ -712,7 +712,7 @@ app.post('/api/profile-invites', requireAuth, limit, (req,res)=>{
    from:req.user.id,to:target.id,status:'pending',createdAt:now(),expiresAt:now()+24*3600*1000};
  save();pushState(target.id);pushState(req.user.id);
  void sendEventPush([target.id],'Invito alla cerchia • ZYRO 360',
-   req.user.name+' ti ha invitato in una cerchia. Apri l’app per accettare o rifiutare.');
+   req.user.name+' ti ha invitato in una cerchia. Apri l’app per accettare o rifiutare.','invite');
  res.json({ok:true,inviteId:id,recipientName:target.name,expiresInHours:24});
 });
 app.post('/api/profile-invites/respond',requireAuth,limit,(req,res)=>{
@@ -750,6 +750,9 @@ app.post('/api/profile-invites/respond',requireAuth,limit,(req,res)=>{
    req.user.inviteBlockedIds=[...new Set([...(req.user.inviteBlockedIds||[]),invite.from])].slice(-200);
  }
  save();refreshRelated(req.user.id);refreshRelated(invite.from);
+ void sendEventPush([invite.from],decision==='accept'?'✅ Invito accettato':'Invito rifiutato',
+   `${req.user.name} ${decision==='accept'?'ha accettato':'ha rifiutato'} il tuo invito alla cerchia.`,'invite')
+   .catch(err=>console.error('[ZYRO push] risposta invito:',err.message));
  res.json({ok:true,status:invite.status});
 });
 app.post('/api/profile-invites/cancel',requireAuth,limit,(req,res)=>{
@@ -884,7 +887,7 @@ app.post('/api/position', requireAuth, (req,res) => {
         }
         save();
         void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),
-          '✅ Arrivo a destinazione',`${req.user.name} è arrivato a destinazione: ${j.destination}.`);
+          '✅ Arrivo a destinazione',`${req.user.name} è arrivato a destinazione: ${j.destination}.`,'journey-status');
       }
     }else if(distance>100 && j.nearCount){
       j.nearCount=0;j.lastNearAt=null;save();
@@ -919,8 +922,8 @@ async function sendFcm(recipients,title,body,kind='general') {
         android:{
           priority:'high',ttl:kind==='sos'?300000:120000,
           notification:{
-            channelId:kind==='sos'||kind==='pickpocket'?'zyro_sos_v2':kind==='chat'?'zyro_chat_v2':'zyro_updates',
-            priority:kind==='sos'||kind==='pickpocket'?'high':'default',
+            channelId:kind==='sos'||kind==='pickpocket'?'zyro_sos_v2':kind==='chat'?'zyro_chat_v2':kind==='journey-request'?'zyro_journey_v1':'zyro_updates',
+            priority:kind==='sos'||kind==='pickpocket'||kind==='journey-request'?'high':'default',
             defaultSound:true,defaultVibrateTimings:true,
             visibility:'private'
           }
@@ -1279,7 +1282,8 @@ app.post('/api/journey/start',requireAuth,limit,(req,res)=>{
  if(req.body.destinationPoint && !point)return res.status(400).json({error:'Coordinate della destinazione non valide.'});
  const j={id:token(10),userId:req.user.id,destination,recipients,responseBy:{},startedAt:now(),status:'active',destinationPoint:point?{lat:point.lat,lon:point.lon}:null,dueAt,autoArrival:!!point,observedOutsideDestination:false,nearCount:0};
  db.journeys[req.user.id]=j;save();refreshRelated(req.user.id);
- void sendEventPush(recipients,'🚶 Richiesta Accompagnami',`${req.user.name} ti chiede di seguire il suo percorso verso ${destination}. Apri Zyro 360 per accettare o rifiutare.`);
+ void sendEventPush(recipients,'🚶 Richiesta Accompagnami',`${req.user.name} ti chiede di accompagnarlo verso ${destination}. Apri per accettare o rifiutare.`,'journey-request')
+    .catch(err=>console.error('[ZYRO push] accompagnami:',err.message));
  res.json({ok:true,journey:publicJourney(j,req.user.id)});
 });
 // Only the invited authenticated user may accept or refuse a particular trip.
@@ -1295,7 +1299,7 @@ app.post('/api/journey/respond',requireAuth,limit,(req,res)=>{
  j.responseBy[req.user.id]=req.body.accept?'accepted':'declined';
  save();refreshRelated(ownerId);
  void sendEventPush([ownerId],req.body.accept?'✅ Accompagnamento accettato':'Accompagnamento rifiutato',
-  `${req.user.name} ${req.body.accept?'ha accettato la tua richiesta Accompagnami. Puoi iniziare il percorso.':'ha rifiutato la richiesta Accompagnami.'}`);
+  `${req.user.name} ${req.body.accept?'ha accettato la tua richiesta Accompagnami. Puoi iniziare il percorso.':'ha rifiutato la richiesta Accompagnami.'}`,'journey-response');
  res.json({ok:true,accepted:req.body.accept,journey:publicJourney(j,req.user.id)});
 });
 app.post('/api/journey/end',requireAuth,(req,res)=>{
@@ -1308,7 +1312,7 @@ app.post('/api/journey/end',requireAuth,(req,res)=>{
   automatedAlert.active=false;automatedAlert.endedAt=now();
   for(const id of alertAudience(automatedAlert))for(const ws of connections(id))sendSocket(ws,{type:'sos-ended',userId:req.user.id});
  }
- save();refreshRelated(req.user.id);void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`);res.json({ok:true});
+ save();refreshRelated(req.user.id);void sendEventPush(j.recipients.filter(id=>journeyDecision(j,id)==='accepted'),arrived?'✅ Sono arrivato/a':'Percorso interrotto',arrived?`${req.user.name} ha confermato l'arrivo a ${j.destination}.`:`${req.user.name} ha interrotto il percorso per ${j.destination}.`,'journey-status');res.json({ok:true});
 });
 app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
  if(!familyActive(req.user))return res.status(402).json({error:'Questa modalità richiede ZYRO Family.'});
@@ -1320,7 +1324,10 @@ app.post('/api/checkin/start',requireAuth,limit,(req,res)=>{
  if(!recipients.every(id=>(req.user.sosRecipients||[]).includes(id)))
    return res.status(409).json({error:'Prima autorizza tutti i destinatari scelti a ricevere SOS in Profilo → Persone invitate.'});
  if(currentAlert(req.user.id))return res.status(409).json({error:'Termina prima il SOS o Pick Pocket attivo.'});
- const c={id:token(10),userId:req.user.id,recipients,dueAt:now()+minutes*60000,status:'pending',startedAt:now()};db.checkins[req.user.id]=c;save();refreshRelated(req.user.id);res.json({ok:true,checkin:publicCheckin(c,req.user.id)});
+ const c={id:token(10),userId:req.user.id,recipients,dueAt:now()+minutes*60000,status:'pending',startedAt:now()};db.checkins[req.user.id]=c;save();refreshRelated(req.user.id);
+  void sendEventPush(recipients,'⌛ Nuovo Check-in',`${req.user.name} ha impostato un Check-in e ti ha scelto come contatto da avvisare.`,'checkin')
+    .catch(err=>console.error('[ZYRO push] check-in:',err.message));
+  res.json({ok:true,checkin:publicCheckin(c,req.user.id)});
 });
 app.post('/api/checkin/end',requireAuth,(req,res)=>{
  const c=db.checkins[req.user.id];if(!c||!['pending','late'].includes(c.status))return res.status(404).json({error:'Nessun check-in attivo.'});
@@ -1332,7 +1339,9 @@ app.post('/api/checkin/end',requireAuth,(req,res)=>{
    for(const id of alertAudience(autoAlert))for(const ws of connections(id))sendSocket(ws,{type:'sos-ended',userId:req.user.id});
  }
  save();refreshRelated(req.user.id);
- if(confirmed)void sendEventPush(c.recipients,'✅ Check-in confermato',`${req.user.name} ha confermato di stare bene.`);
+ void sendEventPush(c.recipients,confirmed?'✅ Check-in confermato':'Check-in annullato',
+   confirmed?`${req.user.name} ha confermato di stare bene.`:`${req.user.name} ha annullato il Check-in.`,'checkin')
+   .catch(err=>console.error('[ZYRO push] checkin concluso:',err.message));
  res.json({ok:true});
 });
 // Each invited viewer may hide a finished card; its original event remains in the database.
