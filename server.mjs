@@ -712,7 +712,7 @@ app.post('/api/profile-invites', requireAuth, limit, (req,res)=>{
    from:req.user.id,to:target.id,status:'pending',createdAt:now(),expiresAt:now()+24*3600*1000};
  save();pushState(target.id);pushState(req.user.id);
  void sendEventPush([target.id],'Invito alla cerchia • ZYRO 360',
-   req.user.name+' ti ha invitato in una cerchia. Apri l’app per accettare o rifiutare.');
+   req.user.name+' ti ha invitato in una cerchia. Apri l’app per accettare o rifiutare.','invite');
  res.json({ok:true,inviteId:id,recipientName:target.name,expiresInHours:24});
 });
 app.post('/api/profile-invites/respond',requireAuth,limit,(req,res)=>{
@@ -750,6 +750,9 @@ app.post('/api/profile-invites/respond',requireAuth,limit,(req,res)=>{
    req.user.inviteBlockedIds=[...new Set([...(req.user.inviteBlockedIds||[]),invite.from])].slice(-200);
  }
  save();refreshRelated(req.user.id);refreshRelated(invite.from);
+ void sendEventPush([invite.from],decision==='accept'?'✅ Invito accettato':'Invito rifiutato',
+   `${req.user.name} ${decision==='accept'?'ha accettato':'ha rifiutato'} il tuo invito alla cerchia.`,'invite')
+   .catch(err=>console.error('[ZYRO push] risposta invito:',err.message));
  res.json({ok:true,status:invite.status});
 });
 app.post('/api/profile-invites/cancel',requireAuth,limit,(req,res)=>{
@@ -1336,7 +1339,9 @@ app.post('/api/checkin/end',requireAuth,(req,res)=>{
    for(const id of alertAudience(autoAlert))for(const ws of connections(id))sendSocket(ws,{type:'sos-ended',userId:req.user.id});
  }
  save();refreshRelated(req.user.id);
- if(confirmed)void sendEventPush(c.recipients,'✅ Check-in confermato',`${req.user.name} ha confermato di stare bene.`,'checkin');
+ void sendEventPush(c.recipients,confirmed?'✅ Check-in confermato':'Check-in annullato',
+   confirmed?`${req.user.name} ha confermato di stare bene.`:`${req.user.name} ha annullato il Check-in.`,'checkin')
+   .catch(err=>console.error('[ZYRO push] checkin concluso:',err.message));
  res.json({ok:true});
 });
 // Each invited viewer may hide a finished card; its original event remains in the database.
